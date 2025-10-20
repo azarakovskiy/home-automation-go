@@ -1,0 +1,34 @@
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - gofmt
+    - goimports
+    - ineffassign
+    - staticcheck
+    - gosimple
+    - revive
+    - goconst
+    - gocyclo
+    - misspell
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  revive:
+    rules:
+      - name: blank-imports
+      - name: var-naming
+  goimports:
+    local-prefixes: hass
+
+issues:
+  exclude-rules:
+    - linters:
+        - errcheck
+      text: "(Close|Close\\(\\))"
+

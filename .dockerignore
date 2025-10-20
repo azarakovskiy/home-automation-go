@@ -1,0 +1,10 @@
+bin/
+dist/
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+.env
+.env.local
