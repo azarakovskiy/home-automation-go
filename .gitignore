@@ -53,4 +53,4 @@ go.work.sum
 .vscode/
 
 # Entity generation config (contains sensitive tokens)
-entities/gen.yaml
+gen.yaml

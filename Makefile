@@ -36,4 +36,4 @@ lint:
 
 generate:
 	@echo "Generating entities from Home Assistant..."
-	@cd entities && go generate
+	@go generate
