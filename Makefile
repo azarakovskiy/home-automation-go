@@ -1,4 +1,4 @@
-SHELL := /bin/zsh
+SHELL := /bin/bash
 
 APP_NAME := home-go
 BIN_DIR := bin
