@@ -5,6 +5,7 @@
 *.dll
 *.so
 *.dylib
+home-go
 
 # Build
 /dist/
