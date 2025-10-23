@@ -37,6 +37,9 @@ type PendingSchedule struct {
 
 // New creates a new dishwasher component
 func New(base component.Base, state ga.State, priceService *pricing.Service) *Dishwasher {
+	// Set the State field in base for IsNightMode() to work
+	base.State = state
+
 	controller := NewController(base.Service)
 
 	dishwasher := &Dishwasher{
@@ -147,9 +150,16 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 	log.Printf("  Cost: €%.2f (vs €%.2f now)", result.EstimatedCost, result.CurrentCost)
 	log.Printf("  Savings: €%.2f (%.1f%%)", result.Savings, result.SavingsPercent)
 
+	// Check if it's night time - if so, accept any savings (no threshold)
+	isNight, err := c.IsNightMode()
+	if err != nil {
+		log.Printf("WARNING: Failed to check daytime mode: %v", err)
+		isNight = false // Default to normal threshold logic
+	}
+
 	// Decide: start now or delay?
 	delayDuration := time.Until(result.StartTime)
-	shouldDelay := c.optimizer.ShouldDelay(result, request.MaxDelayHours) && delayDuration >= 5*time.Minute
+	shouldDelay := c.shouldDelayStart(result, request.MaxDelayHours, isNight, delayDuration)
 
 	if !shouldDelay {
 		// Get dynamic threshold for logging
@@ -163,8 +173,8 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 			return
 		}
 
-		// Announce immediate start via TTS
-		c.announceImmediateStart(result.SavingsPercent)
+		// Don't announce when starting immediately - nothing interesting to report
+		// (savings didn't meet threshold, so we're not actually optimizing)
 		return
 	}
 
@@ -262,23 +272,24 @@ func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent fl
 	}
 }
 
-// announceImmediateStart fires a notification event for an immediate dishwasher start
-func (c *Dishwasher) announceImmediateStart(savingsPercent float64) {
-	message := fmt.Sprintf(
-		"Dishwasher starts now, saving %.0f percent on electricity!",
-		savingsPercent,
-	)
-
-	event := notifications.NotificationEvent{
-		Device:  "dishwasher",
-		Type:    "started",
-		Message: message,
-		Data: map[string]interface{}{
-			"savings_percent": savingsPercent,
-		},
+// shouldDelayStart determines if we should delay the start based on savings and night mode
+func (c *Dishwasher) shouldDelayStart(
+	result *optimizer.OptimizationResult,
+	maxDelayHours int,
+	isNight bool,
+	delayDuration time.Duration,
+) bool {
+	// Need at least 5 minutes of delay to be worth it
+	if delayDuration < 5*time.Minute {
+		return false
 	}
 
-	if err := c.notificationService.Notify(event); err != nil {
-		log.Printf("WARNING: Notification event failed: %v", err)
+	if isNight && result.SavingsPercent > 0 {
+		// Night mode: accept any positive savings
+		log.Printf("Night mode: accepting any positive savings (%.1f%%)", result.SavingsPercent)
+		return true
 	}
+
+	// Normal mode: use dynamic threshold
+	return c.optimizer.ShouldDelay(result, maxDelayHours)
 }
