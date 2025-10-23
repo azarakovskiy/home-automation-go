@@ -4,7 +4,7 @@ APP_NAME := home-go
 BIN_DIR := bin
 PKG := ./...
 
-include .env
+-include .env
 export
 
 .PHONY: all build run test clean fmt tidy lint deps tools generate-entities mocks install-mockgen
