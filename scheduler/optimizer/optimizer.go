@@ -3,6 +3,7 @@ package optimizer
 import (
 	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"home-go/debug"
@@ -357,4 +358,156 @@ func (o *Optimizer) CalculateDynamicThreshold(maxDelayHours int) float64 {
 	threshold := baseThreshold + scaleFactor*math.Exp(-decayRate*float64(maxDelayHours))
 
 	return threshold
+}
+
+// CheapestHoursRequest contains parameters for simple cheapest-hours optimization
+// Used by devices that just need to know: "should I run now?"
+type CheapestHoursRequest struct {
+	TotalDuration time.Duration // Total duration needed (e.g., 6h, 1h30m, 45m)
+	WindowSize    time.Duration // Time window to search within (e.g., 12h, 8h)
+}
+
+// CheapestHoursResult contains the optimization decision for simple on/off devices
+type CheapestHoursResult struct {
+	ChargeNow      bool
+	CheapestSlots  []pricing.PriceSlot // The cheapest time slots
+	AveragePrice   float64
+	CurrentPrice   float64
+	SavingsPercent float64
+	TotalDuration  time.Duration // Actual total duration covered by selected slots
+}
+
+// OptimizeCheapestHours determines if device should run now based on cheapest time slots
+// Works with any time granularity (15min, 1h, etc.) - just selects cheapest slots until duration is met
+// Perfect for chargers, heaters, or any device that can be turned on/off per pricing interval
+func (o *Optimizer) OptimizeCheapestHours(req CheapestHoursRequest, priceSlots []pricing.PriceSlot) (*CheapestHoursResult, error) {
+	if err := o.validateCheapestHoursRequest(req); err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	currentPrice := o.getCurrentPriceFromSlots(priceSlots, now)
+
+	// Filter slots within window
+	windowSlots := o.getWindowSlots(priceSlots, now, req.WindowSize)
+	if len(windowSlots) == 0 {
+		return nil, fmt.Errorf("no price slots available in window")
+	}
+
+	debug.Log("Cheapest hours optimization: need %s in %s window, found %d slots",
+		req.TotalDuration, req.WindowSize, len(windowSlots))
+
+	// Find cheapest slots until we meet the duration requirement
+	cheapestSlots, totalDuration := o.selectCheapestSlotsByDuration(windowSlots, req.TotalDuration)
+	currentSlotIsCheap := o.isCurrentSlotInSelection(cheapestSlots, now)
+
+	// Calculate metrics
+	avgPrice := o.calculateAveragePrice(windowSlots)
+	savingsPercent := o.calculateSavingsPercent(avgPrice, currentPrice)
+
+	debug.Log("Cheapest hours decision: charge now=%v, current=%.4f, avg=%.4f, savings=%.1f%%, selected duration=%s",
+		currentSlotIsCheap, currentPrice, avgPrice, savingsPercent, totalDuration)
+
+	return &CheapestHoursResult{
+		ChargeNow:      currentSlotIsCheap,
+		CheapestSlots:  cheapestSlots,
+		AveragePrice:   avgPrice,
+		CurrentPrice:   currentPrice,
+		SavingsPercent: savingsPercent,
+		TotalDuration:  totalDuration,
+	}, nil
+}
+
+func (o *Optimizer) validateCheapestHoursRequest(req CheapestHoursRequest) error {
+	if req.TotalDuration <= 0 {
+		return fmt.Errorf("total_duration must be positive")
+	}
+	if req.WindowSize <= 0 {
+		return fmt.Errorf("window_size must be positive")
+	}
+	if req.TotalDuration > req.WindowSize {
+		return fmt.Errorf("total_duration (%s) cannot exceed window_size (%s)",
+			req.TotalDuration, req.WindowSize)
+	}
+	return nil
+}
+
+func (o *Optimizer) getWindowSlots(priceSlots []pricing.PriceSlot, now time.Time, windowSize time.Duration) []pricing.PriceSlot {
+	windowEnd := now.Add(windowSize)
+	var windowSlots []pricing.PriceSlot
+	for _, slot := range priceSlots {
+		// Include current slot if it overlaps with now
+		if (slot.From.Before(now) || slot.From.Equal(now)) && slot.Till.After(now) {
+			windowSlots = append(windowSlots, slot)
+		} else if slot.From.After(now) && slot.From.Before(windowEnd) {
+			windowSlots = append(windowSlots, slot)
+		}
+	}
+	return windowSlots
+}
+
+// selectCheapestSlotsByDuration selects the cheapest slots until the total duration is met
+// Returns both the selected slots and the actual total duration covered
+func (o *Optimizer) selectCheapestSlotsByDuration(windowSlots []pricing.PriceSlot, targetDuration time.Duration) ([]pricing.PriceSlot, time.Duration) {
+	// Sort by price (cheapest first)
+	sortedSlots := make([]pricing.PriceSlot, len(windowSlots))
+	copy(sortedSlots, windowSlots)
+	sort.Slice(sortedSlots, func(i, j int) bool {
+		return sortedSlots[i].Price < sortedSlots[j].Price
+	})
+
+	var selected []pricing.PriceSlot
+	var totalDuration time.Duration
+
+	// Keep adding cheapest slots until we meet the duration requirement
+	for _, slot := range sortedSlots {
+		slotDuration := slot.Till.Sub(slot.From)
+		selected = append(selected, slot)
+		totalDuration += slotDuration
+
+		if totalDuration >= targetDuration {
+			break
+		}
+	}
+
+	return selected, totalDuration
+}
+
+func (o *Optimizer) isCurrentSlotInSelection(slots []pricing.PriceSlot, now time.Time) bool {
+	for _, slot := range slots {
+		if o.isCurrentHourSlot(slot, now) {
+			return true
+		}
+	}
+	return false
+}
+
+func (o *Optimizer) calculateAveragePrice(slots []pricing.PriceSlot) float64 {
+	var totalPrice float64
+	for _, slot := range slots {
+		totalPrice += slot.Price
+	}
+	return totalPrice / float64(len(slots))
+}
+
+func (o *Optimizer) calculateSavingsPercent(avgPrice, currentPrice float64) float64 {
+	if avgPrice > 0 {
+		return ((avgPrice - currentPrice) / avgPrice) * 100.0
+	}
+	return 0.0
+}
+
+// Helper methods for cheapest hours optimization
+
+func (o *Optimizer) getCurrentPriceFromSlots(priceSlots []pricing.PriceSlot, now time.Time) float64 {
+	for _, slot := range priceSlots {
+		if o.isCurrentHourSlot(slot, now) {
+			return slot.Price
+		}
+	}
+	return 0.0
+}
+
+func (o *Optimizer) isCurrentHourSlot(slot pricing.PriceSlot, now time.Time) bool {
+	return !slot.From.After(now) && slot.Till.After(now)
 }
