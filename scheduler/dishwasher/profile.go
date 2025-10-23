@@ -13,59 +13,57 @@ func GetProfileForMode(mode Mode) (optimizer.Profile, error) {
 		ModeEco: {
 			Mode:          string(ModeEco),
 			DurationHours: 4,
-			// Pre-wash: 15%, Main wash: 60%, Dry: 25%
-			// Main wash uses most power and is most important for optimization
-			StageWeights:      []float64{0.15, 0.60, 0.25},
+			// Pre-wash (low), Main wash (max - most important), Dry (medium)
+			StageWeights:      []float64{optimizer.WeightLow, optimizer.WeightMax, optimizer.WeightMedium},
 			PowerKW:           0.8,
-			MinSavingsPercent: 5.0, // Delay if at least 5% savings
+			MinSavingsPercent: 5.0,
 		},
 		ModeAuto: {
 			Mode:          string(ModeAuto),
-			DurationHours: 3, // Standard Auto mode - not yet measured
-			// Pre-wash: 20%, Main wash: 50%, Dry: 30%
-			StageWeights:      []float64{0.2, 0.5, 0.3},
-			PowerKW:           1.2, // Estimate - lower power, longer time
-			MinSavingsPercent: 5.0, // Delay if at least 5% savings
+			DurationHours: 3,
+			// Pre-wash (low), Main wash (high), Dry (medium)
+			StageWeights:      []float64{optimizer.WeightLow, optimizer.WeightHigh, optimizer.WeightMedium},
+			PowerKW:           1.2,
+			MinSavingsPercent: 5.0,
 		},
 		ModeAutoQuick: {
 			Mode:          string(ModeAutoQuick),
 			DurationHours: 2, // Measured: ~70 minutes with VarioDry quick option
-			// Stage weights based on actual power consumption pattern from graphs (13 stages):
-			// High weight = high power consumption stages that should run during cheap electricity
-			// Low weight = pauses/drains that don't consume much power
+			// Stage weights based on actual power consumption pattern (13 stages)
+			// Using standard weight levels to approximate the measured power curve
 			StageWeights: []float64{
-				0.40, // 1. First major heating/wash
-				0.50, // 2. Continued heating
-				0.50, // 3. Main wash
-				0.10, // 4. Pause/drain (low power)
-				0.10, // 5. Pause/drain (low power)
-				0.50, // 6. Major stage
-				0.25, // 7. Medium stage
-				0.25, // 8. Medium stage
-				0.25, // 9. Medium stage
-				0.50, // 10. Major heating stage
-				0.50, // 11. Drying stage
-				0.25, // 12. Final medium stage
-				0.05, // 13. Final small stage
+				optimizer.WeightMedium, // 1. First heating/wash
+				optimizer.WeightHigh,   // 2. Continued heating
+				optimizer.WeightHigh,   // 3. Main wash (peak power)
+				optimizer.WeightIdle,   // 4. Pause/drain
+				optimizer.WeightIdle,   // 5. Pause/drain
+				optimizer.WeightHigh,   // 6. Major stage
+				optimizer.WeightLow,    // 7. Medium stage
+				optimizer.WeightLow,    // 8. Medium stage
+				optimizer.WeightLow,    // 9. Medium stage
+				optimizer.WeightMax,    // 10. Major heating stage (peak)
+				optimizer.WeightHigh,   // 11. Drying stage
+				optimizer.WeightLow,    // 12. Final medium stage
+				optimizer.WeightIdle,   // 13. Final small stage
 			},
 			PowerKW:           2.0, // Measured: ~2000W during active washing
-			MinSavingsPercent: 5.0, // Delay if at least 5% savings
+			MinSavingsPercent: 5.0,
 		},
 		ModeIntensive: {
 			Mode:          string(ModeIntensive),
 			DurationHours: 3,
-			// All stages use high power, more balanced optimization
-			StageWeights:      []float64{0.25, 0.50, 0.25},
+			// All stages use high power
+			StageWeights:      []float64{optimizer.WeightMedium, optimizer.WeightMax, optimizer.WeightMedium},
 			PowerKW:           1.5,
-			MinSavingsPercent: 5.0, // Delay if at least 5% savings
+			MinSavingsPercent: 5.0,
 		},
 		ModeQuick: {
 			Mode:          string(ModeQuick),
-			DurationHours: 1, // Not yet measured - estimate for standalone Quick mode
-			// No dry stage, main wash is critical
-			StageWeights:      []float64{0.3, 0.7, 0.0},
-			PowerKW:           2.0, // Assuming similar power to Auto mode
-			MinSavingsPercent: 3.0, // More lenient for quick mode (less overall cost)
+			DurationHours: 1,
+			// Pre-wash (medium), Main wash (max - critical), No dry
+			StageWeights:      []float64{optimizer.WeightMedium, optimizer.WeightMax, optimizer.WeightIdle},
+			PowerKW:           2.0,
+			MinSavingsPercent: 3.0, // More lenient for quick mode
 		},
 	}
 

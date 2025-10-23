@@ -1,5 +1,15 @@
 package optimizer
 
+// Standard stage weight levels for consistent profiling across devices
+// These represent the importance of optimizing each stage (higher = more important)
+const (
+	WeightIdle   = 0.0  // Idle/pause stages with minimal power consumption
+	WeightLow    = 0.25 // Low power stages (draining, pre-rinse)
+	WeightMedium = 0.50 // Medium power stages (washing, rinsing)
+	WeightHigh   = 0.75 // High power stages (heating water, intensive wash)
+	WeightMax    = 1.0  // Maximum power stages (main heating, intensive drying)
+)
+
 // Profile is a generic device profile implementation
 // Devices can use this directly or create their own implementation of DeviceProfile
 type Profile struct {
