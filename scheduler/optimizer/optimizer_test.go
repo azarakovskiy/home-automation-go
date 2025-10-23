@@ -9,14 +9,14 @@ import (
 
 // MockProfile implements DeviceProfile for testing
 type MockProfile struct {
-	duration          int
+	duration          time.Duration
 	weights           []float64
 	power             float64
 	mode              string
 	minSavingsPercent float64
 }
 
-func (m MockProfile) GetDurationHours() int         { return m.duration }
+func (m MockProfile) GetDuration() time.Duration    { return m.duration }
 func (m MockProfile) GetStageWeights() []float64    { return m.weights }
 func (m MockProfile) GetPowerKW() float64           { return m.power }
 func (m MockProfile) GetMode() string               { return m.mode }
@@ -36,7 +36,7 @@ func TestOptimizer_Optimize_SimpleCase(t *testing.T) {
 	}
 
 	profile := MockProfile{
-		duration:          2, // 2-hour cycle
+		duration:          2 * time.Hour, // 2-hour cycle
 		weights:           []float64{0.5, 0.5},
 		power:             1.0,
 		mode:              "test",
@@ -85,7 +85,7 @@ func TestOptimizer_Optimize_WeightedStages(t *testing.T) {
 
 	// Profile with heavily weighted second stage
 	profile := MockProfile{
-		duration:          2,
+		duration:          2 * time.Hour,
 		weights:           []float64{0.1, 0.9}, // Second stage is 9x more important
 		power:             1.0,
 		mode:              "weighted",
@@ -138,7 +138,7 @@ func TestOptimizer_Optimize_RespectDeadline(t *testing.T) {
 	}
 
 	profile := MockProfile{
-		duration:          2,
+		duration:          2 * time.Hour,
 		weights:           []float64{0.5, 0.5},
 		power:             1.0,
 		mode:              "test",
@@ -179,7 +179,7 @@ func TestOptimizer_Optimize_InsufficientSlots(t *testing.T) {
 	}
 
 	profile := MockProfile{
-		duration:          3, // Need 3 hours but only 1 slot
+		duration:          3 * time.Hour, // Need 3 hours but only 1 slot
 		weights:           []float64{0.33, 0.33, 0.34},
 		power:             1.0,
 		mode:              "test",
@@ -229,7 +229,7 @@ func TestOptimizer_Optimize_FifteenMinuteSlots(t *testing.T) {
 	}
 
 	profile := MockProfile{
-		duration:          1, // 1 hour = 4 slots of 15 min
+		duration:          1 * time.Hour, // 1 hour = 4 slots of 15 min
 		weights:           []float64{0.25, 0.25, 0.25, 0.25},
 		power:             1.0,
 		mode:              "test",
@@ -277,6 +277,7 @@ func TestOptimizer_ShouldDelay(t *testing.T) {
 			}
 			profile := MockProfile{
 				minSavingsPercent: tt.minSavingsPercent,
+				duration:          1 * time.Hour,
 			}
 
 			got := optimizer.ShouldDelay(result, profile)
@@ -302,7 +303,7 @@ func TestOptimizer_Optimize_StartAfter(t *testing.T) {
 	}
 
 	profile := MockProfile{
-		duration:          1,
+		duration:          1 * time.Hour,
 		weights:           []float64{1.0},
 		power:             1.0,
 		mode:              "test",
@@ -337,7 +338,7 @@ func TestOptimizer_Optimize_GracefulDegradation(t *testing.T) {
 	}
 
 	profile := MockProfile{
-		duration:          4, // Need 4 hours but only have 2
+		duration:          4 * time.Hour, // Need 4 hours but only have 2
 		weights:           []float64{0.25, 0.25, 0.25, 0.25},
 		power:             1.0,
 		mode:              "test",

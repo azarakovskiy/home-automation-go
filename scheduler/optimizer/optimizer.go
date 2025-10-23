@@ -2,6 +2,7 @@ package optimizer
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -11,8 +12,8 @@ import (
 // DeviceProfile defines characteristics of any device cycle
 // This is the generic interface that all devices must implement
 type DeviceProfile interface {
-	// GetDurationHours returns total cycle duration
-	GetDurationHours() int
+	// GetDuration returns total cycle duration
+	GetDuration() time.Duration
 
 	// GetStageWeights returns importance weights for each stage
 	// Sum of weights doesn't need to equal 1.0
@@ -75,7 +76,7 @@ func (o *Optimizer) Optimize(req OptimizationRequest) (*OptimizationResult, erro
 	}
 
 	slotDuration := req.PriceSlots[0].Till.Sub(req.PriceSlots[0].From)
-	cycleDuration := time.Duration(req.Profile.GetDurationHours()) * time.Hour
+	cycleDuration := req.Profile.GetDuration()
 	slotsNeeded := o.calculateSlotsNeeded(cycleDuration, slotDuration, len(req.PriceSlots))
 
 	now := o.calculateStartTime(req.StartAfter)
@@ -131,15 +132,21 @@ func (o *Optimizer) findBestWindow(
 	var bestResult *OptimizationResult
 	bestWeightedCost := math.MaxFloat64
 
+	log.Printf("[DEBUG] Finding best window: now=%s, deadline=%s, slotsNeeded=%d",
+		now.Format(time.RFC3339), deadline.Format(time.RFC3339), slotsNeeded)
+
 	for startIdx := 0; startIdx <= len(req.PriceSlots)-slotsNeeded; startIdx++ {
 		startSlot := req.PriceSlots[startIdx]
 
+		// Skip slots that are in the past
 		if startSlot.From.Before(now) {
+			log.Printf("[DEBUG] Skipping past slot %d: %s (before now)", startIdx, startSlot.From.Format(time.RFC3339))
 			continue
 		}
 
 		endTime := startSlot.From.Add(cycleDuration)
 		if endTime.After(deadline) {
+			log.Printf("[DEBUG] Stopping at slot %d: end time %s exceeds deadline", startIdx, endTime.Format(time.RFC3339))
 			break
 		}
 
@@ -151,10 +158,19 @@ func (o *Optimizer) findBestWindow(
 		result.StartTime = startSlot.From
 		result.EndTime = endTime
 
+		log.Printf("[DEBUG] Evaluated slot %d: start=%s, weightedCost=%.4f, estimatedCost=%.4f",
+			startIdx, startSlot.From.Format(time.RFC3339), result.WeightedCost, result.EstimatedCost)
+
 		if result.WeightedCost < bestWeightedCost {
 			bestWeightedCost = result.WeightedCost
 			bestResult = result
+			log.Printf("[DEBUG] New best result found at %s", startSlot.From.Format(time.RFC3339))
 		}
+	}
+
+	if bestResult != nil {
+		log.Printf("[DEBUG] Final best window: start=%s, weightedCost=%.4f",
+			bestResult.StartTime.Format(time.RFC3339), bestResult.WeightedCost)
 	}
 
 	return bestResult
