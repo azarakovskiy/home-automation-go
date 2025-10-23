@@ -19,11 +19,11 @@ import (
 type Dishwasher struct {
 	component.Base // Embed Base to get default implementations and common services
 
-	priceService *pricing.Service
-	ttsService   *notifications.TTSService
-	controller   *Controller
-	optimizer    *optimizer.Optimizer
-	stateManager *StateManager
+	priceService        *pricing.Service
+	notificationService *notifications.NotificationService
+	controller          *Controller
+	optimizer           *optimizer.Optimizer
+	stateManager        *StateManager
 
 	pendingSchedule *PendingSchedule
 }
@@ -40,12 +40,12 @@ func New(base component.Base, state ga.State, priceService *pricing.Service) *Di
 	controller := NewController(base.Service)
 
 	dishwasher := &Dishwasher{
-		Base:         base,
-		priceService: priceService,
-		ttsService:   notifications.NewTTSService(base.Service),
-		controller:   controller,
-		optimizer:    optimizer.NewOptimizer(),
-		stateManager: NewStateManager(base.Service, state, controller),
+		Base:                base,
+		priceService:        priceService,
+		notificationService: notifications.NewNotificationService(base.Service),
+		controller:          controller,
+		optimizer:           optimizer.NewOptimizer(),
+		stateManager:        NewStateManager(base.Service, state, controller),
 	}
 
 	// Attempt to restore schedule from HASS on startup
@@ -231,33 +231,51 @@ func (c *Dishwasher) checkPendingStart(service *ga.Service, state ga.State) {
 	}
 }
 
-// announceDelayedStart announces a scheduled dishwasher start via TTS
+// announceDelayedStart fires a notification event for a scheduled dishwasher start
 func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent float64) {
+	// Format time in a natural way for speech
+	// e.g., "3 PM", "3:30 PM", "noon", "midnight"
+	timeStr := notifications.FormatTimeForSpeech(startTime)
+
 	message := fmt.Sprintf(
 		"Dishwasher starts at %s, saving %.0f percent on electricity!",
-		startTime.Format("15:04"),
+		timeStr,
 		savingsPercent,
 	)
 
-	config := notifications.DefaultConfig()
-	config.Message = message
+	event := notifications.NotificationEvent{
+		Device:  "dishwasher",
+		Type:    "scheduled",
+		Message: message,
+		Data: map[string]interface{}{
+			"start_time":      startTime.Format("15:04"),
+			"start_time_text": timeStr,
+			"savings_percent": savingsPercent,
+		},
+	}
 
-	if err := c.ttsService.Announce(config); err != nil {
-		log.Printf("WARNING: TTS announcement failed: %v", err)
+	if err := c.notificationService.Notify(event); err != nil {
+		log.Printf("WARNING: Notification event failed: %v", err)
 	}
 }
 
-// announceImmediateStart announces an immediate dishwasher start via TTS
+// announceImmediateStart fires a notification event for an immediate dishwasher start
 func (c *Dishwasher) announceImmediateStart(savingsPercent float64) {
 	message := fmt.Sprintf(
 		"Dishwasher starts now, saving %.0f percent on electricity!",
 		savingsPercent,
 	)
 
-	config := notifications.DefaultConfig()
-	config.Message = message
+	event := notifications.NotificationEvent{
+		Device:  "dishwasher",
+		Type:    "started",
+		Message: message,
+		Data: map[string]interface{}{
+			"savings_percent": savingsPercent,
+		},
+	}
 
-	if err := c.ttsService.Announce(config); err != nil {
-		log.Printf("WARNING: TTS announcement failed: %v", err)
+	if err := c.notificationService.Notify(event); err != nil {
+		log.Printf("WARNING: Notification event failed: %v", err)
 	}
 }
