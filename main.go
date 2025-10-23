@@ -1,17 +1,18 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"home-go/entities"
 	"log"
 	"os"
+
+	"home-go/component"
+	"home-go/pricing"
+	"home-go/scheduler/dishwasher"
 
 	ga "saml.dev/gome-assistant"
 )
 
 func main() {
-	// Get Home Assistant URL from environment or use default
+	// Get Home Assistant configuration from environment
 	haURL := os.Getenv("HA_URL")
 	if haURL == "" {
 		log.Fatalf("HA_URL is not set")
@@ -30,61 +31,41 @@ func main() {
 	}
 	defer app.Cleanup()
 
-	dishwasherListener := ga.NewEventListener().
-		EventTypes(entities.CustomEvents.ScheduleDishwasher).
-		Call(consumeEvent).
-		Build()
+	// Initialize shared services and base component
+	base := component.NewBase(app.GetService())
+	priceService := pricing.NewService(app.GetState())
 
-	lightListener := ga.NewEntityListener().
-		EntityIds(entities.InputBoolean.HeadHealed, entities.InputBoolean.VitaminsTaken).
-		Call(blinkLights).
-		Build()
+	// Initialize components - pass shared base and state
+	dishwasherComp := dishwasher.New(base, app.GetState(), priceService)
 
-	app.RegisterEntityListeners(lightListener)
-	app.RegisterEventListeners(dishwasherListener)
+	// Collect all components
+	components := []component.Component{
+		dishwasherComp,
+	}
 
+	// Register all listeners from components
+	for _, comp := range components {
+		app.RegisterEventListeners(comp.EventListeners()...)
+		app.RegisterEntityListeners(comp.EntityListeners()...)
+		app.RegisterSchedules(comp.Schedules()...)
+		app.RegisterIntervals(comp.Intervals()...)
+	}
+
+	log.Printf("Starting home automation with %d components", len(components))
 	app.Start()
 }
 
-type EventData struct {
-	Source      string `json:"source"`
-	User        string `json:"user"`
-	Timestamp   string `json:"timestamp"`
-	Temperature string `json:"temperature"`
-	// Add more fields if needed
-}
-
-type HAEvent struct {
-	EventType string    `json:"event_type"`
-	Data      EventData `json:"data"`
-	Origin    string    `json:"origin"`
-	TimeFired string    `json:"time_fired"`
-	Context   any       `json:"context"`
-}
-
-func consumeEvent(service *ga.Service, state ga.State, event ga.EventData) {
-	e := HAEvent{}
-	if err := json.Unmarshal(event.RawEventJSON, &e); err != nil {
-		log.Fatalf("Failed to parse json")
-	}
-
-	fmt.Printf("Event Type: %s\n", e.EventType)
-	fmt.Printf("User: %s\n", e.Data.User)
-	fmt.Printf("Temperature: %s\n", e.Data.Temperature)
-}
-
-func blinkLights(service *ga.Service, state ga.State, sensor ga.EntityData) {
-	light := entities.Light.LivingRoomBlackLamp
-	switch sensor.ToState {
-	case "on":
-		err := service.HomeAssistant.TurnOn(light)
-		if err != nil {
-			log.Printf("Failed to turn on switch: %v", err)
-		}
-	case "off":
-		err := service.HomeAssistant.TurnOff(light)
-		if err != nil {
-			log.Printf("Failed to turn off switch: %v", err)
-		}
-	}
-}
+// blinkLights is an example entity listener (disabled)
+// func blinkLights(service *ga.Service, state ga.State, sensor ga.EntityData) {
+// 	light := entities.Light.LivingRoomBlackLamp
+// 	switch sensor.ToState {
+// 	case "on":
+// 		if err := service.HomeAssistant.TurnOn(light); err != nil {
+// 			log.Printf("Failed to turn on light: %v", err)
+// 		}
+// 	case "off":
+// 		if err := service.HomeAssistant.TurnOff(light); err != nil {
+// 			log.Printf("Failed to turn off light: %v", err)
+// 		}
+// 	}
+// }

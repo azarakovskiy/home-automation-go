@@ -1,6 +1,6 @@
 module home-go
 
-go 1.23
+go 1.23.0
 
 require saml.dev/gome-assistant v0.6.0
 
@@ -13,4 +13,5 @@ require (
 	github.com/joho/godotenv v1.4.0 // indirect
 	github.com/nathan-osman/go-sunrise v1.1.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	go.uber.org/mock v0.6.0 // indirect
 )

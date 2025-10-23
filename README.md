@@ -1,6 +1,30 @@
 # home-go
 
-Home Assistant automation written in Go using the [gome-assistant](https://github.com/saml-dev/gome-assistant) library.
+Event-driven home automation in Go with intelligent electricity price optimization.
+
+Built on [gome-assistant](https://github.com/saml-dev/gome-assistant) library.
+
+## Features
+
+### Dishwasher Scheduler
+Automatically schedules dishwasher to run during cheapest electricity periods:
+- 5 operating modes: Eco (4h), Auto (3h), AutoQuick (2h), Intensive (3h), Quick (1h)
+- Price optimization with weighted stage importance
+- State persistence survives service restarts
+- Custom event trigger from Home Assistant
+
+### Price Optimization Engine
+Generic optimizer for any cyclic appliance:
+- Calculates cheapest time window within deadline
+- Weighted cost optimization (prioritize high-power stages)
+- Percentage-based savings thresholds
+- Graceful degradation with insufficient data
+
+### Architecture
+- Component-based system with self-contained modules
+- Type-safe event handling using Go generics
+- 4 listener types: EventListener, EntityListener, DailySchedule, Interval
+- Generic state manager for device persistence
 
 ## Quick Start
 
@@ -62,16 +86,31 @@ docker run -d --name home-go-automation \
 ### Available Commands
 - `make build` - Build binary
 - `make run` - Build and run
-- `make test` - Run tests
+- `make test` - Run tests with coverage
 - `make lint` - Run linter
 - `make fmt` - Format code
 - `make generate` - Generate entities from HA
+- `make mocks` - Generate test mocks
+- `make install-mockgen` - Install mockgen tool
 - `make tidy` - Clean up dependencies
 
 ### CI/CD
 - **PRs**: Run linting and tests
 - **Push to main**: Build and publish Docker image to GHCR
 - **Tags**: Create tagged releases
+
+### Test Coverage
+```
+pricing:    96.6%
+optimizer:  90.5%
+component:  43.7%
+dishwasher: 13.8%
+```
+
+Run tests with coverage:
+```bash
+make test
+```
 
 ## Configuration
 
@@ -89,12 +128,32 @@ make generate
 ## Project Structure
 
 ```
-├── entities/           # Generated HA entity constants
-├── .github/workflows/  # CI/CD configuration
-├── main.go            # Application entrypoint
-├── Dockerfile         # Container image
-├── docker-compose.yml # Local development
-└── Makefile          # Build commands
+├── component/          # Component framework
+│   ├── component.go   # Component interface & Base
+│   ├── event_handler.go # Type-safe event handling
+│   └── state.go       # Generic state persistence
+├── pricing/           # Electricity pricing service
+│   └── service.go
+├── scheduler/
+│   ├── optimizer/     # Generic optimization engine
+│   │   ├── optimizer.go
+│   │   └── profile.go # Weight constants
+│   ├── dishwasher/    # Dishwasher implementation
+│   │   ├── component.go
+│   │   ├── controller.go
+│   │   ├── state_manager.go
+│   │   ├── profile.go
+│   │   └── types.go
+│   └── types.go       # Shared types
+├── entities/          # Generated HA entities
+│   ├── entities.go    # Generated constants
+│   ├── events.go      # Event wrappers
+│   └── custom_entities.go
+├── mocks/             # Generated test mocks
+├── main.go            # Application entry
+├── Dockerfile
+├── docker-compose.yml
+└── Makefile
 ```
 
 ## License
