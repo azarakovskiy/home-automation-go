@@ -1,5 +1,7 @@
 package optimizer
 
+import "time"
+
 // Standard stage weight levels for consistent profiling across devices
 // These represent the importance of optimizing each stage (higher = more important)
 const (
@@ -13,18 +15,17 @@ const (
 // Profile is a generic device profile implementation
 // Devices can use this directly or create their own implementation of DeviceProfile
 type Profile struct {
-	Mode              string
-	DurationHours     int
-	StageWeights      []float64
-	PowerKW           float64
-	MinSavingsPercent float64 // Minimum savings percentage to delay start
+	Mode         string
+	Duration     time.Duration
+	StageWeights []float64
+	PowerKW      float64
 }
 
 // Verify Profile implements the interface at compile time
 var _ DeviceProfile = (*Profile)(nil)
 
-func (p Profile) GetDurationHours() int {
-	return p.DurationHours
+func (p Profile) GetDuration() time.Duration {
+	return p.Duration
 }
 
 func (p Profile) GetStageWeights() []float64 {
@@ -37,8 +38,4 @@ func (p Profile) GetPowerKW() float64 {
 
 func (p Profile) GetMode() string {
 	return p.Mode
-}
-
-func (p Profile) GetMinSavingsPercent() float64 {
-	return p.MinSavingsPercent
 }

@@ -2,47 +2,48 @@ package dishwasher
 
 import (
 	"testing"
+	"time"
 )
 
 func TestGetProfileForMode_AllModes(t *testing.T) {
 	tests := []struct {
 		mode         Mode
-		wantDuration int
+		wantDuration time.Duration
 		wantStages   int
 		wantPowerMin float64
 		wantPowerMax float64
 	}{
 		{
 			mode:         ModeEco,
-			wantDuration: 4,
+			wantDuration: 4 * time.Hour,
 			wantStages:   3,
 			wantPowerMin: 0.7,
 			wantPowerMax: 0.9,
 		},
 		{
 			mode:         ModeAuto,
-			wantDuration: 3,
-			wantStages:   3,
-			wantPowerMin: 1.0,
-			wantPowerMax: 1.5,
+			wantDuration: 137 * time.Minute, // Measured: exactly 137 minutes
+			wantStages:   7,                 // Updated: 7 stages from measured data
+			wantPowerMin: 1.8,               // Updated: measured ~2000W
+			wantPowerMax: 2.1,
 		},
 		{
 			mode:         ModeAutoQuick,
-			wantDuration: 2,   // Measured: ~70 minutes
-			wantStages:   13,  // Measured: 13 distinct stages from power graph
-			wantPowerMin: 1.8, // Real measured: ~2000W
+			wantDuration: 70 * time.Minute, // Measured: ~70 minutes
+			wantStages:   13,               // Measured: 13 distinct stages from power graph
+			wantPowerMin: 1.8,              // Real measured: ~2000W
 			wantPowerMax: 2.1,
 		},
 		{
 			mode:         ModeIntensive,
-			wantDuration: 3,
+			wantDuration: 3 * time.Hour,
 			wantStages:   3,
 			wantPowerMin: 1.4,
 			wantPowerMax: 1.6,
 		},
 		{
 			mode:         ModeQuick,
-			wantDuration: 1,
+			wantDuration: 1 * time.Hour,
 			wantStages:   3,
 			wantPowerMin: 1.8, // Real measured: ~2000W
 			wantPowerMax: 2.1,
@@ -56,8 +57,8 @@ func TestGetProfileForMode_AllModes(t *testing.T) {
 				t.Fatalf("GetProfileForMode(%s) failed: %v", tt.mode, err)
 			}
 
-			if profile.GetDurationHours() != tt.wantDuration {
-				t.Errorf("Duration = %d, want %d", profile.GetDurationHours(), tt.wantDuration)
+			if profile.GetDuration() != tt.wantDuration {
+				t.Errorf("Duration = %s, want %s", profile.GetDuration(), tt.wantDuration)
 			}
 
 			weights := profile.GetStageWeights()
@@ -101,7 +102,7 @@ func TestProfile_ImplementsDeviceProfile(t *testing.T) {
 	}
 
 	// Verify interface methods work
-	if profile.GetDurationHours() <= 0 {
+	if profile.GetDuration() <= 0 {
 		t.Error("Duration should be positive")
 	}
 
@@ -124,7 +125,7 @@ func TestProfile_StageWeights(t *testing.T) {
 		expectedStageCount int
 	}{
 		{ModeEco, 3},
-		{ModeAuto, 3},
+		{ModeAuto, 7},       // Updated: 7 stages from measured data
 		{ModeAutoQuick, 13}, // 13 stages based on measured power pattern
 		{ModeIntensive, 3},
 		{ModeQuick, 3},
@@ -164,9 +165,9 @@ func TestProfile_EcoVsIntensive(t *testing.T) {
 	}
 
 	// Eco should take longer
-	if eco.GetDurationHours() <= intensive.GetDurationHours() {
-		t.Errorf("Eco duration (%d) should be longer than intensive (%d)",
-			eco.GetDurationHours(), intensive.GetDurationHours())
+	if eco.GetDuration() <= intensive.GetDuration() {
+		t.Errorf("Eco duration (%s) should be longer than intensive (%s)",
+			eco.GetDuration(), intensive.GetDuration())
 	}
 
 	// Intensive should use more power

@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"home-go/component"
+	"home-go/debug"
+	"home-go/dryrun"
 	"home-go/pricing"
 	"home-go/scheduler/dishwasher"
 
@@ -21,6 +23,10 @@ func main() {
 	if authToken == "" {
 		log.Fatalf("HA_AUTH_TOKEN is not set")
 	}
+
+	// Initialize dry-run and debug modes
+	dryrun.Init()
+	debug.Init()
 
 	app, err := ga.NewApp(ga.NewAppRequest{
 		URL:         haURL,
@@ -51,7 +57,11 @@ func main() {
 		app.RegisterIntervals(comp.Intervals()...)
 	}
 
-	log.Printf("Starting home automation with %d components", len(components))
+	if dryrun.IsEnabled() {
+		log.Printf("🔧 Starting home automation with %d components in DRY-RUN mode", len(components))
+	} else {
+		log.Printf("Starting home automation with %d components", len(components))
+	}
 	app.Start()
 }
 

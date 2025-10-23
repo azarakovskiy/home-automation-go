@@ -1,6 +1,12 @@
 package component
 
-import ga "saml.dev/gome-assistant"
+import (
+	"fmt"
+
+	"home-go/entities"
+
+	ga "saml.dev/gome-assistant"
+)
 
 // Component is a generic interface for any self-contained component.
 // Each component (scheduler, lighting, security, etc.) implements this interface
@@ -41,12 +47,14 @@ type Component interface {
 //	}
 type Base struct {
 	Service *ga.Service
+	State   ga.State
 }
 
 // NewBase creates a new Base with common services
 func NewBase(service *ga.Service) Base {
 	return Base{
 		Service: service,
+		State:   nil, // Will be set by component constructor if needed
 	}
 }
 
@@ -68,4 +76,20 @@ func (b Base) Schedules() []ga.DailySchedule {
 // Intervals returns an empty slice by default
 func (b Base) Intervals() []ga.Interval {
 	return []ga.Interval{}
+}
+
+// IsNightMode checks if the daytime mode is currently "Night"
+// This is useful for components that want to adjust behavior based on time of day
+func (b Base) IsNightMode() (bool, error) {
+	if b.State == nil {
+		return false, fmt.Errorf("state not initialized in component")
+	}
+
+	state, err := b.State.Get(entities.InputSelect.DaytimeMode)
+	if err != nil {
+		return false, fmt.Errorf("failed to get daytime mode: %w", err)
+	}
+
+	// The state value is directly in state.State for input_select
+	return state.State == "Night", nil
 }

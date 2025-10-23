@@ -47,6 +47,7 @@ Generic optimizer for any cyclic appliance:
    ```bash
    cp env.example .env
    # Edit .env with your HA_URL and HA_AUTH_TOKEN
+   # Optional: Set DRY_RUN=true for testing without device control
    ```
 
 3. **Generate entities** (optional):
@@ -93,6 +94,16 @@ docker run -d --name home-go-automation \
 - `make mocks` - Generate test mocks
 - `make install-mockgen` - Install mockgen tool
 - `make tidy` - Clean up dependencies
+
+### Dry-Run Mode
+Test automation logic without controlling real devices:
+```bash
+DRY_RUN=true make run
+```
+All device control calls will be logged but not executed. Perfect for:
+- Testing logic without affecting physical devices
+- Development without Home Assistant connection
+- Validating automation flows safely
 
 ### CI/CD
 - **PRs**: Run linting and tests

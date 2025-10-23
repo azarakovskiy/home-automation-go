@@ -5,14 +5,15 @@ import (
 	"math"
 	"time"
 
+	"home-go/debug"
 	"home-go/pricing"
 )
 
 // DeviceProfile defines characteristics of any device cycle
 // This is the generic interface that all devices must implement
 type DeviceProfile interface {
-	// GetDurationHours returns total cycle duration
-	GetDurationHours() int
+	// GetDuration returns total cycle duration
+	GetDuration() time.Duration
 
 	// GetStageWeights returns importance weights for each stage
 	// Sum of weights doesn't need to equal 1.0
@@ -24,10 +25,6 @@ type DeviceProfile interface {
 
 	// GetMode returns the device mode identifier
 	GetMode() string
-
-	// GetMinSavingsPercent returns minimum savings percentage to delay start
-	// e.g., 5.0 means delay only if savings >= 5% of immediate cost
-	GetMinSavingsPercent() float64
 }
 
 // OptimizationRequest contains all parameters for optimization
@@ -60,8 +57,26 @@ type StageAllocation struct {
 
 // Optimizer is a generic price optimizer for any cyclic device
 type Optimizer struct {
-	// No fixed threshold - each device profile specifies its own minimum savings percentage
+	// Dynamic threshold calculation based on MaxDelayHours
+	// Reference points:
+	// - 12 hours wait → 5% minimum savings
+	// - 2 hours wait → 20% minimum savings
+	// Inverse relationship: less time = higher threshold
 }
+
+// Constants for dynamic threshold calculation using exponential decay
+const (
+	// Base threshold: asymptotic minimum as delay approaches infinity
+	baseThreshold = 2.0
+
+	// Decay rate: controls how quickly threshold decreases with more delay time
+	// Higher value = faster decay (threshold drops more quickly)
+	decayRate = 0.15
+
+	// Scale factor: multiplier for the exponential term
+	// Controls the range of threshold values
+	scaleFactor = 25.0
+)
 
 // NewOptimizer creates a new generic optimizer
 func NewOptimizer() *Optimizer {
@@ -75,7 +90,7 @@ func (o *Optimizer) Optimize(req OptimizationRequest) (*OptimizationResult, erro
 	}
 
 	slotDuration := req.PriceSlots[0].Till.Sub(req.PriceSlots[0].From)
-	cycleDuration := time.Duration(req.Profile.GetDurationHours()) * time.Hour
+	cycleDuration := req.Profile.GetDuration()
 	slotsNeeded := o.calculateSlotsNeeded(cycleDuration, slotDuration, len(req.PriceSlots))
 
 	now := o.calculateStartTime(req.StartAfter)
@@ -131,15 +146,21 @@ func (o *Optimizer) findBestWindow(
 	var bestResult *OptimizationResult
 	bestWeightedCost := math.MaxFloat64
 
+	debug.Log("Finding best window: now=%s, deadline=%s, slotsNeeded=%d",
+		now.Format(time.RFC3339), deadline.Format(time.RFC3339), slotsNeeded)
+
 	for startIdx := 0; startIdx <= len(req.PriceSlots)-slotsNeeded; startIdx++ {
 		startSlot := req.PriceSlots[startIdx]
 
+		// Skip slots that are in the past
 		if startSlot.From.Before(now) {
+			debug.Log("Skipping past slot %d: %s (before now)", startIdx, startSlot.From.Format(time.RFC3339))
 			continue
 		}
 
 		endTime := startSlot.From.Add(cycleDuration)
 		if endTime.After(deadline) {
+			debug.Log("Stopping at slot %d: end time %s exceeds deadline", startIdx, endTime.Format(time.RFC3339))
 			break
 		}
 
@@ -151,10 +172,19 @@ func (o *Optimizer) findBestWindow(
 		result.StartTime = startSlot.From
 		result.EndTime = endTime
 
+		debug.Log("Evaluated slot %d: start=%s, weightedCost=%.4f, estimatedCost=%.4f",
+			startIdx, startSlot.From.Format(time.RFC3339), result.WeightedCost, result.EstimatedCost)
+
 		if result.WeightedCost < bestWeightedCost {
 			bestWeightedCost = result.WeightedCost
 			bestResult = result
+			debug.Log("New best result found at %s", startSlot.From.Format(time.RFC3339))
 		}
+	}
+
+	if bestResult != nil {
+		debug.Log("Final best window: start=%s, weightedCost=%.4f",
+			bestResult.StartTime.Format(time.RFC3339), bestResult.WeightedCost)
 	}
 
 	return bestResult
@@ -280,8 +310,51 @@ func (o *Optimizer) calculateCostForWindow(
 	}
 }
 
-// ShouldDelay determines if delaying is worth it based on the device profile's threshold
-func (o *Optimizer) ShouldDelay(result *OptimizationResult, profile DeviceProfile) bool {
-	minSavingsPercent := profile.GetMinSavingsPercent()
-	return result.SavingsPercent >= minSavingsPercent
+// ShouldDelay determines if delaying is worth it based on dynamic threshold
+// The threshold uses an exponential decay function based on MaxDelayHours:
+// threshold = baseThreshold + scaleFactor * exp(-decayRate * hours)
+//
+// This creates a smooth curve where:
+// - Short delays (1-2h) require high savings (~20-25%)
+// - Medium delays (6h) require moderate savings (~10%)
+// - Long delays (12h+) require lower savings (~5%)
+// - Very long delays approach base threshold asymptotically (~2%)
+func (o *Optimizer) ShouldDelay(result *OptimizationResult, maxDelayHours int) bool {
+	if maxDelayHours <= 0 {
+		return false
+	}
+
+	// Calculate dynamic threshold based on available delay time
+	threshold := o.CalculateDynamicThreshold(maxDelayHours)
+
+	debug.Log("ShouldDelay: savings=%.1f%%, threshold=%.1f%% (for %dh delay)",
+		result.SavingsPercent, threshold, maxDelayHours)
+
+	return result.SavingsPercent >= threshold
+}
+
+// CalculateDynamicThreshold computes the minimum savings threshold using exponential decay
+// Formula: threshold = baseThreshold + scaleFactor * exp(-decayRate * hours)
+//
+// This creates a smooth inverse relationship:
+// - 1h delay  → ~23% threshold (very high, need significant savings for short wait)
+// - 2h delay  → ~18% threshold
+// - 3h delay  → ~15% threshold
+// - 6h delay  → ~9% threshold
+// - 12h delay → ~5% threshold (willing to wait longer for smaller savings)
+// - 24h delay → ~3% threshold (approaches baseThreshold asymptotically)
+//
+// This is exported so callers can log the threshold value
+func (o *Optimizer) CalculateDynamicThreshold(maxDelayHours int) float64 {
+	if maxDelayHours <= 0 {
+		// For zero or negative delay, return a very high threshold
+		// (effectively: don't delay unless savings are exceptional)
+		return 100.0
+	}
+
+	// Exponential decay function: threshold decreases smoothly as delay time increases
+	// base + scale * e^(-decay * hours)
+	threshold := baseThreshold + scaleFactor*math.Exp(-decayRate*float64(maxDelayHours))
+
+	return threshold
 }
