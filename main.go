@@ -4,6 +4,8 @@ import (
 	"log"
 	"os"
 
+	"home-go/charger/laptop"
+	"home-go/charger/vacuum"
 	"home-go/component"
 	"home-go/debug"
 	"home-go/dryrun"
@@ -43,10 +45,14 @@ func main() {
 
 	// Initialize components - pass shared base and state
 	dishwasherComp := dishwasher.New(base, app.GetState(), priceService)
+	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
+	vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
 
 	// Collect all components
 	components := []component.Component{
 		dishwasherComp,
+		laptopChargerComp,
+		vacuumChargerComp,
 	}
 
 	// Register all listeners from components

@@ -1,6 +1,10 @@
-package optimizer
+package scheduler
 
-import "time"
+import (
+	"time"
+
+	"home-go/scheduler/optimizer"
+)
 
 // Standard stage weight levels for consistent profiling across devices
 // These represent the importance of optimizing each stage (higher = more important)
@@ -22,7 +26,7 @@ type Profile struct {
 }
 
 // Verify Profile implements the interface at compile time
-var _ DeviceProfile = (*Profile)(nil)
+var _ optimizer.DeviceProfile = (*Profile)(nil)
 
 func (p Profile) GetDuration() time.Duration {
 	return p.Duration

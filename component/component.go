@@ -2,6 +2,7 @@ package component
 
 import (
 	"fmt"
+	"time"
 
 	"home-go/entities"
 
@@ -92,4 +93,56 @@ func (b Base) IsNightMode() (bool, error) {
 
 	// The state value is directly in state.State for input_select
 	return state.State == "Night", nil
+}
+
+// GetHouseMode returns the current house mode (Home, Away, Travel, etc.)
+func (b Base) GetHouseMode() (string, error) {
+	if b.State == nil {
+		return "", fmt.Errorf("state not initialized in component")
+	}
+
+	state, err := b.State.Get(entities.InputSelect.HouseMode)
+	if err != nil {
+		return "", fmt.Errorf("failed to get house mode: %w", err)
+	}
+
+	return state.State, nil
+}
+
+// IsAway checks if house is in Away or Travel mode
+func (b Base) IsAway() (bool, error) {
+	mode, err := b.GetHouseMode()
+	if err != nil {
+		return false, err
+	}
+
+	return mode == "Away" || mode == "Travel", nil
+}
+
+// IsAwayForDuration checks if house has been away for specified duration
+// This is useful for safety features (turn off devices after prolonged absence)
+func (b Base) IsAwayForDuration(duration time.Duration) (bool, error) {
+	if b.State == nil {
+		return false, fmt.Errorf("state not initialized in component")
+	}
+
+	state, err := b.State.Get(entities.InputSelect.HouseMode)
+	if err != nil {
+		return false, fmt.Errorf("failed to get house mode: %w", err)
+	}
+
+	mode := state.State
+	if mode != "Away" && mode != "Travel" {
+		return false, nil
+	}
+
+	// Check how long we've been in this state
+	// Note: LastChanged might not be available in all HA versions
+	// If not available, we return true (conservative: assume we've been away long enough)
+	if state.LastChanged.IsZero() {
+		return true, nil
+	}
+
+	awayDuration := time.Since(state.LastChanged)
+	return awayDuration >= duration, nil
 }
