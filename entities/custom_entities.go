@@ -1,9 +1,9 @@
 package entities
 
 type CustomEventsDomain struct {
-	ScheduleDishwasher string
+	ScheduledStart string
 }
 
 var CustomEvents = CustomEventsDomain{
-	ScheduleDishwasher: "event.custom_schedule_dishwasher",
+	ScheduledStart: "event.custom_scheduled_start",
 }
