@@ -2,8 +2,6 @@ module home-go
 
 go 1.23.0
 
-toolchain go1.24.5
-
 require saml.dev/gome-assistant v0.6.0
 
 require (
