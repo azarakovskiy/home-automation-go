@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"home-go/component"
+	"home-go/debug"
 	"home-go/dryrun"
 	"home-go/pricing"
 	"home-go/scheduler/dishwasher"
@@ -23,8 +24,9 @@ func main() {
 		log.Fatalf("HA_AUTH_TOKEN is not set")
 	}
 
-	// Initialize dry-run mode
+	// Initialize dry-run and debug modes
 	dryrun.Init()
+	debug.Init()
 
 	app, err := ga.NewApp(ga.NewAppRequest{
 		URL:         haURL,

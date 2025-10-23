@@ -2,10 +2,10 @@ package optimizer
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"time"
 
+	"home-go/debug"
 	"home-go/pricing"
 )
 
@@ -146,7 +146,7 @@ func (o *Optimizer) findBestWindow(
 	var bestResult *OptimizationResult
 	bestWeightedCost := math.MaxFloat64
 
-	log.Printf("[DEBUG] Finding best window: now=%s, deadline=%s, slotsNeeded=%d",
+	debug.Log("Finding best window: now=%s, deadline=%s, slotsNeeded=%d",
 		now.Format(time.RFC3339), deadline.Format(time.RFC3339), slotsNeeded)
 
 	for startIdx := 0; startIdx <= len(req.PriceSlots)-slotsNeeded; startIdx++ {
@@ -154,13 +154,13 @@ func (o *Optimizer) findBestWindow(
 
 		// Skip slots that are in the past
 		if startSlot.From.Before(now) {
-			log.Printf("[DEBUG] Skipping past slot %d: %s (before now)", startIdx, startSlot.From.Format(time.RFC3339))
+			debug.Log("Skipping past slot %d: %s (before now)", startIdx, startSlot.From.Format(time.RFC3339))
 			continue
 		}
 
 		endTime := startSlot.From.Add(cycleDuration)
 		if endTime.After(deadline) {
-			log.Printf("[DEBUG] Stopping at slot %d: end time %s exceeds deadline", startIdx, endTime.Format(time.RFC3339))
+			debug.Log("Stopping at slot %d: end time %s exceeds deadline", startIdx, endTime.Format(time.RFC3339))
 			break
 		}
 
@@ -172,18 +172,18 @@ func (o *Optimizer) findBestWindow(
 		result.StartTime = startSlot.From
 		result.EndTime = endTime
 
-		log.Printf("[DEBUG] Evaluated slot %d: start=%s, weightedCost=%.4f, estimatedCost=%.4f",
+		debug.Log("Evaluated slot %d: start=%s, weightedCost=%.4f, estimatedCost=%.4f",
 			startIdx, startSlot.From.Format(time.RFC3339), result.WeightedCost, result.EstimatedCost)
 
 		if result.WeightedCost < bestWeightedCost {
 			bestWeightedCost = result.WeightedCost
 			bestResult = result
-			log.Printf("[DEBUG] New best result found at %s", startSlot.From.Format(time.RFC3339))
+			debug.Log("New best result found at %s", startSlot.From.Format(time.RFC3339))
 		}
 	}
 
 	if bestResult != nil {
-		log.Printf("[DEBUG] Final best window: start=%s, weightedCost=%.4f",
+		debug.Log("Final best window: start=%s, weightedCost=%.4f",
 			bestResult.StartTime.Format(time.RFC3339), bestResult.WeightedCost)
 	}
 
@@ -327,7 +327,7 @@ func (o *Optimizer) ShouldDelay(result *OptimizationResult, maxDelayHours int) b
 	// Calculate dynamic threshold based on available delay time
 	threshold := o.CalculateDynamicThreshold(maxDelayHours)
 
-	log.Printf("[DEBUG] ShouldDelay: savings=%.1f%%, threshold=%.1f%% (for %dh delay)",
+	debug.Log("ShouldDelay: savings=%.1f%%, threshold=%.1f%% (for %dh delay)",
 		result.SavingsPercent, threshold, maxDelayHours)
 
 	return result.SavingsPercent >= threshold
