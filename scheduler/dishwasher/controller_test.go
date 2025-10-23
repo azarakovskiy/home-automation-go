@@ -26,4 +26,3 @@ func TestController_NewController(t *testing.T) {
 // would require mocking the ga.Service.Switch methods.
 // These are better tested as integration tests with a real Home Assistant instance
 // or by creating wrapper interfaces for the Service.
-

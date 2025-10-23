@@ -471,10 +471,10 @@ func TestService_IsCurrentlyExpensive(t *testing.T) {
 	twoHoursFromNow := now.Add(2 * time.Hour)
 
 	tests := []struct {
-		name        string
-		setupMock   func(*mocks.MockStateInterface)
+		name          string
+		setupMock     func(*mocks.MockStateInterface)
 		wantExpensive bool
-		wantErr     bool
+		wantErr       bool
 	}{
 		{
 			name: "current price above average",
@@ -500,7 +500,7 @@ func TestService_IsCurrentlyExpensive(t *testing.T) {
 					Times(2) // Called twice: once by GetCurrentPrice, once by GetAveragePrice
 			},
 			wantExpensive: true, // 0.30 > 0.20 (average)
-			wantErr:     false,
+			wantErr:       false,
 		},
 		{
 			name: "current price below average",
@@ -526,7 +526,7 @@ func TestService_IsCurrentlyExpensive(t *testing.T) {
 					Times(2)
 			},
 			wantExpensive: false, // 0.10 < 0.20 (average)
-			wantErr:     false,
+			wantErr:       false,
 		},
 		{
 			name: "GetCurrentPrice fails",
