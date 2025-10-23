@@ -1,211 +1,562 @@
 package pricing
 
 import (
+	"fmt"
 	"testing"
 	"time"
+
+	"home-go/entities"
+	"home-go/mocks"
+
+	"go.uber.org/mock/gomock"
+	ga "saml.dev/gome-assistant"
 )
 
-func TestPriceSlot_TimeHandling(t *testing.T) {
-	now := time.Now()
-	slot := PriceSlot{
-		From:  now,
-		Till:  now.Add(time.Hour),
-		Price: 0.25,
+func TestNewService(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockState := mocks.NewMockStateInterface(ctrl)
+	service := NewService(mockState)
+
+	if service == nil {
+		t.Fatal("NewService returned nil")
 	}
 
-	if !slot.From.Before(slot.Till) {
-		t.Error("From should be before Till")
-	}
-
-	duration := slot.Till.Sub(slot.From)
-	if duration != time.Hour {
-		t.Errorf("Expected 1 hour duration, got %v", duration)
+	if service.state != mockState {
+		t.Error("Service state not set correctly")
 	}
 }
 
-func TestGetPriceSlotsInWindow(t *testing.T) {
-	// This would need a mock State implementation
-	// For now, just test the logic with a mock service
-	t.Skip("Requires mock State implementation")
-}
-
-func TestPriceSlot_Comparison(t *testing.T) {
-	now := time.Now()
-	slot1 := PriceSlot{From: now, Till: now.Add(time.Hour), Price: 0.20}
-	slot2 := PriceSlot{From: now.Add(time.Hour), Till: now.Add(2 * time.Hour), Price: 0.30}
-
-	if slot1.Price >= slot2.Price {
-		t.Error("slot1 should be cheaper than slot2")
-	}
-}
-
-func TestPriceSlot_FifteenMinuteIntervals(t *testing.T) {
-	now := time.Now().Truncate(15 * time.Minute)
-
-	slots := []PriceSlot{
-		{From: now, Till: now.Add(15 * time.Minute), Price: 0.20},
-		{From: now.Add(15 * time.Minute), Till: now.Add(30 * time.Minute), Price: 0.22},
-		{From: now.Add(30 * time.Minute), Till: now.Add(45 * time.Minute), Price: 0.21},
-		{From: now.Add(45 * time.Minute), Till: now.Add(60 * time.Minute), Price: 0.23},
-	}
-
-	for i, slot := range slots {
-		duration := slot.Till.Sub(slot.From)
-		if duration != 15*time.Minute {
-			t.Errorf("Slot %d duration = %v, want 15 minutes", i, duration)
-		}
-	}
-
-	// Verify slots are consecutive
-	for i := 0; i < len(slots)-1; i++ {
-		if !slots[i].Till.Equal(slots[i+1].From) {
-			t.Errorf("Slots %d and %d are not consecutive", i, i+1)
-		}
-	}
-}
-
-func TestPriceSlot_FindCheapest(t *testing.T) {
-	now := time.Now()
-	slots := []PriceSlot{
-		{From: now, Till: now.Add(time.Hour), Price: 0.30},
-		{From: now.Add(time.Hour), Till: now.Add(2 * time.Hour), Price: 0.18}, // Cheapest
-		{From: now.Add(2 * time.Hour), Till: now.Add(3 * time.Hour), Price: 0.25},
-	}
-
-	minPrice := slots[0].Price
-	minIdx := 0
-
-	for i, slot := range slots {
-		if slot.Price < minPrice {
-			minPrice = slot.Price
-			minIdx = i
-		}
-	}
-
-	if minIdx != 1 {
-		t.Errorf("Expected slot 1 to be cheapest, got slot %d", minIdx)
-	}
-
-	if minPrice != 0.18 {
-		t.Errorf("Expected min price 0.18, got %.2f", minPrice)
-	}
-}
-
-func TestGetAveragePrice_Calculation(t *testing.T) {
-	// Test average price calculation with known values
-	now := time.Now()
-	testSlots := []PriceSlot{
-		{From: now, Till: now.Add(time.Hour), Price: 0.20},
-		{From: now.Add(time.Hour), Till: now.Add(2 * time.Hour), Price: 0.30},
-		{From: now.Add(2 * time.Hour), Till: now.Add(3 * time.Hour), Price: 0.25},
-	}
-
-	// Expected average: (0.20 + 0.30 + 0.25) / 3 = 0.25
-	expected := 0.25
-
-	var total float64
-	for _, slot := range testSlots {
-		total += slot.Price
-	}
-	average := total / float64(len(testSlots))
-
-	if average != expected {
-		t.Errorf("Average = %.2f, want %.2f", average, expected)
-	}
-}
-
-func TestGetAveragePrice_MultipleSlots(t *testing.T) {
-	// Test with different number of slots
-	testCases := []struct {
-		name     string
-		prices   []float64
-		expected float64
+func TestService_GetPriceSlots(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(*mocks.MockStateInterface)
+		wantSlotCount  int
+		wantFirstPrice float64
+		wantErr        bool
 	}{
 		{
-			name:     "single slot",
-			prices:   []float64{0.25},
-			expected: 0.25,
+			name: "successfully parse price slots",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  "2025-10-23T10:00:00Z",
+									"till":  "2025-10-23T11:00:00Z",
+									"price": 0.15,
+								},
+								map[string]any{
+									"from":  "2025-10-23T11:00:00Z",
+									"till":  "2025-10-23T12:00:00Z",
+									"price": 0.20,
+								},
+								map[string]any{
+									"from":  "2025-10-23T12:00:00Z",
+									"till":  "2025-10-23T13:00:00Z",
+									"price": 0.25,
+								},
+							},
+						},
+					}, nil)
+			},
+			wantSlotCount:  3,
+			wantFirstPrice: 0.15,
+			wantErr:        false,
 		},
 		{
-			name:     "two slots",
-			prices:   []float64{0.20, 0.30},
-			expected: 0.25,
+			name: "state.Get returns error",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{}, fmt.Errorf("sensor not found"))
+			},
+			wantErr: true,
 		},
 		{
-			name:     "many slots",
-			prices:   []float64{0.10, 0.15, 0.20, 0.25, 0.30},
-			expected: 0.20,
+			name: "prices attribute not found",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{},
+					}, nil)
+			},
+			wantErr: true,
 		},
 		{
-			name:     "identical prices",
-			prices:   []float64{0.22, 0.22, 0.22, 0.22},
-			expected: 0.22,
+			name: "prices attribute is not a list",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": "not a list",
+						},
+					}, nil)
+			},
+			wantErr: true,
+		},
+		{
+			name: "skip invalid items in list",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  "2025-10-23T10:00:00Z",
+									"till":  "2025-10-23T11:00:00Z",
+									"price": 0.15,
+								},
+								"invalid item", // Should be skipped
+								map[string]any{
+									"from":  "invalid-date",
+									"till":  "2025-10-23T12:00:00Z",
+									"price": 0.20,
+								}, // Should be skipped (invalid from)
+								map[string]any{
+									"from":  "2025-10-23T12:00:00Z",
+									"till":  "2025-10-23T13:00:00Z",
+									"price": 0.25,
+								},
+							},
+						},
+					}, nil)
+			},
+			wantSlotCount:  2,
+			wantFirstPrice: 0.15,
+			wantErr:        false,
+		},
+		{
+			name: "empty prices list",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{},
+						},
+					}, nil)
+			},
+			wantSlotCount: 0,
+			wantErr:       false,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			var total float64
-			for _, price := range tc.prices {
-				total += price
-			}
-			average := total / float64(len(tc.prices))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-			// Use a small epsilon for float comparison
-			epsilon := 0.0001
-			if average < tc.expected-epsilon || average > tc.expected+epsilon {
-				t.Errorf("Average = %.4f, want %.4f", average, tc.expected)
+			mockState := mocks.NewMockStateInterface(ctrl)
+			tt.setupMock(mockState)
+
+			service := NewService(mockState)
+			slots, err := service.GetPriceSlots()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPriceSlots() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr {
+				if len(slots) != tt.wantSlotCount {
+					t.Errorf("GetPriceSlots() got %d slots, want %d", len(slots), tt.wantSlotCount)
+				}
+
+				if tt.wantSlotCount > 0 && slots[0].Price != tt.wantFirstPrice {
+					t.Errorf("GetPriceSlots() first price = %f, want %f", slots[0].Price, tt.wantFirstPrice)
+				}
 			}
 		})
 	}
 }
 
-func TestIsCurrentlyExpensive_Logic(t *testing.T) {
-	// Test the comparison logic
-	testCases := []struct {
-		name         string
-		currentPrice float64
-		avgPrice     float64
-		expensive    bool
+func TestService_GetCurrentPrice(t *testing.T) {
+	now := time.Now()
+	hourAgo := now.Add(-1 * time.Hour)
+	hourFromNow := now.Add(1 * time.Hour)
+	twoHoursFromNow := now.Add(2 * time.Hour)
+
+	tests := []struct {
+		name      string
+		setupMock func(*mocks.MockStateInterface)
+		wantPrice float64
+		wantErr   bool
 	}{
 		{
-			name:         "above average",
-			currentPrice: 0.30,
-			avgPrice:     0.25,
-			expensive:    true,
+			name: "finds current price slot",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  hourAgo.Format(time.RFC3339),
+									"till":  hourFromNow.Format(time.RFC3339),
+									"price": 0.15,
+								},
+								map[string]any{
+									"from":  hourFromNow.Format(time.RFC3339),
+									"till":  twoHoursFromNow.Format(time.RFC3339),
+									"price": 0.20,
+								},
+							},
+						},
+					}, nil)
+			},
+			wantPrice: 0.15,
+			wantErr:   false,
 		},
 		{
-			name:         "below average",
-			currentPrice: 0.20,
-			avgPrice:     0.25,
-			expensive:    false,
+			name: "no current price slot found",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  hourFromNow.Format(time.RFC3339),
+									"till":  twoHoursFromNow.Format(time.RFC3339),
+									"price": 0.15,
+								},
+							},
+						},
+					}, nil)
+			},
+			wantErr: true,
 		},
 		{
-			name:         "at average",
-			currentPrice: 0.25,
-			avgPrice:     0.25,
-			expensive:    false,
-		},
-		{
-			name:         "significantly above",
-			currentPrice: 0.40,
-			avgPrice:     0.25,
-			expensive:    true,
-		},
-		{
-			name:         "significantly below",
-			currentPrice: 0.10,
-			avgPrice:     0.25,
-			expensive:    false,
+			name: "GetPriceSlots fails",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{}, fmt.Errorf("sensor error"))
+			},
+			wantErr: true,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			isExpensive := tc.currentPrice > tc.avgPrice
-			if isExpensive != tc.expensive {
-				t.Errorf("Current %.2f vs Avg %.2f: expensive = %v, want %v",
-					tc.currentPrice, tc.avgPrice, isExpensive, tc.expensive)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockState := mocks.NewMockStateInterface(ctrl)
+			tt.setupMock(mockState)
+
+			service := NewService(mockState)
+			price, err := service.GetCurrentPrice()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetCurrentPrice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr && price != tt.wantPrice {
+				t.Errorf("GetCurrentPrice() = %f, want %f", price, tt.wantPrice)
+			}
+		})
+	}
+}
+
+func TestService_GetPriceSlotsInWindow(t *testing.T) {
+	baseTime := time.Date(2025, 10, 23, 10, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name          string
+		setupMock     func(*mocks.MockStateInterface)
+		from          time.Time
+		until         time.Time
+		wantSlotCount int
+		wantErr       bool
+	}{
+		{
+			name: "filter slots within window",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  baseTime.Format(time.RFC3339),
+									"till":  baseTime.Add(1 * time.Hour).Format(time.RFC3339),
+									"price": 0.15,
+								},
+								map[string]any{
+									"from":  baseTime.Add(1 * time.Hour).Format(time.RFC3339),
+									"till":  baseTime.Add(2 * time.Hour).Format(time.RFC3339),
+									"price": 0.20,
+								},
+								map[string]any{
+									"from":  baseTime.Add(2 * time.Hour).Format(time.RFC3339),
+									"till":  baseTime.Add(3 * time.Hour).Format(time.RFC3339),
+									"price": 0.25,
+								},
+								map[string]any{
+									"from":  baseTime.Add(3 * time.Hour).Format(time.RFC3339),
+									"till":  baseTime.Add(4 * time.Hour).Format(time.RFC3339),
+									"price": 0.30,
+								},
+							},
+						},
+					}, nil)
+			},
+			from:          baseTime.Add(30 * time.Minute),
+			until:         baseTime.Add(150 * time.Minute),
+			wantSlotCount: 2, // Both 1-hour and 2-hour slots start within window (after baseTime+30m)
+			wantErr:       false,
+		},
+		{
+			name: "no slots in window",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  baseTime.Format(time.RFC3339),
+									"till":  baseTime.Add(1 * time.Hour).Format(time.RFC3339),
+									"price": 0.15,
+								},
+							},
+						},
+					}, nil)
+			},
+			from:          baseTime.Add(2 * time.Hour),
+			until:         baseTime.Add(3 * time.Hour),
+			wantSlotCount: 0,
+			wantErr:       false,
+		},
+		{
+			name: "GetPriceSlots fails",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{}, fmt.Errorf("sensor error"))
+			},
+			from:    baseTime,
+			until:   baseTime.Add(1 * time.Hour),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockState := mocks.NewMockStateInterface(ctrl)
+			tt.setupMock(mockState)
+
+			service := NewService(mockState)
+			slots, err := service.GetPriceSlotsInWindow(tt.from, tt.until)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPriceSlotsInWindow() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr && len(slots) != tt.wantSlotCount {
+				t.Errorf("GetPriceSlotsInWindow() got %d slots, want %d", len(slots), tt.wantSlotCount)
+			}
+		})
+	}
+}
+
+func TestService_GetAveragePrice(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupMock    func(*mocks.MockStateInterface)
+		wantAverage  float64
+		wantErr      bool
+		errorMessage string
+	}{
+		{
+			name: "calculates average from multiple slots",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  "2025-10-23T10:00:00Z",
+									"till":  "2025-10-23T11:00:00Z",
+									"price": 0.10,
+								},
+								map[string]any{
+									"from":  "2025-10-23T11:00:00Z",
+									"till":  "2025-10-23T12:00:00Z",
+									"price": 0.20,
+								},
+								map[string]any{
+									"from":  "2025-10-23T12:00:00Z",
+									"till":  "2025-10-23T13:00:00Z",
+									"price": 0.30,
+								},
+							},
+						},
+					}, nil)
+			},
+			wantAverage: 0.20, // (0.10 + 0.20 + 0.30) / 3
+			wantErr:     false,
+		},
+		{
+			name: "no price slots available",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{},
+						},
+					}, nil)
+			},
+			wantErr:      true,
+			errorMessage: "no price slots available",
+		},
+		{
+			name: "GetPriceSlots fails",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{}, fmt.Errorf("sensor error"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockState := mocks.NewMockStateInterface(ctrl)
+			tt.setupMock(mockState)
+
+			service := NewService(mockState)
+			avg, err := service.GetAveragePrice()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAveragePrice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr {
+				const epsilon = 0.0001
+				if diff := avg - tt.wantAverage; diff < -epsilon || diff > epsilon {
+					t.Errorf("GetAveragePrice() = %f, want %f (diff: %f)", avg, tt.wantAverage, diff)
+				}
+			} else if tt.errorMessage != "" && err.Error() != tt.errorMessage {
+				t.Errorf("GetAveragePrice() error message = %q, want %q", err.Error(), tt.errorMessage)
+			}
+		})
+	}
+}
+
+func TestService_IsCurrentlyExpensive(t *testing.T) {
+	now := time.Now()
+	hourAgo := now.Add(-1 * time.Hour)
+	hourFromNow := now.Add(1 * time.Hour)
+	twoHoursFromNow := now.Add(2 * time.Hour)
+
+	tests := []struct {
+		name        string
+		setupMock   func(*mocks.MockStateInterface)
+		wantExpensive bool
+		wantErr     bool
+	}{
+		{
+			name: "current price above average",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  hourAgo.Format(time.RFC3339),
+									"till":  hourFromNow.Format(time.RFC3339),
+									"price": 0.30, // Current: 0.30
+								},
+								map[string]any{
+									"from":  hourFromNow.Format(time.RFC3339),
+									"till":  twoHoursFromNow.Format(time.RFC3339),
+									"price": 0.10, // Future: 0.10
+								},
+							},
+						},
+					}, nil).
+					Times(2) // Called twice: once by GetCurrentPrice, once by GetAveragePrice
+			},
+			wantExpensive: true, // 0.30 > 0.20 (average)
+			wantErr:     false,
+		},
+		{
+			name: "current price below average",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{
+						Attributes: map[string]any{
+							"prices": []any{
+								map[string]any{
+									"from":  hourAgo.Format(time.RFC3339),
+									"till":  hourFromNow.Format(time.RFC3339),
+									"price": 0.10, // Current: 0.10
+								},
+								map[string]any{
+									"from":  hourFromNow.Format(time.RFC3339),
+									"till":  twoHoursFromNow.Format(time.RFC3339),
+									"price": 0.30, // Future: 0.30
+								},
+							},
+						},
+					}, nil).
+					Times(2)
+			},
+			wantExpensive: false, // 0.10 < 0.20 (average)
+			wantErr:     false,
+		},
+		{
+			name: "GetCurrentPrice fails",
+			setupMock: func(m *mocks.MockStateInterface) {
+				m.EXPECT().
+					Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+					Return(ga.EntityState{}, fmt.Errorf("sensor error"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockState := mocks.NewMockStateInterface(ctrl)
+			tt.setupMock(mockState)
+
+			service := NewService(mockState)
+			expensive, err := service.IsCurrentlyExpensive()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("IsCurrentlyExpensive() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr && expensive != tt.wantExpensive {
+				t.Errorf("IsCurrentlyExpensive() = %v, want %v", expensive, tt.wantExpensive)
 			}
 		})
 	}

@@ -41,6 +41,93 @@ func (m *MockStateInterface) EXPECT() *MockStateInterfaceMockRecorder {
 	return m.recorder
 }
 
+// AfterSunrise mocks base method.
+func (m *MockStateInterface) AfterSunrise(offset ...gomeassistant.DurationString) bool {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range offset {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "AfterSunrise", varargs...)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// AfterSunrise indicates an expected call of AfterSunrise.
+func (mr *MockStateInterfaceMockRecorder) AfterSunrise(offset ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterSunrise", reflect.TypeOf((*MockStateInterface)(nil).AfterSunrise), offset...)
+}
+
+// AfterSunset mocks base method.
+func (m *MockStateInterface) AfterSunset(offset ...gomeassistant.DurationString) bool {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range offset {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "AfterSunset", varargs...)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// AfterSunset indicates an expected call of AfterSunset.
+func (mr *MockStateInterfaceMockRecorder) AfterSunset(offset ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AfterSunset", reflect.TypeOf((*MockStateInterface)(nil).AfterSunset), offset...)
+}
+
+// BeforeSunrise mocks base method.
+func (m *MockStateInterface) BeforeSunrise(offset ...gomeassistant.DurationString) bool {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range offset {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "BeforeSunrise", varargs...)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// BeforeSunrise indicates an expected call of BeforeSunrise.
+func (mr *MockStateInterfaceMockRecorder) BeforeSunrise(offset ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeforeSunrise", reflect.TypeOf((*MockStateInterface)(nil).BeforeSunrise), offset...)
+}
+
+// BeforeSunset mocks base method.
+func (m *MockStateInterface) BeforeSunset(offset ...gomeassistant.DurationString) bool {
+	m.ctrl.T.Helper()
+	varargs := []any{}
+	for _, a := range offset {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "BeforeSunset", varargs...)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// BeforeSunset indicates an expected call of BeforeSunset.
+func (mr *MockStateInterfaceMockRecorder) BeforeSunset(offset ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeforeSunset", reflect.TypeOf((*MockStateInterface)(nil).BeforeSunset), offset...)
+}
+
+// Equals mocks base method.
+func (m *MockStateInterface) Equals(entityID, state string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Equals", entityID, state)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Equals indicates an expected call of Equals.
+func (mr *MockStateInterfaceMockRecorder) Equals(entityID, state any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Equals", reflect.TypeOf((*MockStateInterface)(nil).Equals), entityID, state)
+}
+
 // Get mocks base method.
 func (m *MockStateInterface) Get(entityID string) (gomeassistant.EntityState, error) {
 	m.ctrl.T.Helper()
@@ -54,6 +141,21 @@ func (m *MockStateInterface) Get(entityID string) (gomeassistant.EntityState, er
 func (mr *MockStateInterfaceMockRecorder) Get(entityID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockStateInterface)(nil).Get), entityID)
+}
+
+// ListEntities mocks base method.
+func (m *MockStateInterface) ListEntities() ([]gomeassistant.EntityState, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEntities")
+	ret0, _ := ret[0].([]gomeassistant.EntityState)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEntities indicates an expected call of ListEntities.
+func (mr *MockStateInterfaceMockRecorder) ListEntities() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEntities", reflect.TypeOf((*MockStateInterface)(nil).ListEntities))
 }
 
 // MockSwitchInterface is a mock of SwitchInterface interface.

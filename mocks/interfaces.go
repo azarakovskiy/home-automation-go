@@ -10,7 +10,13 @@ import (
 
 // StateInterface wraps ga.State for testing
 type StateInterface interface {
+	AfterSunrise(offset ...ga.DurationString) bool
+	BeforeSunrise(offset ...ga.DurationString) bool
+	AfterSunset(offset ...ga.DurationString) bool
+	BeforeSunset(offset ...ga.DurationString) bool
+	ListEntities() ([]ga.EntityState, error)
 	Get(entityID string) (ga.EntityState, error)
+	Equals(entityID, state string) (bool, error)
 }
 
 // SwitchInterface wraps the Switch service for testing
@@ -63,4 +69,3 @@ type PriceSlot struct {
 	Till  time.Time
 	Price float64
 }
-
