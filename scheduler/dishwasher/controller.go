@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"home-go/dryrun"
 	"home-go/entities"
 
 	ga "saml.dev/gome-assistant"
@@ -60,10 +61,14 @@ func (c *Controller) StartDishwasher() error {
 // turnOnSocket turns on the dishwasher socket
 func (c *Controller) turnOnSocket() error {
 	// Using the kitchen dishwasher socket entity from entities package
-	return c.service.Switch.TurnOn(entities.Switch.KitchenDishwasherSocket)
+	return dryrun.Call("Switch.TurnOn", entities.Switch.KitchenDishwasherSocket, func() error {
+		return c.service.Switch.TurnOn(entities.Switch.KitchenDishwasherSocket)
+	})
 }
 
 // turnOffSocket turns off the dishwasher socket
 func (c *Controller) turnOffSocket() error {
-	return c.service.Switch.TurnOff(entities.Switch.KitchenDishwasherSocket)
+	return dryrun.Call("Switch.TurnOff", entities.Switch.KitchenDishwasherSocket, func() error {
+		return c.service.Switch.TurnOff(entities.Switch.KitchenDishwasherSocket)
+	})
 }
