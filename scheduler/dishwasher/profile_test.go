@@ -28,8 +28,8 @@ func TestGetProfileForMode_AllModes(t *testing.T) {
 		},
 		{
 			mode:         ModeAutoQuick,
-			wantDuration: 2, // Measured: ~70 minutes
-			wantStages:   13, // Measured: 13 distinct stages from power graph
+			wantDuration: 2,   // Measured: ~70 minutes
+			wantStages:   13,  // Measured: 13 distinct stages from power graph
 			wantPowerMin: 1.8, // Real measured: ~2000W
 			wantPowerMax: 2.1,
 		},

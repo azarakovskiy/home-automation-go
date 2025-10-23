@@ -70,54 +70,79 @@ func NewOptimizer() *Optimizer {
 
 // Optimize finds the best start time for a device cycle
 func (o *Optimizer) Optimize(req OptimizationRequest) (*OptimizationResult, error) {
-	if len(req.PriceSlots) == 0 {
-		return nil, fmt.Errorf("no price slots available")
+	if err := o.validateRequest(req); err != nil {
+		return nil, err
 	}
 
-	if req.Profile == nil {
-		return nil, fmt.Errorf("device profile is required")
-	}
-
-	// Calculate slot duration (works for both 1h and 15m intervals)
 	slotDuration := req.PriceSlots[0].Till.Sub(req.PriceSlots[0].From)
-
-	// Calculate how many slots needed for the cycle
 	cycleDuration := time.Duration(req.Profile.GetDurationHours()) * time.Hour
-	slotsNeeded := int(math.Ceil(float64(cycleDuration) / float64(slotDuration)))
+	slotsNeeded := o.calculateSlotsNeeded(cycleDuration, slotDuration, len(req.PriceSlots))
 
-	// If we don't have enough data, optimize with what we have and start immediately
-	availableSlots := len(req.PriceSlots)
-	if slotsNeeded > availableSlots {
-		// Use all available slots - we'll optimize for partial data
-		slotsNeeded = availableSlots
-	}
-
-	// Calculate deadline
-	now := time.Now()
-	if req.StartAfter != nil && req.StartAfter.After(now) {
-		now = *req.StartAfter
-	}
+	now := o.calculateStartTime(req.StartAfter)
 	deadline := now.Add(time.Duration(req.MaxDelayHours) * time.Hour)
 
-	// Try each possible start slot within deadline
+	// Find best optimization window
+	bestResult := o.findBestWindow(req, slotsNeeded, slotDuration, cycleDuration, now, deadline)
+
+	if bestResult == nil {
+		return o.createImmediateResult(req, slotsNeeded, slotDuration, cycleDuration, now)
+	}
+
+	// Calculate savings compared to immediate start
+	o.calculateSavings(bestResult, req, slotsNeeded, slotDuration, now)
+
+	return bestResult, nil
+}
+
+func (o *Optimizer) validateRequest(req OptimizationRequest) error {
+	if len(req.PriceSlots) == 0 {
+		return fmt.Errorf("no price slots available")
+	}
+	if req.Profile == nil {
+		return fmt.Errorf("device profile is required")
+	}
+	return nil
+}
+
+func (o *Optimizer) calculateSlotsNeeded(cycleDuration time.Duration, slotDuration time.Duration, availableSlots int) int {
+	slotsNeeded := int(math.Ceil(float64(cycleDuration) / float64(slotDuration)))
+	if slotsNeeded > availableSlots {
+		return availableSlots
+	}
+	return slotsNeeded
+}
+
+func (o *Optimizer) calculateStartTime(startAfter *time.Time) time.Time {
+	now := time.Now()
+	if startAfter != nil && startAfter.After(now) {
+		return *startAfter
+	}
+	return now
+}
+
+func (o *Optimizer) findBestWindow(
+	req OptimizationRequest,
+	slotsNeeded int,
+	slotDuration time.Duration,
+	cycleDuration time.Duration,
+	now time.Time,
+	deadline time.Time,
+) *OptimizationResult {
 	var bestResult *OptimizationResult
 	bestWeightedCost := math.MaxFloat64
 
 	for startIdx := 0; startIdx <= len(req.PriceSlots)-slotsNeeded; startIdx++ {
 		startSlot := req.PriceSlots[startIdx]
 
-		// Skip if before allowed start time
 		if startSlot.From.Before(now) {
 			continue
 		}
 
-		// Check if this start time respects the deadline
 		endTime := startSlot.From.Add(cycleDuration)
 		if endTime.After(deadline) {
-			break // Can't start any later
+			break
 		}
 
-		// Calculate cost for this start time
 		result := o.calculateCostForWindow(
 			req.Profile,
 			req.PriceSlots[startIdx:startIdx+slotsNeeded],
@@ -132,45 +157,53 @@ func (o *Optimizer) Optimize(req OptimizationRequest) (*OptimizationResult, erro
 		}
 	}
 
-	if bestResult == nil {
-		// No valid optimization window found - start immediately
-		// This ensures the device will always run even if we can't optimize
-		firstValidIdx := 0
-		for i, slot := range req.PriceSlots {
-			if !slot.From.Before(now) {
-				firstValidIdx = i
-				break
-			}
-		}
+	return bestResult
+}
 
-		// Create immediate start result with available slots
-		slotsToUse := slotsNeeded
-		if firstValidIdx+slotsToUse > len(req.PriceSlots) {
-			slotsToUse = len(req.PriceSlots) - firstValidIdx
-		}
-
-		immediateResult := o.calculateCostForWindow(
-			req.Profile,
-			req.PriceSlots[firstValidIdx:firstValidIdx+slotsToUse],
-			slotDuration,
-		)
-		immediateResult.StartTime = req.PriceSlots[firstValidIdx].From
-		immediateResult.EndTime = immediateResult.StartTime.Add(cycleDuration)
-		immediateResult.CurrentCost = immediateResult.EstimatedCost
-		immediateResult.Savings = 0
-		immediateResult.SavingsPercent = 0
-
-		return immediateResult, nil
+func (o *Optimizer) createImmediateResult(
+	req OptimizationRequest,
+	slotsNeeded int,
+	slotDuration time.Duration,
+	cycleDuration time.Duration,
+	now time.Time,
+) (*OptimizationResult, error) {
+	firstValidIdx := o.findFirstValidSlot(req.PriceSlots, now)
+	slotsToUse := slotsNeeded
+	if firstValidIdx+slotsToUse > len(req.PriceSlots) {
+		slotsToUse = len(req.PriceSlots) - firstValidIdx
 	}
 
-	// Calculate cost if started now (for savings comparison)
-	firstValidIdx := 0
-	for i, slot := range req.PriceSlots {
+	result := o.calculateCostForWindow(
+		req.Profile,
+		req.PriceSlots[firstValidIdx:firstValidIdx+slotsToUse],
+		slotDuration,
+	)
+	result.StartTime = req.PriceSlots[firstValidIdx].From
+	result.EndTime = result.StartTime.Add(cycleDuration)
+	result.CurrentCost = result.EstimatedCost
+	result.Savings = 0
+	result.SavingsPercent = 0
+
+	return result, nil
+}
+
+func (o *Optimizer) findFirstValidSlot(slots []pricing.PriceSlot, now time.Time) int {
+	for i, slot := range slots {
 		if !slot.From.Before(now) {
-			firstValidIdx = i
-			break
+			return i
 		}
 	}
+	return 0
+}
+
+func (o *Optimizer) calculateSavings(
+	result *OptimizationResult,
+	req OptimizationRequest,
+	slotsNeeded int,
+	slotDuration time.Duration,
+	now time.Time,
+) {
+	firstValidIdx := o.findFirstValidSlot(req.PriceSlots, now)
 
 	if firstValidIdx+slotsNeeded <= len(req.PriceSlots) {
 		immediateResult := o.calculateCostForWindow(
@@ -178,16 +211,13 @@ func (o *Optimizer) Optimize(req OptimizationRequest) (*OptimizationResult, erro
 			req.PriceSlots[firstValidIdx:firstValidIdx+slotsNeeded],
 			slotDuration,
 		)
-		bestResult.CurrentCost = immediateResult.EstimatedCost
-		bestResult.Savings = immediateResult.EstimatedCost - bestResult.EstimatedCost
+		result.CurrentCost = immediateResult.EstimatedCost
+		result.Savings = immediateResult.EstimatedCost - result.EstimatedCost
 
-		// Calculate savings as percentage of immediate cost
 		if immediateResult.EstimatedCost > 0 {
-			bestResult.SavingsPercent = (bestResult.Savings / immediateResult.EstimatedCost) * 100.0
+			result.SavingsPercent = (result.Savings / immediateResult.EstimatedCost) * 100.0
 		}
 	}
-
-	return bestResult, nil
 }
 
 // calculateCostForWindow calculates weighted cost for a specific time window
