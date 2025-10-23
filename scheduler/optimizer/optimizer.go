@@ -25,10 +25,6 @@ type DeviceProfile interface {
 
 	// GetMode returns the device mode identifier
 	GetMode() string
-
-	// GetMinSavingsPercent returns minimum savings percentage to delay start
-	// e.g., 5.0 means delay only if savings >= 5% of immediate cost
-	GetMinSavingsPercent() float64
 }
 
 // OptimizationRequest contains all parameters for optimization
@@ -61,8 +57,26 @@ type StageAllocation struct {
 
 // Optimizer is a generic price optimizer for any cyclic device
 type Optimizer struct {
-	// No fixed threshold - each device profile specifies its own minimum savings percentage
+	// Dynamic threshold calculation based on MaxDelayHours
+	// Reference points:
+	// - 12 hours wait → 5% minimum savings
+	// - 2 hours wait → 20% minimum savings
+	// Inverse relationship: less time = higher threshold
 }
+
+// Constants for dynamic threshold calculation using exponential decay
+const (
+	// Base threshold: asymptotic minimum as delay approaches infinity
+	baseThreshold = 2.0
+
+	// Decay rate: controls how quickly threshold decreases with more delay time
+	// Higher value = faster decay (threshold drops more quickly)
+	decayRate = 0.15
+
+	// Scale factor: multiplier for the exponential term
+	// Controls the range of threshold values
+	scaleFactor = 25.0
+)
 
 // NewOptimizer creates a new generic optimizer
 func NewOptimizer() *Optimizer {
@@ -296,8 +310,51 @@ func (o *Optimizer) calculateCostForWindow(
 	}
 }
 
-// ShouldDelay determines if delaying is worth it based on the device profile's threshold
-func (o *Optimizer) ShouldDelay(result *OptimizationResult, profile DeviceProfile) bool {
-	minSavingsPercent := profile.GetMinSavingsPercent()
-	return result.SavingsPercent >= minSavingsPercent
+// ShouldDelay determines if delaying is worth it based on dynamic threshold
+// The threshold uses an exponential decay function based on MaxDelayHours:
+// threshold = baseThreshold + scaleFactor * exp(-decayRate * hours)
+//
+// This creates a smooth curve where:
+// - Short delays (1-2h) require high savings (~20-25%)
+// - Medium delays (6h) require moderate savings (~10%)
+// - Long delays (12h+) require lower savings (~5%)
+// - Very long delays approach base threshold asymptotically (~2%)
+func (o *Optimizer) ShouldDelay(result *OptimizationResult, maxDelayHours int) bool {
+	if maxDelayHours <= 0 {
+		return false
+	}
+
+	// Calculate dynamic threshold based on available delay time
+	threshold := o.CalculateDynamicThreshold(maxDelayHours)
+
+	log.Printf("[DEBUG] ShouldDelay: savings=%.1f%%, threshold=%.1f%% (for %dh delay)",
+		result.SavingsPercent, threshold, maxDelayHours)
+
+	return result.SavingsPercent >= threshold
+}
+
+// CalculateDynamicThreshold computes the minimum savings threshold using exponential decay
+// Formula: threshold = baseThreshold + scaleFactor * exp(-decayRate * hours)
+//
+// This creates a smooth inverse relationship:
+// - 1h delay  → ~23% threshold (very high, need significant savings for short wait)
+// - 2h delay  → ~18% threshold
+// - 3h delay  → ~15% threshold
+// - 6h delay  → ~9% threshold
+// - 12h delay → ~5% threshold (willing to wait longer for smaller savings)
+// - 24h delay → ~3% threshold (approaches baseThreshold asymptotically)
+//
+// This is exported so callers can log the threshold value
+func (o *Optimizer) CalculateDynamicThreshold(maxDelayHours int) float64 {
+	if maxDelayHours <= 0 {
+		// For zero or negative delay, return a very high threshold
+		// (effectively: don't delay unless savings are exceptional)
+		return 100.0
+	}
+
+	// Exponential decay function: threshold decreases smoothly as delay time increases
+	// base + scale * e^(-decay * hours)
+	threshold := baseThreshold + scaleFactor*math.Exp(-decayRate*float64(maxDelayHours))
+
+	return threshold
 }

@@ -15,11 +15,10 @@ const (
 // Profile is a generic device profile implementation
 // Devices can use this directly or create their own implementation of DeviceProfile
 type Profile struct {
-	Mode              string
-	Duration          time.Duration
-	StageWeights      []float64
-	PowerKW           float64
-	MinSavingsPercent float64 // Minimum savings percentage to delay start
+	Mode         string
+	Duration     time.Duration
+	StageWeights []float64
+	PowerKW      float64
 }
 
 // Verify Profile implements the interface at compile time
@@ -39,8 +38,4 @@ func (p Profile) GetPowerKW() float64 {
 
 func (p Profile) GetMode() string {
 	return p.Mode
-}
-
-func (p Profile) GetMinSavingsPercent() float64 {
-	return p.MinSavingsPercent
 }

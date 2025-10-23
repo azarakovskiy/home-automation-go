@@ -149,11 +149,13 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 
 	// Decide: start now or delay?
 	delayDuration := time.Until(result.StartTime)
-	shouldDelay := c.optimizer.ShouldDelay(result, profile) && delayDuration >= 5*time.Minute
+	shouldDelay := c.optimizer.ShouldDelay(result, request.MaxDelayHours) && delayDuration >= 5*time.Minute
 
 	if !shouldDelay {
-		log.Printf("Starting immediately (savings %.1f%% below threshold of %.1f%%)",
-			result.SavingsPercent, profile.GetMinSavingsPercent())
+		// Get dynamic threshold for logging
+		threshold := c.optimizer.CalculateDynamicThreshold(request.MaxDelayHours)
+		log.Printf("Starting immediately (savings %.1f%% below threshold of %.1f%% for %dh delay)",
+			result.SavingsPercent, threshold, request.MaxDelayHours)
 
 		// Start immediately
 		if err := c.controller.StartDishwasher(); err != nil {
@@ -167,8 +169,9 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 	}
 
 	// Schedule delayed start
-	log.Printf("Delaying start by %d minutes (savings %.1f%% meets threshold of %.1f%%)",
-		int(delayDuration.Minutes()), result.SavingsPercent, profile.GetMinSavingsPercent())
+	threshold := c.optimizer.CalculateDynamicThreshold(request.MaxDelayHours)
+	log.Printf("Delaying start by %d minutes (savings %.1f%% meets threshold of %.1f%% for %dh delay)",
+		int(delayDuration.Minutes()), result.SavingsPercent, threshold, request.MaxDelayHours)
 
 	// Initialize dishwasher NOW (socket on, wait 5s, socket off)
 	// This allows user to set the mode, then we wait until optimal time to turn it back on

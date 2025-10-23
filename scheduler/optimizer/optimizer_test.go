@@ -256,18 +256,117 @@ func TestOptimizer_ShouldDelay(t *testing.T) {
 	optimizer := NewOptimizer()
 
 	tests := []struct {
-		name              string
-		savingsPercent    float64
-		minSavingsPercent float64
-		expected          bool
+		name           string
+		savingsPercent float64
+		maxDelayHours  int
+		expected       bool
+		description    string
 	}{
-		{"above threshold", 10.0, 5.0, true},
-		{"at threshold", 5.0, 5.0, true},
-		{"below threshold", 3.0, 5.0, false},
-		{"zero savings", 0.0, 5.0, false},
-		{"negative savings", -1.0, 5.0, false},
-		{"high threshold not met", 4.0, 5.0, false},
-		{"low threshold met", 2.5, 2.0, true},
+		{
+			name:           "12h delay, 10% savings - well above ~6% threshold",
+			savingsPercent: 10.0,
+			maxDelayHours:  12,
+			expected:       true,
+			description:    "12h delay → ~6% threshold, 10% savings easily meets it",
+		},
+		{
+			name:           "12h delay, 6% savings - at threshold",
+			savingsPercent: 6.2,
+			maxDelayHours:  12,
+			expected:       true,
+			description:    "12h delay → ~6% threshold, 6.2% savings meets it",
+		},
+		{
+			name:           "12h delay, 3% savings - below threshold",
+			savingsPercent: 3.0,
+			maxDelayHours:  12,
+			expected:       false,
+			description:    "12h delay → ~6% threshold, 3% savings doesn't meet it",
+		},
+		{
+			name:           "6h delay, 13% savings - meets ~12% threshold",
+			savingsPercent: 13.0,
+			maxDelayHours:  6,
+			expected:       true,
+			description:    "6h delay → ~12% threshold, 13% savings meets it",
+		},
+		{
+			name:           "6h delay, 10% savings - below ~12% threshold",
+			savingsPercent: 10.0,
+			maxDelayHours:  6,
+			expected:       false,
+			description:    "6h delay → ~12% threshold, 10% savings doesn't quite meet it",
+		},
+		{
+			name:           "3h delay, 18% savings - meets threshold",
+			savingsPercent: 18.0,
+			maxDelayHours:  3,
+			expected:       true,
+			description:    "3h delay → ~18% threshold, 18% savings meets it",
+		},
+		{
+			name:           "3h delay, 15% savings - below threshold",
+			savingsPercent: 15.0,
+			maxDelayHours:  3,
+			expected:       false,
+			description:    "3h delay → ~18% threshold, 15% savings doesn't meet it",
+		},
+		{
+			name:           "2h delay, 21% savings - meets ~21% threshold",
+			savingsPercent: 21.0,
+			maxDelayHours:  2,
+			expected:       true,
+			description:    "2h delay → ~21% threshold, 21% savings meets it",
+		},
+		{
+			name:           "2h delay, 15% savings - below threshold",
+			savingsPercent: 15.0,
+			maxDelayHours:  2,
+			expected:       false,
+			description:    "2h delay → ~21% threshold, 15% doesn't meet it",
+		},
+		{
+			name:           "1h delay, 25% savings - meets ~23% threshold",
+			savingsPercent: 25.0,
+			maxDelayHours:  1,
+			expected:       true,
+			description:    "1h delay → ~23% threshold, 25% savings meets it",
+		},
+		{
+			name:           "1h delay, 20% savings - below threshold",
+			savingsPercent: 20.0,
+			maxDelayHours:  1,
+			expected:       false,
+			description:    "1h delay → ~23% threshold, 20% doesn't meet it",
+		},
+		{
+			name:           "24h delay, 3% savings - meets ~3% threshold",
+			savingsPercent: 3.0,
+			maxDelayHours:  24,
+			expected:       true,
+			description:    "24h delay → ~3% threshold, 3% savings meets it",
+		},
+		{
+			name:           "zero savings always false",
+			savingsPercent: 0.0,
+			maxDelayHours:  12,
+			expected:       false,
+			description:    "Zero savings never justifies delay",
+		},
+		{
+			name:           "negative savings always false",
+			savingsPercent: -1.0,
+			maxDelayHours:  12,
+			expected:       false,
+			description:    "Negative savings never justifies delay",
+		},
+		{
+			name:           "zero delay hours always false",
+			savingsPercent: 50.0,
+			maxDelayHours:  0,
+			expected:       false,
+			description:    "Zero delay hours means start immediately",
+		},
 	}
 
 	for _, tt := range tests {
@@ -275,17 +374,121 @@ func TestOptimizer_ShouldDelay(t *testing.T) {
 			result := &OptimizationResult{
 				SavingsPercent: tt.savingsPercent,
 			}
-			profile := MockProfile{
-				minSavingsPercent: tt.minSavingsPercent,
-				duration:          1 * time.Hour,
-			}
 
-			got := optimizer.ShouldDelay(result, profile)
+			got := optimizer.ShouldDelay(result, tt.maxDelayHours)
+			threshold := optimizer.CalculateDynamicThreshold(tt.maxDelayHours)
+
 			if got != tt.expected {
-				t.Errorf("ShouldDelay(%.1f%%, threshold %.1f%%) = %v, want %v",
-					tt.savingsPercent, tt.minSavingsPercent, got, tt.expected)
+				t.Errorf("ShouldDelay(%.1f%%, %dh delay with %.2f%% threshold) = %v, want %v\nReason: %s",
+					tt.savingsPercent, tt.maxDelayHours, threshold, got, tt.expected, tt.description)
 			}
 		})
+	}
+}
+
+func TestOptimizer_CalculateDynamicThreshold(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	tests := []struct {
+		name          string
+		maxDelayHours int
+		minExpected   float64 // Allow range due to exponential function
+		maxExpected   float64
+		description   string
+	}{
+		{
+			name:          "1 hour → ~23%",
+			maxDelayHours: 1,
+			minExpected:   22.0,
+			maxExpected:   24.0,
+			description:   "Very short delay requires high savings",
+		},
+		{
+			name:          "2 hours → ~20.5%",
+			maxDelayHours: 2,
+			minExpected:   20.0,
+			maxExpected:   21.0,
+			description:   "Short delay still requires significant savings",
+		},
+		{
+			name:          "3 hours → ~18%",
+			maxDelayHours: 3,
+			minExpected:   17.5,
+			maxExpected:   18.5,
+			description:   "Moderate delay requires moderate-high savings",
+		},
+		{
+			name:          "6 hours → ~12%",
+			maxDelayHours: 6,
+			minExpected:   11.5,
+			maxExpected:   12.5,
+			description:   "Medium delay allows lower threshold",
+		},
+		{
+			name:          "12 hours → ~6%",
+			maxDelayHours: 12,
+			minExpected:   6.0,
+			maxExpected:   6.5,
+			description:   "Long delay allows small savings to be worthwhile",
+		},
+		{
+			name:          "24 hours → ~3%",
+			maxDelayHours: 24,
+			minExpected:   2.5,
+			maxExpected:   3.5,
+			description:   "Very long delay approaches base threshold",
+		},
+		{
+			name:          "48 hours → approaching base (~2%)",
+			maxDelayHours: 48,
+			minExpected:   2.0,
+			maxExpected:   2.5,
+			description:   "Extremely long delay nearly at asymptotic minimum",
+		},
+		{
+			name:          "0 hours → 100% (immediate start)",
+			maxDelayHours: 0,
+			minExpected:   100.0,
+			maxExpected:   100.0,
+			description:   "Zero hours means start immediately",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := optimizer.CalculateDynamicThreshold(tt.maxDelayHours)
+			if got < tt.minExpected || got > tt.maxExpected {
+				t.Errorf("CalculateDynamicThreshold(%d) = %.2f%%, want between %.2f%% and %.2f%%\nReason: %s",
+					tt.maxDelayHours, got, tt.minExpected, tt.maxExpected, tt.description)
+			}
+		})
+	}
+}
+
+func TestOptimizer_CalculateDynamicThreshold_SmoothCurve(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	// Test that the function creates a smooth decreasing curve
+	hours := []int{1, 2, 3, 6, 12, 24, 48}
+	var prevThreshold float64 = 1000.0 // Start with impossibly high value
+
+	for _, h := range hours {
+		threshold := optimizer.CalculateDynamicThreshold(h)
+
+		// Each threshold should be strictly less than the previous
+		if threshold >= prevThreshold {
+			t.Errorf("Threshold not decreasing smoothly: %dh (%.2f%%) >= previous (%.2f%%)",
+				h, threshold, prevThreshold)
+		}
+
+		prevThreshold = threshold
+		t.Logf("%2dh delay → %.2f%% threshold", h, threshold)
+	}
+
+	// Verify it approaches but never goes below base threshold
+	veryLongDelay := optimizer.CalculateDynamicThreshold(1000)
+	if veryLongDelay < 2.0 {
+		t.Errorf("Threshold %.2f%% went below base threshold of 2.0%%", veryLongDelay)
 	}
 }
 
