@@ -8,9 +8,9 @@ import (
 	"home-go/component"
 	"home-go/entities"
 	"home-go/notifications"
+	"home-go/optimization/optimizer"
+	"home-go/optimization/scheduled"
 	"home-go/pricing"
-	"home-go/scheduler"
-	"home-go/scheduler/optimizer"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -90,7 +90,7 @@ func (c *Dishwasher) Intervals() []ga.Interval {
 
 // handleScheduleRequest processes strongly-typed dishwasher schedule events
 // The TypedEventHandler automatically parses the event, so we receive typed data directly
-func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, request scheduler.ScheduleRequest) {
+func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, request scheduled.ScheduleRequest) {
 	log.Printf("Received schedule request event")
 
 	// Type-safe access to fields - no parsing needed!
@@ -99,7 +99,7 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 		return
 	}
 
-	mode := request.Mode
+	mode := Mode(request.Mode)
 	log.Printf("Processing dishwasher schedule: mode=%s, max_delay=%d hours",
 		mode, request.MaxDelayHours)
 

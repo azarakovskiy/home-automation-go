@@ -6,7 +6,7 @@ import (
 
 	"home-go/component"
 	"home-go/entities"
-	"home-go/scheduler/optimizer"
+	"home-go/optimization/optimizer"
 
 	ga "saml.dev/gome-assistant"
 )

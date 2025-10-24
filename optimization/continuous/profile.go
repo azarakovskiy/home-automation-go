@@ -1,9 +1,9 @@
-package charger
+package continuous
 
 import (
 	"time"
 
-	"home-go/scheduler/optimizer"
+	"home-go/optimization/optimizer"
 )
 
 // ChargingProfile defines charging behavior for different device types

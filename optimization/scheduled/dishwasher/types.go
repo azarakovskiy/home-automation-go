@@ -1,9 +1,7 @@
 package dishwasher
 
-import "home-go/scheduler"
-
 // Mode represents dishwasher operating modes
-type Mode = scheduler.Mode
+type Mode string
 
 // Dishwasher-specific modes
 const (
