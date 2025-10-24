@@ -34,7 +34,7 @@ func TestPredefinedProfiles(t *testing.T) {
 		{
 			name:            "Laptop Profile",
 			profile:         LaptopProfile,
-			expectedDur:     6 * time.Hour,
+			expectedDur:     1 * time.Hour,  // 1h actual charging time (measured: 20% → 100%)
 			expectedWindow:  12 * time.Hour, // 12h window for finding cheap charging slots
 			expectedNameSet: true,
 		},

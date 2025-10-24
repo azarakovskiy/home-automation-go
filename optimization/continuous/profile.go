@@ -71,11 +71,11 @@ var (
 	LaptopProfile = ChargingProfile{
 		Name:               "Laptop",
 		Strategy:           StrategyCriticalUptime,
-		TotalDuration:      6 * time.Hour,  // Needs 6h total charging per cycle
-		WindowSize:         12 * time.Hour, // Find cheap slots in 12h window (typically night + lunch)
+		TotalDuration:      1 * time.Hour,  // Measured: 20% → 100% in ~1h
+		WindowSize:         12 * time.Hour, // Find cheapest 1h within 12h window (night + lunch)
 		CriticalHoursStart: 9,              // Work starts at 9 AM (morning peak)
 		CriticalHoursEnd:   19,             // Work ends at 19:00 (after evening peak)
-		DrainRate:          8 * time.Hour,  // Can run ~8 hours on full charge (full workday)
+		DrainRate:          3 * time.Hour,  // Measured: 100% → 20% in 3h
 		BatteryEntity:      entities.Sensor.OfficeLaptopWorkInternalBatteryLevel,
 		MinBatteryPercent:  10, // Allow aggressive drain to 10% by end of work day
 		Description:        "Work laptop - charged by 9 AM, drains through work, charges overnight",
