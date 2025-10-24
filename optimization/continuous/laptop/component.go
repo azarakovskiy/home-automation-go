@@ -1,10 +1,12 @@
 package laptop
 
 import (
+	"fmt"
 	"log"
 	"time"
 
 	"home-go/component"
+	"home-go/debug"
 	"home-go/dryrun"
 	"home-go/entities"
 	"home-go/optimization/continuous"
@@ -81,8 +83,26 @@ func (c *LaptopCharger) optimizeCharging(service *ga.Service, state ga.State) {
 		return
 	}
 
-	// Optimize using predefined profile
-	result, err := c.optimizer.OptimizeCheapestHours(c.profile.ToOptimizerRequest(), priceSlots)
+	// Build optimization request
+	request := c.profile.ToOptimizerRequest()
+
+	// Try to get battery level if entity is configured
+	if c.profile.BatteryEntity != "" {
+		batteryState, err := state.Get(c.profile.BatteryEntity)
+		if err != nil {
+			log.Printf("WARNING: Failed to get battery level from %s: %v (will use estimation)", c.profile.BatteryEntity, err)
+		} else {
+			// Parse battery level (state should be a number like "75")
+			var batteryLevel int
+			if _, err := fmt.Sscanf(batteryState.State, "%d", &batteryLevel); err == nil {
+				request.CurrentBatteryLevel = batteryLevel
+				debug.Log("Battery level from sensor: %d%%", batteryLevel)
+			}
+		}
+	}
+
+	// Optimize using profile + battery level
+	result, err := c.optimizer.OptimizeCheapestHours(request, priceSlots)
 	if err != nil {
 		log.Printf("ERROR: Optimization failed: %v", err)
 		return
@@ -90,15 +110,12 @@ func (c *LaptopCharger) optimizeCharging(service *ga.Service, state ga.State) {
 
 	// Apply decision
 	if result.ChargeNow {
-		log.Printf("Laptop: Charging now (current slot is cheap, savings: %.1f%%, will charge for %s)",
-			result.SavingsPercent, result.TotalDuration)
 		if err := c.turnOn(); err != nil {
-			log.Printf("ERROR: Failed to turn on: %v", err)
+			log.Printf("ERROR: Failed to turn on laptop charger: %v", err)
 		}
 	} else {
-		log.Printf("Laptop: Not charging now (waiting for cheaper slots)")
 		if err := c.turnOff(); err != nil {
-			log.Printf("ERROR: Failed to turn off: %v", err)
+			log.Printf("ERROR: Failed to turn off laptop charger: %v", err)
 		}
 	}
 }

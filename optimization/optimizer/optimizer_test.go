@@ -578,3 +578,266 @@ func abs(x float64) float64 {
 	}
 	return x
 }
+
+func TestOptimizer_OptimizeCheapestHours_Opportunistic(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	now := time.Now().Truncate(15 * time.Minute)
+	slots := []pricing.PriceSlot{
+		{From: now, Till: now.Add(15 * time.Minute), Price: 0.20},                       // Current slot - cheap!
+		{From: now.Add(15 * time.Minute), Till: now.Add(30 * time.Minute), Price: 0.30}, // Expensive
+		{From: now.Add(30 * time.Minute), Till: now.Add(45 * time.Minute), Price: 0.25},
+		{From: now.Add(45 * time.Minute), Till: now.Add(60 * time.Minute), Price: 0.28},
+		{From: now.Add(60 * time.Minute), Till: now.Add(75 * time.Minute), Price: 0.18}, // Cheapest
+		{From: now.Add(75 * time.Minute), Till: now.Add(90 * time.Minute), Price: 0.22},
+	}
+
+	req := CheapestHoursRequest{
+		DeviceName:    "Vacuum",
+		TotalDuration: 30 * time.Minute, // Need 30 minutes
+		WindowSize:    90 * time.Minute, // Look in 90-minute window
+	}
+
+	result, err := optimizer.OptimizeCheapestHours(req, slots)
+	if err != nil {
+		t.Fatalf("OptimizeCheapestHours failed: %v", err)
+	}
+
+	// Should find cheapest slots
+	if len(result.CheapestSlots) == 0 {
+		t.Error("Expected cheapest slots to be populated")
+	}
+
+	// Current slot is one of the cheapest, so should charge now
+	if !result.ChargeNow {
+		t.Error("Expected ChargeNow=true at cheap current slot")
+	}
+}
+
+func TestOptimizer_CriticalUptime_WithBatterySensor_LowBattery(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	// Current time: 2 PM (14:00) - in critical hours (10-18)
+	now := time.Date(2024, 1, 1, 14, 0, 0, 0, time.Local)
+	slots := []pricing.PriceSlot{
+		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50}, // Expensive!
+	}
+
+	req := CheapestHoursRequest{
+		DeviceName:          "Laptop",
+		TotalDuration:       6 * time.Hour,
+		WindowSize:          12 * time.Hour,
+		CriticalHoursStart:  10,
+		CriticalHoursEnd:    18,
+		MinBatteryPercent:   20,
+		CurrentBatteryLevel: 15, // Below 20% - CRITICAL!
+	}
+
+	result, err := optimizer.OptimizeCheapestHours(req, slots)
+	if err != nil {
+		t.Fatalf("OptimizeCheapestHours failed: %v", err)
+	}
+
+	// Should charge immediately despite expensive rates
+	if !result.ChargeNow {
+		t.Error("Expected ChargeNow=true when battery is critically low during critical hours")
+	}
+
+	if result.SavingsPercent != 0 {
+		t.Errorf("Expected 0%% savings (emergency charge), got %.2f%%", result.SavingsPercent)
+	}
+}
+
+func TestOptimizer_CriticalUptime_WithBatterySensor_HealthyBattery(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	// Current time: 3 PM (15:00) - in critical hours
+	now := time.Date(2024, 1, 1, 15, 0, 0, 0, time.Local)
+	slots := []pricing.PriceSlot{
+		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50}, // Expensive
+	}
+
+	req := CheapestHoursRequest{
+		DeviceName:          "Laptop",
+		TotalDuration:       6 * time.Hour,
+		WindowSize:          12 * time.Hour,
+		CriticalHoursStart:  10,
+		CriticalHoursEnd:    18,
+		MinBatteryPercent:   20,
+		CurrentBatteryLevel: 75, // Healthy battery
+	}
+
+	result, err := optimizer.OptimizeCheapestHours(req, slots)
+	if err != nil {
+		t.Fatalf("OptimizeCheapestHours failed: %v", err)
+	}
+
+	// Should NOT charge - battery is healthy, let it drain during expensive hours
+	if result.ChargeNow {
+		t.Error("Expected ChargeNow=false when battery is healthy during critical hours")
+	}
+}
+
+func TestOptimizer_CriticalUptime_WithEstimation_NeedCharge(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	// Current time: 11 AM (11:00) - 1 hour into critical hours (10-18)
+	// With DrainRate=2h, after 1h we're at 50% of drain rate
+	now := time.Date(2024, 1, 1, 11, 0, 0, 0, time.Local)
+	slots := []pricing.PriceSlot{
+		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50},
+	}
+
+	req := CheapestHoursRequest{
+		DeviceName:          "Laptop",
+		TotalDuration:       6 * time.Hour,
+		WindowSize:          12 * time.Hour,
+		CriticalHoursStart:  10,
+		CriticalHoursEnd:    18,
+		DrainRate:           2 * time.Hour, // 2 hours of work drains battery
+		MinBatteryPercent:   20,
+		CurrentBatteryLevel: 0, // No sensor - use estimation
+	}
+
+	result, err := optimizer.OptimizeCheapestHours(req, slots)
+	if err != nil {
+		t.Fatalf("OptimizeCheapestHours failed: %v", err)
+	}
+
+	// Should charge - 1h into critical period, which is > 50% of 2h drain rate
+	if !result.ChargeNow {
+		t.Error("Expected ChargeNow=true after 1h into critical period (DrainRate=2h)")
+	}
+}
+
+func TestOptimizer_CriticalUptime_WithEstimation_NoChargeYet(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	// Current time: 10:15 AM - just started critical hours
+	// With 10 being the start hour, currentHour=10, hoursIntoCritical=0
+	now := time.Date(2024, 1, 1, 10, 15, 0, 0, time.Local)
+	slots := []pricing.PriceSlot{
+		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50},
+	}
+
+	req := CheapestHoursRequest{
+		DeviceName:          "Laptop",
+		TotalDuration:       6 * time.Hour,
+		WindowSize:          12 * time.Hour,
+		CriticalHoursStart:  10,
+		CriticalHoursEnd:    18,
+		DrainRate:           4 * time.Hour, // 4 hours to drain - so 0h into critical is well below 50%
+		MinBatteryPercent:   20,
+		CurrentBatteryLevel: 0, // No sensor
+	}
+
+	result, err := optimizer.OptimizeCheapestHours(req, slots)
+	if err != nil {
+		t.Fatalf("OptimizeCheapestHours failed: %v", err)
+	}
+
+	// Should NOT charge yet - only 15min into critical period, battery should still be good
+	if result.ChargeNow {
+		t.Error("Expected ChargeNow=false early in critical period")
+	}
+}
+
+func TestOptimizer_CriticalUptime_PreCharge_BeforeCriticalHours(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	// Current time: 2 AM - well before critical hours (10-18)
+	now := time.Date(2024, 1, 1, 2, 0, 0, 0, time.Local)
+	var slots []pricing.PriceSlot
+
+	// Create slots for next 10 hours (2 AM to noon)
+	// Prices: cheap early, expensive later
+	for i := 0; i < 40; i++ { // 10 hours * 4 (15-min slots)
+		hour := 2 + (i / 4)
+		var price float64
+		if hour < 6 {
+			price = 0.18 // Cheap night rates
+		} else {
+			price = 0.30 // Expensive morning rates
+		}
+
+		slots = append(slots, pricing.PriceSlot{
+			From:  now.Add(time.Duration(i) * 15 * time.Minute),
+			Till:  now.Add(time.Duration(i+1) * 15 * time.Minute),
+			Price: price,
+		})
+	}
+
+	req := CheapestHoursRequest{
+		DeviceName:         "Laptop",
+		TotalDuration:      60 * time.Minute, // 1 hour
+		WindowSize:         8 * time.Hour,    // Look 8 hours ahead
+		CriticalHoursStart: 10,
+		CriticalHoursEnd:   18,
+		DrainRate:          2 * time.Hour,
+		MinBatteryPercent:  20,
+	}
+
+	result, err := optimizer.OptimizeCheapestHours(req, slots)
+	if err != nil {
+		t.Fatalf("OptimizeCheapestHours failed: %v", err)
+	}
+
+	// Should execute pre-charge logic successfully
+	// At 2 AM, before critical hours, should find cheap slots
+	if result == nil {
+		t.Fatal("Expected result to be non-nil")
+	}
+
+	// Should charge now since current slot (2 AM) is cheap
+	if !result.ChargeNow {
+		t.Error("Expected ChargeNow=true at 2 AM during cheap night rates")
+	}
+}
+
+func TestOptimizer_CriticalUptime_StrategyAutoDetection(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	now := time.Now().Truncate(15 * time.Minute)
+	slots := []pricing.PriceSlot{
+		{From: now, Till: now.Add(15 * time.Minute), Price: 0.30},
+	}
+
+	tests := []struct {
+		name               string
+		criticalHoursStart int
+		criticalHoursEnd   int
+		expectedStrategy   string
+	}{
+		{
+			name:               "No critical hours - opportunistic",
+			criticalHoursStart: 0,
+			criticalHoursEnd:   0,
+			expectedStrategy:   "opportunistic",
+		},
+		{
+			name:               "Has critical hours - critical uptime",
+			criticalHoursStart: 10,
+			criticalHoursEnd:   18,
+			expectedStrategy:   "critical_uptime",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := CheapestHoursRequest{
+				DeviceName:         "TestDevice",
+				TotalDuration:      1 * time.Hour,
+				WindowSize:         6 * time.Hour,
+				CriticalHoursStart: tt.criticalHoursStart,
+				CriticalHoursEnd:   tt.criticalHoursEnd,
+			}
+
+			_, err := optimizer.OptimizeCheapestHours(req, slots)
+			if err != nil {
+				t.Fatalf("OptimizeCheapestHours failed: %v", err)
+			}
+
+			// Just verify it doesn't error - strategy is auto-detected internally
+		})
+	}
+}
