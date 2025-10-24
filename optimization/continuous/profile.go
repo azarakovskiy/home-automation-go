@@ -28,10 +28,10 @@ type ChargingProfile struct {
 
 	// For StrategyCriticalUptime only:
 	CriticalHoursStart int           // Hour when device must be available (e.g., 9 for 9 AM)
-	CriticalHoursEnd   int           // Hour when critical period ends (e.g., 17 for 5 PM)
-	DrainRate          time.Duration // How long device can run on full charge (e.g., 2h)
+	CriticalHoursEnd   int           // Hour when critical period ends (e.g., 19 for 7 PM)
+	DrainRate          time.Duration // How long device can run on full charge (e.g., 8h for full workday)
 	BatteryEntity      string        // Optional: HA entity for battery level (e.g., "sensor.laptop_battery_level")
-	MinBatteryPercent  int           // Charge during critical hours if battery drops below this (default: 20)
+	MinBatteryPercent  int           // Minimum battery during critical hours (e.g., 10% - allows aggressive drain)
 
 	Description string
 }
@@ -58,21 +58,27 @@ func (p ChargingProfile) ToOptimizerRequest() optimizer.CheapestHoursRequest {
 
 // Predefined charging profiles for active devices
 var (
-	// LaptopProfile - critical uptime during work hours (10-18)
-	// Must be charged before work starts. Can charge opportunistically outside work hours.
-	// Working drains battery (~2h usage), needs pre-charging to ensure availability.
+	// LaptopProfile - critical uptime during work hours with adaptive battery management
+	// Optimized for typical work pattern:
+	// - Fully charged by 9 AM (before morning price peak)
+	// - Drain through morning peak (9 AM) and work hours
+	// - Light usage during lunch (12-13), opportunistic charging if cheap
+	// - Continue working through afternoon
+	// - Drain through evening peak (18:00)
+	// - Can reach minimum (10%) by 19:00, then charge overnight at cheap rates
+	// - Avoids charging during expensive peak hours (9:00, 18:00)
 	// Uses actual battery sensor from Home Assistant companion app.
 	LaptopProfile = ChargingProfile{
 		Name:               "Laptop",
 		Strategy:           StrategyCriticalUptime,
 		TotalDuration:      6 * time.Hour,  // Needs 6h total charging per cycle
-		WindowSize:         12 * time.Hour, // Find cheap slots in 12h window (typically night)
-		CriticalHoursStart: 10,             // Must be available 10 AM - 6 PM
-		CriticalHoursEnd:   18,
-		DrainRate:          2 * time.Hour,                                        // 2 hours of work drains battery
-		BatteryEntity:      entities.Sensor.OfficeLaptopWorkInternalBatteryLevel, // HA companion app sensor (auto-generated)
-		MinBatteryPercent:  20,                                                   // Charge during work if battery < 20%
-		Description:        "Work laptop - ensure charged before 10 AM",
+		WindowSize:         12 * time.Hour, // Find cheap slots in 12h window (typically night + lunch)
+		CriticalHoursStart: 9,              // Work starts at 9 AM (morning peak)
+		CriticalHoursEnd:   19,             // Work ends at 19:00 (after evening peak)
+		DrainRate:          8 * time.Hour,  // Can run ~8 hours on full charge (full workday)
+		BatteryEntity:      entities.Sensor.OfficeLaptopWorkInternalBatteryLevel,
+		MinBatteryPercent:  10, // Allow aggressive drain to 10% by end of work day
+		Description:        "Work laptop - charged by 9 AM, drains through work, charges overnight",
 	}
 
 	// VacuumProfile - opportunistic charging, no critical uptime

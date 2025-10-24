@@ -470,7 +470,14 @@ func (o *Optimizer) optimizeCriticalUptime(req CheapestHoursRequest, priceSlots 
 	currentPrice := o.getCurrentPriceFromSlots(priceSlots, now)
 
 	// Check if we're in critical hours (device is being used, might be draining)
-	inCriticalHours := currentHour >= req.CriticalHoursStart && currentHour < req.CriticalHoursEnd
+	// Handle both normal range (e.g., 10-18) and wrap-around (e.g., 22-6)
+	inCriticalHours := false
+	if req.CriticalHoursStart < req.CriticalHoursEnd {
+		inCriticalHours = currentHour >= req.CriticalHoursStart && currentHour < req.CriticalHoursEnd
+	} else {
+		// Wrap-around case: e.g., 22-6 means 22,23,0,1,2,3,4,5
+		inCriticalHours = currentHour >= req.CriticalHoursStart || currentHour < req.CriticalHoursEnd
+	}
 
 	if inCriticalHours {
 		return o.handleCriticalHoursCharging(req, currentPrice)
@@ -566,34 +573,86 @@ func (o *Optimizer) handlePreChargingBeforeCriticalHours(req CheapestHoursReques
 	debug.Log("Critical uptime optimization: need %s before %d:00, found %d slots",
 		req.TotalDuration, req.CriticalHoursStart, len(windowSlots))
 
-	// Find cheapest slots for charging (pre-charge strategy)
+	// Find cheapest slots for charging
 	cheapestSlots, totalDuration := o.selectCheapestSlotsByDuration(windowSlots, req.TotalDuration)
 	currentSlotIsCheap := o.isCurrentSlotInSelection(cheapestSlots, now)
+
+	// Check if we should charge now to avoid expensive critical hours
+	shouldChargeNow, criticalHoursAvg := o.shouldPreChargeNow(req, priceSlots, now, currentPrice, currentSlotIsCheap)
 
 	avgPrice := o.calculateAveragePrice(windowSlots)
 	savingsPercent := o.calculateSavingsPercent(avgPrice, currentPrice)
 
-	debug.Log("Critical uptime decision: charge now=%v, current=%.4f, avg=%.4f, savings=%.1f%%",
-		currentSlotIsCheap, currentPrice, avgPrice, savingsPercent)
-
-	// Log user-friendly information
-	if !currentSlotIsCheap && len(cheapestSlots) > 0 {
-		nextSlot := cheapestSlots[0]
-		log.Printf("%s: Not charging now - next cheap slot at %s before work hours",
-			req.DeviceName, nextSlot.From.Format("15:04"))
-	} else if !currentSlotIsCheap {
-		log.Printf("%s: Not charging now - waiting for cheaper slots before %d:00",
-			req.DeviceName, req.CriticalHoursStart)
-	}
+	o.logPreChargeDecision(req, currentPrice, cheapestSlots, shouldChargeNow, currentSlotIsCheap, criticalHoursAvg)
 
 	return &CheapestHoursResult{
-		ChargeNow:      currentSlotIsCheap,
+		ChargeNow:      shouldChargeNow,
 		CheapestSlots:  cheapestSlots,
 		AveragePrice:   avgPrice,
 		CurrentPrice:   currentPrice,
 		SavingsPercent: savingsPercent,
 		TotalDuration:  totalDuration,
 	}, nil
+}
+
+// shouldPreChargeNow determines if we should charge now based on price spikes and critical hours proximity
+// Returns the decision and the critical hours average price for logging
+func (o *Optimizer) shouldPreChargeNow(req CheapestHoursRequest, priceSlots []pricing.PriceSlot, now time.Time, currentPrice float64, currentSlotIsCheap bool) (bool, float64) {
+	// Always charge if current slot is among the cheapest
+	if currentSlotIsCheap {
+		return true, 0
+	}
+
+	// Check if we're approaching a price spike during critical hours
+	criticalHoursAvg := o.getAveragePriceDuringCriticalHours(priceSlots, now, req.CriticalHoursStart, req.CriticalHoursEnd)
+	hoursUntilCritical := o.calculateHoursUntilCritical(now, req.CriticalHoursStart)
+
+	// Smart spike detection: if we're close to critical hours (≤4h) and current price is cheaper
+	// than critical hours average, charge now to avoid being caught with low battery during expensive peaks
+	closeToCriticalHours := hoursUntilCritical <= 4
+	currentCheaperThanCriticalHours := currentPrice < criticalHoursAvg
+
+	shouldEmergencyPreCharge := currentCheaperThanCriticalHours && closeToCriticalHours
+
+	debug.Log("Pre-charge decision: current=%.4f, critical_avg=%.4f, hours_until_critical=%d, emergency=%v",
+		currentPrice, criticalHoursAvg, hoursUntilCritical, shouldEmergencyPreCharge)
+
+	return shouldEmergencyPreCharge, criticalHoursAvg
+}
+
+// calculateHoursUntilCritical calculates hours until critical hours start, handling day wrap-around
+func (o *Optimizer) calculateHoursUntilCritical(now time.Time, criticalHoursStart int) int {
+	currentHour := now.Hour()
+	hoursUntil := criticalHoursStart - currentHour
+	if hoursUntil < 0 {
+		hoursUntil += 24 // Handle wrap-around (e.g., 23:00 to 01:00 = 2 hours)
+	}
+	return hoursUntil
+}
+
+// logPreChargeDecision logs user-friendly information about the pre-charge decision
+func (o *Optimizer) logPreChargeDecision(req CheapestHoursRequest, currentPrice float64, cheapestSlots []pricing.PriceSlot, shouldChargeNow bool, currentSlotIsCheap bool, criticalHoursAvg float64) {
+	if !shouldChargeNow {
+		if len(cheapestSlots) > 0 {
+			nextSlot := cheapestSlots[0]
+			log.Printf("%s: Not charging now - next cheap slot at %s before critical hours",
+				req.DeviceName, nextSlot.From.Format("15:04"))
+		} else {
+			log.Printf("%s: Not charging now - waiting for cheaper slots before %d:00",
+				req.DeviceName, req.CriticalHoursStart)
+		}
+		return
+	}
+
+	// Already charging and it's among cheapest slots - no special logging needed
+	if currentSlotIsCheap {
+		return
+	}
+
+	// Emergency pre-charge due to approaching spike
+	savingsVsCritical := ((criticalHoursAvg - currentPrice) / criticalHoursAvg) * 100
+	log.Printf("%s: Pre-charging now - %.1f%% cheaper than critical hours peak (%.4f vs %.4f)",
+		req.DeviceName, savingsVsCritical, currentPrice, criticalHoursAvg)
 }
 
 func (o *Optimizer) validateCheapestHoursRequest(req CheapestHoursRequest) error {
@@ -622,6 +681,39 @@ func (o *Optimizer) getWindowSlots(priceSlots []pricing.PriceSlot, now time.Time
 		}
 	}
 	return windowSlots
+}
+
+// getAveragePriceDuringCriticalHours calculates average price during critical hours to detect spikes
+func (o *Optimizer) getAveragePriceDuringCriticalHours(priceSlots []pricing.PriceSlot, now time.Time, startHour, endHour int) float64 {
+	var totalPrice float64
+	var count int
+
+	for _, slot := range priceSlots {
+		slotHour := slot.From.Hour()
+
+		// Check if this slot falls within critical hours
+		// Handle both normal range (e.g., 10-18) and wrap-around (e.g., 22-6)
+		inCriticalHours := false
+		if startHour < endHour {
+			inCriticalHours = slotHour >= startHour && slotHour < endHour
+		} else {
+			// Wrap-around case: e.g., 22-6 means 22,23,0,1,2,3,4,5
+			inCriticalHours = slotHour >= startHour || slotHour < endHour
+		}
+
+		if inCriticalHours && (slot.From.After(now) || slot.From.Equal(now)) {
+			totalPrice += slot.Price
+			count++
+		}
+	}
+
+	if count == 0 {
+		// If no critical hours slots found (e.g., it's evening and critical hours are in past),
+		// return current price as fallback
+		return o.getCurrentPriceFromSlots(priceSlots, now)
+	}
+
+	return totalPrice / float64(count)
 }
 
 // selectCheapestSlotsByDuration selects the cheapest slots until the total duration is met

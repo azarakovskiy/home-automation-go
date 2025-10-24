@@ -870,3 +870,136 @@ func TestOptimizer_CriticalUptime_StrategyAutoDetection(t *testing.T) {
 		})
 	}
 }
+
+func TestOptimizer_CriticalUptime_SpikeDetection_MorningRamp(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	// Use current time and set critical hours in the future
+	// Simulate being 3 hours before critical hours (like 7 AM before 10 AM work)
+	now := time.Now()
+	currentHour := now.Hour()
+
+	criticalStart := (currentHour + 3) % 24
+	criticalEnd := (currentHour + 11) % 24
+
+	// Handle wrap-around
+	if criticalEnd <= criticalStart {
+		criticalStart = (currentHour + 3) % 24
+		criticalEnd = 23
+	}
+
+	var slots []pricing.PriceSlot
+	// Create 24 hours of price data with a spike pattern
+	for i := 0; i < 96; i++ { // 24 hours * 4 (15-min slots)
+		relativeHour := i / 4 // Hours from now
+
+		var price float64
+		if relativeHour < 3 {
+			// Next 3 hours: ramping up (current slot = 0.26, then 0.28, 0.29)
+			price = 0.26 + float64(relativeHour)*0.015
+		} else if relativeHour >= 3 && relativeHour < 11 {
+			// Critical hours (3-11 hours from now): expensive with spike
+			// Average will be around 0.30
+			if relativeHour < 5 {
+				price = 0.26 // Early critical hours
+			} else if relativeHour < 7 {
+				price = 0.29 // Mid critical hours
+			} else {
+				price = 0.36 // Late critical hours (spike)
+			}
+		} else {
+			// After critical hours: cheaper again
+			price = 0.24
+		}
+
+		slots = append(slots, pricing.PriceSlot{
+			From:  now.Add(time.Duration(i) * 15 * time.Minute),
+			Till:  now.Add(time.Duration(i+1) * 15 * time.Minute),
+			Price: price,
+		})
+	}
+
+	req := CheapestHoursRequest{
+		DeviceName:         "Laptop",
+		TotalDuration:      60 * time.Minute,
+		WindowSize:         12 * time.Hour,
+		CriticalHoursStart: criticalStart,
+		CriticalHoursEnd:   criticalEnd,
+		DrainRate:          2 * time.Hour,
+		MinBatteryPercent:  20,
+	}
+
+	result, err := optimizer.OptimizeCheapestHours(req, slots)
+	if err != nil {
+		t.Fatalf("OptimizeCheapestHours failed: %v", err)
+	}
+
+	// Current price (0.26) should trigger charging because critical hours average is higher (0.30+)
+	if !result.ChargeNow {
+		t.Errorf("Expected ChargeNow=true during ramp-up before expensive critical hours (current=%.4f)", result.CurrentPrice)
+	}
+}
+
+func TestOptimizer_CriticalUptime_SpikeDetection_NightIsStillCheaper(t *testing.T) {
+	optimizer := NewOptimizer()
+
+	// Use current time and set critical hours well in the future (8-16 hours from now)
+	// Current slot is not the cheapest - there are cheaper slots coming soon
+	now := time.Now()
+	currentHour := now.Hour()
+
+	criticalStart := (currentHour + 8) % 24
+	criticalEnd := (currentHour + 16) % 24
+
+	// Handle wrap-around
+	if criticalEnd <= criticalStart {
+		criticalStart = (currentHour + 8) % 24
+		criticalEnd = 23
+	}
+
+	var slots []pricing.PriceSlot
+	// Create price pattern where cheaper slots exist before the current price
+	for i := 0; i < 96; i++ { // 24 hours * 4 (15-min slots)
+		relativeHour := i / 4 // Hours from now
+
+		var price float64
+		if relativeHour == 0 {
+			price = 0.25 // Current slot: not the cheapest
+		} else if relativeHour >= 1 && relativeHour < 4 {
+			price = 0.22 // Next few hours: cheaper (best time to charge)
+		} else if relativeHour >= 4 && relativeHour < 8 {
+			price = 0.26 // Before critical: ramping up
+		} else if relativeHour >= 8 && relativeHour < 16 {
+			price = 0.30 // Critical hours: expensive
+		} else {
+			price = 0.24 // After: moderate
+		}
+
+		slots = append(slots, pricing.PriceSlot{
+			From:  now.Add(time.Duration(i) * 15 * time.Minute),
+			Till:  now.Add(time.Duration(i+1) * 15 * time.Minute),
+			Price: price,
+		})
+	}
+
+	req := CheapestHoursRequest{
+		DeviceName:         "Laptop",
+		TotalDuration:      60 * time.Minute,
+		WindowSize:         12 * time.Hour,
+		CriticalHoursStart: criticalStart,
+		CriticalHoursEnd:   criticalEnd,
+		DrainRate:          2 * time.Hour,
+		MinBatteryPercent:  20,
+	}
+
+	result, err := optimizer.OptimizeCheapestHours(req, slots)
+	if err != nil {
+		t.Fatalf("OptimizeCheapestHours failed: %v", err)
+	}
+
+	// Current price (0.25) is cheaper than critical hours (0.30), but there are even cheaper slots ahead (0.22)
+	// Should wait for the absolute cheapest slots
+	if result.ChargeNow {
+		t.Errorf("Expected ChargeNow=false when cheaper slots exist soon (current=%.4f, cheapest ahead=0.22)", result.CurrentPrice)
+	}
+}
