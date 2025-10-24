@@ -618,7 +618,7 @@ func TestOptimizer_CriticalUptime_WithBatterySensor_LowBattery(t *testing.T) {
 	optimizer := NewOptimizer()
 
 	// Current time: 2 PM (14:00) - in critical hours (10-18)
-	now := time.Date(2024, 1, 1, 14, 0, 0, 0, time.Local)
+	now := time.Date(2024, 1, 1, 14, 0, 0, 0, time.UTC)
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50}, // Expensive!
 	}
@@ -652,7 +652,7 @@ func TestOptimizer_CriticalUptime_WithBatterySensor_HealthyBattery(t *testing.T)
 	optimizer := NewOptimizer()
 
 	// Current time: 3 PM (15:00) - in critical hours
-	now := time.Date(2024, 1, 1, 15, 0, 0, 0, time.Local)
+	now := time.Date(2024, 1, 1, 15, 0, 0, 0, time.UTC)
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50}, // Expensive
 	}
@@ -683,7 +683,7 @@ func TestOptimizer_CriticalUptime_WithEstimation_NeedCharge(t *testing.T) {
 
 	// Current time: 11 AM (11:00) - 1 hour into critical hours (10-18)
 	// With DrainRate=2h, after 1h we're at 50% of drain rate
-	now := time.Date(2024, 1, 1, 11, 0, 0, 0, time.Local)
+	now := time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC)
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50},
 	}
@@ -715,7 +715,7 @@ func TestOptimizer_CriticalUptime_WithEstimation_NoChargeYet(t *testing.T) {
 
 	// Current time: 10:15 AM - just started critical hours
 	// With 10 being the start hour, currentHour=10, hoursIntoCritical=0
-	now := time.Date(2024, 1, 1, 10, 15, 0, 0, time.Local)
+	now := time.Date(2024, 1, 1, 10, 15, 0, 0, time.UTC)
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50},
 	}
@@ -746,7 +746,7 @@ func TestOptimizer_CriticalUptime_PreCharge_BeforeCriticalHours(t *testing.T) {
 	optimizer := NewOptimizer()
 
 	// Current time: 2 AM - well before critical hours (10-18)
-	now := time.Date(2024, 1, 1, 2, 0, 0, 0, time.Local)
+	now := time.Date(2024, 1, 1, 2, 0, 0, 0, time.UTC)
 	var slots []pricing.PriceSlot
 
 	// Create slots for next 10 hours (2 AM to noon)
