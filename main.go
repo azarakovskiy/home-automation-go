@@ -63,11 +63,38 @@ func main() {
 		app.RegisterIntervals(comp.Intervals()...)
 	}
 
+	// Log startup info
 	if dryrun.IsEnabled() {
-		log.Printf("🔧 Starting home automation with %d components in DRY-RUN mode", len(components))
-	} else {
-		log.Printf("Starting home automation with %d components", len(components))
+		log.Printf("🔧 DRY-RUN MODE ENABLED")
 	}
+
+	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	log.Printf("🏠 Starting Home Automation with %d components:", len(components))
+	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	for _, comp := range components {
+		eventCount := len(comp.EventListeners())
+		entityCount := len(comp.EntityListeners())
+		scheduleCount := len(comp.Schedules())
+		intervalCount := len(comp.Intervals())
+
+		log.Printf("  📦 %T", comp)
+		if eventCount > 0 {
+			log.Printf("     ⚡ %d event listener(s)", eventCount)
+		}
+		if entityCount > 0 {
+			log.Printf("     🔔 %d entity listener(s)", entityCount)
+		}
+		if scheduleCount > 0 {
+			log.Printf("     ⏰ %d daily schedule(s)", scheduleCount)
+		}
+		if intervalCount > 0 {
+			log.Printf("     🔄 %d interval(s)", intervalCount)
+		}
+	}
+
+	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
 	app.Start()
 }
 

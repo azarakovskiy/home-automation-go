@@ -6,25 +6,39 @@ Built on [gome-assistant](https://github.com/saml-dev/gome-assistant) library.
 
 ## Features
 
+### Smart Charger Optimization
+Intelligent electricity price-based charging for battery-powered devices:
+- **Laptop Charger**: 6h charging optimized within 12h window
+- **Vacuum Charger**: 1h charging optimized within 12h window
+- 15-minute optimization cycles aligned with pricing granularity
+- Automatic safety shutoff when away >2h
+- Finds cheapest time slots for continuous charging
+
 ### Dishwasher Scheduler
 Automatically schedules dishwasher to run during cheapest electricity periods:
-- 5 operating modes: Eco (4h), Auto (3h), AutoQuick (2h), Intensive (3h), Quick (1h)
-- Price optimization with weighted stage importance
+- 5 operating modes with measured durations: Auto (137min), AutoQuick (70min), Eco (4h), Intensive (3h), Quick (1h)
+- Price optimization with weighted stage importance based on actual power consumption
+- Dynamic savings threshold using exponential decay
+- Night mode: accepts any positive savings
 - State persistence survives service restarts
+- Human-readable TTS notifications via Home Assistant
 - Custom event trigger from Home Assistant
 
 ### Price Optimization Engine
-Generic optimizer for any cyclic appliance:
-- Calculates cheapest time window within deadline
+Unified optimizer supporting two strategies:
+- **Scheduled Optimization**: Best start time for fixed-duration cycles (dishwasher, dryer)
+- **Continuous Optimization**: Cheapest time slots within a window (chargers, heating)
 - Weighted cost optimization (prioritize high-power stages)
-- Percentage-based savings thresholds
+- Dynamic savings thresholds based on available wait time
 - Graceful degradation with insufficient data
 
 ### Architecture
 - Component-based system with self-contained modules
 - Type-safe event handling using Go generics
 - 4 listener types: EventListener, EntityListener, DailySchedule, Interval
-- Generic state manager for device persistence
+- Presence detection with house mode integration
+- Event-based notifications (TTS via Home Assistant automations)
+- Dry-run mode for safe testing
 
 ## Quick Start
 
@@ -128,6 +142,8 @@ make test
 ### Environment Variables
 - `HA_URL` - Home Assistant URL (default: http://192.168.1.43:8123)
 - `HA_AUTH_TOKEN` - Long-lived access token
+- `DRY_RUN` - Enable dry-run mode (logs actions without execution)
+- `DEBUG` - Enable verbose debug logging
 
 ### Entity Generation
 The `entities/` directory contains generated type-safe constants for your Home Assistant entities. Regenerate when you add new entities:
@@ -140,28 +156,32 @@ make generate
 
 ```
 ├── component/          # Component framework
-│   ├── component.go   # Component interface & Base
-│   ├── event_handler.go # Type-safe event handling
-│   └── state.go       # Generic state persistence
+│   ├── component.go   # Component interface & Base with house mode helpers
+│   └── event_handler.go # Type-safe event handling
 ├── pricing/           # Electricity pricing service
 │   └── service.go
 ├── scheduler/
-│   ├── optimizer/     # Generic optimization engine
-│   │   ├── optimizer.go
-│   │   └── profile.go # Weight constants
-│   ├── dishwasher/    # Dishwasher implementation
-│   │   ├── component.go
-│   │   ├── controller.go
-│   │   ├── state_manager.go
-│   │   ├── profile.go
-│   │   └── types.go
-│   └── types.go       # Shared types
+│   ├── optimizer/     # Unified optimization engine
+│   │   └── optimizer.go  # Scheduled & continuous optimization
+│   ├── profile.go     # Generic profile for scheduled devices
+│   └── dishwasher/    # Dishwasher implementation
+│       ├── component.go
+│       ├── profile.go # Device-specific profiles
+│       └── types.go
+├── charger/
+│   ├── profiles.go    # Charging profiles (Laptop, Vacuum)
+│   ├── laptop/        # Laptop charger component
+│   └── vacuum/        # Vacuum charger component
+├── notifications/     # Event-based notification service
+│   └── service.go
+├── debug/             # Debug logging utility
+├── dryrun/            # Dry-run mode wrapper
 ├── entities/          # Generated HA entities
 │   ├── entities.go    # Generated constants
-│   ├── events.go      # Event wrappers
-│   └── custom_entities.go
+│   └── custom_entities.go # Custom events
 ├── mocks/             # Generated test mocks
 ├── main.go            # Application entry
+├── AGENTS.md          # AI agent instructions
 ├── Dockerfile
 ├── docker-compose.yml
 └── Makefile
