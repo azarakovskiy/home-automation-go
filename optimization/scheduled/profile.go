@@ -1,9 +1,9 @@
-package scheduler
+package scheduled
 
 import (
 	"time"
 
-	"home-go/scheduler/optimizer"
+	"home-go/optimization/optimizer"
 )
 
 // Standard stage weight levels for consistent profiling across devices

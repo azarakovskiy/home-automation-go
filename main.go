@@ -4,13 +4,13 @@ import (
 	"log"
 	"os"
 
-	"home-go/charger/laptop"
-	"home-go/charger/vacuum"
 	"home-go/component"
 	"home-go/debug"
 	"home-go/dryrun"
+	"home-go/optimization/continuous/laptop"
+	"home-go/optimization/continuous/vacuum"
+	"home-go/optimization/scheduled/dishwasher"
 	"home-go/pricing"
-	"home-go/scheduler/dishwasher"
 
 	ga "saml.dev/gome-assistant"
 )
