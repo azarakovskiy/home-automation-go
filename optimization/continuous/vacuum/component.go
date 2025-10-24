@@ -90,15 +90,12 @@ func (c *VacuumCharger) optimizeCharging(service *ga.Service, state ga.State) {
 
 	// Apply decision
 	if result.ChargeNow {
-		log.Printf("Vacuum: Charging now (current slot is cheap, savings: %.1f%%, will charge for %s)",
-			result.SavingsPercent, result.TotalDuration)
 		if err := c.turnOn(); err != nil {
-			log.Printf("ERROR: Failed to turn on: %v", err)
+			log.Printf("ERROR: Failed to turn on vacuum charger: %v", err)
 		}
 	} else {
-		log.Printf("Vacuum: Not charging now (waiting for cheaper slots)")
 		if err := c.turnOff(); err != nil {
-			log.Printf("ERROR: Failed to turn off: %v", err)
+			log.Printf("ERROR: Failed to turn off vacuum charger: %v", err)
 		}
 	}
 }

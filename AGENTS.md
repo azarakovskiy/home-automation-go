@@ -64,6 +64,9 @@ This document contains coding standards, architectural patterns, and conventions
 - Mock external dependencies using `mockgen`
 - Aim for meaningful coverage, not just high percentages
 - Test edge cases and error paths
+- **ALWAYS update tests when adding new features or modifying existing code**
+- **Ensure test coverage for all new functions and logic paths**
+- Run `make test` before considering work complete
 
 ### Error Handling
 - Always handle errors explicitly
@@ -76,6 +79,13 @@ This document contains coding standards, architectural patterns, and conventions
 - Control via `DEBUG=true` environment variable
 - Use standard `log.Printf()` for important events
 - Include context in log messages
+
+### Code Readability
+- **Keep functions small and readable like a book** - each function should do one thing
+- Extract complex logic into well-named helper methods
+- Aim for functions under 20-30 lines when possible
+- If a function has multiple responsibilities, split it into smaller, focused functions
+- Example: Instead of one 100-line function with nested conditionals, create 4-5 functions with descriptive names that read naturally
 
 ### Cyclomatic Complexity
 - Keep functions under complexity 15
@@ -159,6 +169,12 @@ This document contains coding standards, architectural patterns, and conventions
 
 ## Git Workflow
 
+### Commit Approval
+- **NEVER commit code without explicit user approval**
+- **Wait for the user to say "commit" or "push" before executing git commands**
+- Present a summary of changes and ask for approval first
+- The user reviews and decides when code is ready to commit
+
 ### Commit Signing
 - Different key for personal and work repos (configured in git config)
 - All commits must be signed
@@ -184,6 +200,14 @@ This document contains coding standards, architectural patterns, and conventions
 - Follow HA conventions: `domain.name`, specifically `domain.area_device_variable`, e.g. `input_text.kitchen_dishwasher_cost` means "an input text to store cost for dishwasher in the kitchen"
 - Use underscores: `input_boolean.office_laptop_charge_optimization_auto`
 - Define in `entities/custom_entities.go`. `entities/entities.go` is generated with `go generate`
+- **NEVER use hardcoded entity strings in code** - always reference entities from `entities` package:
+  - Auto-generated entities: `entities.InputBoolean.OfficeLaptopChargeOptimizationAuto`
+  - Custom entities (events): `entities.CustomEvents.Notify`
+  - Custom entities (sensors from external sources): `entities.CustomSensors.OfficeLaptopWorkInternalBatteryLevel`
+- If you need a new entity, add it to `entities/custom_entities.go` first, then use the constant
+- **IMPORTANT**: `entities/entities.go` is auto-generated from Home Assistant and contains ALL existing entities in the system
+  - Only add to `custom_entities.go` if the entity is truly custom (events, helpers not in HA yet)
+  - If entity exists in HA (like companion app sensors), it's already in `entities/entities.go` - use it directly
 
 ### Event-Driven Architecture
 - Components react to events

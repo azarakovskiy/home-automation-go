@@ -2,6 +2,7 @@ package optimizer
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"time"
@@ -362,9 +363,21 @@ func (o *Optimizer) CalculateDynamicThreshold(maxDelayHours int) float64 {
 
 // CheapestHoursRequest contains parameters for simple cheapest-hours optimization
 // Used by devices that just need to know: "should I run now?"
+// Strategy is auto-detected: if CriticalHoursStart/End are set, uses critical_uptime strategy
 type CheapestHoursRequest struct {
+	DeviceName    string        // Name of the device for logging (e.g., "Laptop", "Vacuum")
 	TotalDuration time.Duration // Total duration needed (e.g., 6h, 1h30m, 45m)
 	WindowSize    time.Duration // Time window to search within (e.g., 12h, 8h)
+
+	// For critical_uptime strategy (auto-detected if these are non-zero):
+	CriticalHoursStart int           // Hour when device must be available (e.g., 10)
+	CriticalHoursEnd   int           // Hour when critical period ends (e.g., 18)
+	DrainRate          time.Duration // How long device runs on full charge (e.g., 2h)
+	BatteryEntity      string        // Optional: HA entity for battery level
+	MinBatteryPercent  int           // Charge during critical hours if battery < this (default: 20)
+
+	// Runtime state (passed by component, not from profile):
+	CurrentBatteryLevel int // Current battery %, 0-100. If 0, will estimate based on DrainRate
 }
 
 // CheapestHoursResult contains the optimization decision for simple on/off devices
@@ -379,12 +392,30 @@ type CheapestHoursResult struct {
 
 // OptimizeCheapestHours determines if device should run now based on cheapest time slots
 // Works with any time granularity (15min, 1h, etc.) - just selects cheapest slots until duration is met
+//
+// Supports two strategies (auto-detected):
+// - "opportunistic": Simply charge during cheapest slots (CriticalHours not set)
+// - "critical_uptime": Ensure charged before critical hours, skip charging during expensive critical hours
+//
 // Perfect for chargers, heaters, or any device that can be turned on/off per pricing interval
 func (o *Optimizer) OptimizeCheapestHours(req CheapestHoursRequest, priceSlots []pricing.PriceSlot) (*CheapestHoursResult, error) {
 	if err := o.validateCheapestHoursRequest(req); err != nil {
 		return nil, err
 	}
 
+	// Auto-detect strategy based on CriticalHours fields
+	hasCriticalHours := req.CriticalHoursStart > 0 || req.CriticalHoursEnd > 0
+
+	if hasCriticalHours {
+		return o.optimizeCriticalUptime(req, priceSlots)
+	}
+
+	return o.optimizeOpportunistic(req, priceSlots)
+}
+
+// optimizeOpportunistic implements simple cheapest-slots strategy
+// Just charges during the cheapest available slots, no special logic
+func (o *Optimizer) optimizeOpportunistic(req CheapestHoursRequest, priceSlots []pricing.PriceSlot) (*CheapestHoursResult, error) {
 	now := time.Now()
 	currentPrice := o.getCurrentPriceFromSlots(priceSlots, now)
 
@@ -407,6 +438,153 @@ func (o *Optimizer) OptimizeCheapestHours(req CheapestHoursRequest, priceSlots [
 
 	debug.Log("Cheapest hours decision: charge now=%v, current=%.4f, avg=%.4f, savings=%.1f%%, selected duration=%s",
 		currentSlotIsCheap, currentPrice, avgPrice, savingsPercent, totalDuration)
+
+	// Log user-friendly information
+	if !currentSlotIsCheap && len(cheapestSlots) > 0 {
+		nextSlot := cheapestSlots[0]
+		log.Printf("%s: Not charging now - next cheap slot at %s (avg price: %.2f)",
+			req.DeviceName, nextSlot.From.Format("15:04"), avgPrice)
+	} else if !currentSlotIsCheap {
+		log.Printf("%s: Not charging now - no optimal slots found", req.DeviceName)
+	} else {
+		log.Printf("%s: Charging now - current slot is cheap (savings: %.1f%%, duration: %s)",
+			req.DeviceName, savingsPercent, totalDuration)
+	}
+
+	return &CheapestHoursResult{
+		ChargeNow:      currentSlotIsCheap,
+		CheapestSlots:  cheapestSlots,
+		AveragePrice:   avgPrice,
+		CurrentPrice:   currentPrice,
+		SavingsPercent: savingsPercent,
+		TotalDuration:  totalDuration,
+	}, nil
+}
+
+// optimizeCriticalUptime implements strategy for devices that need to be available during specific hours
+// Ensures device is charged before critical hours start, allows drain during expensive critical periods
+// Uses actual battery level if available, otherwise estimates based on DrainRate
+func (o *Optimizer) optimizeCriticalUptime(req CheapestHoursRequest, priceSlots []pricing.PriceSlot) (*CheapestHoursResult, error) {
+	now := time.Now()
+	currentHour := now.Hour()
+	currentPrice := o.getCurrentPriceFromSlots(priceSlots, now)
+
+	// Check if we're in critical hours (device is being used, might be draining)
+	inCriticalHours := currentHour >= req.CriticalHoursStart && currentHour < req.CriticalHoursEnd
+
+	if inCriticalHours {
+		return o.handleCriticalHoursCharging(req, currentPrice)
+	}
+
+	// Outside critical hours: charge opportunistically during cheapest slots
+	return o.handlePreChargingBeforeCriticalHours(req, priceSlots, now, currentPrice)
+}
+
+// handleCriticalHoursCharging decides whether to charge during critical hours
+// Uses actual battery sensor if available, otherwise estimates based on drain rate
+func (o *Optimizer) handleCriticalHoursCharging(req CheapestHoursRequest, currentPrice float64) (*CheapestHoursResult, error) {
+	batteryLevel := req.CurrentBatteryLevel
+
+	if batteryLevel > 0 {
+		return o.handleCriticalHoursWithBatterySensor(req, batteryLevel, currentPrice)
+	}
+
+	return o.handleCriticalHoursWithEstimation(req, currentPrice)
+}
+
+// handleCriticalHoursWithBatterySensor handles charging during critical hours when battery sensor is available
+func (o *Optimizer) handleCriticalHoursWithBatterySensor(req CheapestHoursRequest, batteryLevel int, currentPrice float64) (*CheapestHoursResult, error) {
+	if batteryLevel < req.MinBatteryPercent {
+		log.Printf("%s: CRITICAL - Battery at %d%% (below %d%%), charging despite expensive rates",
+			req.DeviceName, batteryLevel, req.MinBatteryPercent)
+		return &CheapestHoursResult{
+			ChargeNow:      true,
+			CheapestSlots:  []pricing.PriceSlot{},
+			AveragePrice:   currentPrice,
+			CurrentPrice:   currentPrice,
+			SavingsPercent: 0,
+			TotalDuration:  req.TotalDuration,
+		}, nil
+	}
+
+	log.Printf("%s: In critical hours (%d-%d), battery at %d%%, skipping charge",
+		req.DeviceName, req.CriticalHoursStart, req.CriticalHoursEnd, batteryLevel)
+
+	return &CheapestHoursResult{
+		ChargeNow:      false,
+		CheapestSlots:  []pricing.PriceSlot{},
+		AveragePrice:   currentPrice,
+		CurrentPrice:   currentPrice,
+		SavingsPercent: 0,
+		TotalDuration:  0,
+	}, nil
+}
+
+// handleCriticalHoursWithEstimation handles charging during critical hours using drain rate estimation
+func (o *Optimizer) handleCriticalHoursWithEstimation(req CheapestHoursRequest, currentPrice float64) (*CheapestHoursResult, error) {
+	now := time.Now()
+	currentHour := now.Hour()
+	hoursIntoCritical := currentHour - req.CriticalHoursStart
+	criticalHoursRemaining := req.CriticalHoursEnd - currentHour
+
+	if req.DrainRate > 0 {
+		// Rough estimate: charge if we've been in critical hours for > 50% of DrainRate
+		if time.Duration(hoursIntoCritical)*time.Hour > req.DrainRate/2 {
+			log.Printf("%s: %dh into critical period (drain rate: %s), charging to prevent depletion",
+				req.DeviceName, hoursIntoCritical, req.DrainRate)
+			return &CheapestHoursResult{
+				ChargeNow:      true,
+				CheapestSlots:  []pricing.PriceSlot{},
+				AveragePrice:   currentPrice,
+				CurrentPrice:   currentPrice,
+				SavingsPercent: 0,
+				TotalDuration:  req.TotalDuration,
+			}, nil
+		}
+	}
+
+	log.Printf("%s: In critical hours (%d-%d), %dh remaining, skipping charge",
+		req.DeviceName, req.CriticalHoursStart, req.CriticalHoursEnd, criticalHoursRemaining)
+
+	return &CheapestHoursResult{
+		ChargeNow:      false,
+		CheapestSlots:  []pricing.PriceSlot{},
+		AveragePrice:   currentPrice,
+		CurrentPrice:   currentPrice,
+		SavingsPercent: 0,
+		TotalDuration:  0,
+	}, nil
+}
+
+// handlePreChargingBeforeCriticalHours optimizes charging outside critical hours to prepare for the day
+func (o *Optimizer) handlePreChargingBeforeCriticalHours(req CheapestHoursRequest, priceSlots []pricing.PriceSlot, now time.Time, currentPrice float64) (*CheapestHoursResult, error) {
+	windowSlots := o.getWindowSlots(priceSlots, now, req.WindowSize)
+	if len(windowSlots) == 0 {
+		return nil, fmt.Errorf("no price slots available in window")
+	}
+
+	debug.Log("Critical uptime optimization: need %s before %d:00, found %d slots",
+		req.TotalDuration, req.CriticalHoursStart, len(windowSlots))
+
+	// Find cheapest slots for charging (pre-charge strategy)
+	cheapestSlots, totalDuration := o.selectCheapestSlotsByDuration(windowSlots, req.TotalDuration)
+	currentSlotIsCheap := o.isCurrentSlotInSelection(cheapestSlots, now)
+
+	avgPrice := o.calculateAveragePrice(windowSlots)
+	savingsPercent := o.calculateSavingsPercent(avgPrice, currentPrice)
+
+	debug.Log("Critical uptime decision: charge now=%v, current=%.4f, avg=%.4f, savings=%.1f%%",
+		currentSlotIsCheap, currentPrice, avgPrice, savingsPercent)
+
+	// Log user-friendly information
+	if !currentSlotIsCheap && len(cheapestSlots) > 0 {
+		nextSlot := cheapestSlots[0]
+		log.Printf("%s: Not charging now - next cheap slot at %s before work hours",
+			req.DeviceName, nextSlot.From.Format("15:04"))
+	} else if !currentSlotIsCheap {
+		log.Printf("%s: Not charging now - waiting for cheaper slots before %d:00",
+			req.DeviceName, req.CriticalHoursStart)
+	}
 
 	return &CheapestHoursResult{
 		ChargeNow:      currentSlotIsCheap,
