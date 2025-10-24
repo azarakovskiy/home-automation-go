@@ -684,11 +684,11 @@ func TestOptimizer_CriticalUptime_WithEstimation_NeedCharge(t *testing.T) {
 	// Use current time and adjust critical hours to ensure we're in the critical period
 	now := time.Now()
 	currentHour := now.Hour()
-	
+
 	// Set critical hours around current time: start 2 hours ago, end 6 hours from now
 	criticalStart := (currentHour - 2 + 24) % 24
 	criticalEnd := (currentHour + 6) % 24
-	
+
 	// Handle day wrap-around - if end < start, we're crossing midnight
 	// For simplicity, just ensure start < end by adjusting
 	if criticalEnd <= criticalStart {
@@ -729,7 +729,7 @@ func TestOptimizer_CriticalUptime_WithEstimation_NoChargeYet(t *testing.T) {
 	// Use current time and set critical hours so we just started
 	now := time.Now()
 	currentHour := now.Hour()
-	
+
 	// Set critical start to current hour, end 8 hours later
 	criticalStart := currentHour
 	criticalEnd := (currentHour + 8) % 24
@@ -766,11 +766,11 @@ func TestOptimizer_CriticalUptime_PreCharge_BeforeCriticalHours(t *testing.T) {
 	// Use current time and set critical hours well in the future
 	now := time.Now()
 	currentHour := now.Hour()
-	
+
 	// Set critical hours 4-12 hours in the future (well outside current time)
 	criticalStart := (currentHour + 4) % 24
 	criticalEnd := (currentHour + 12) % 24
-	
+
 	// Handle midnight wrap - if end < start, adjust
 	if criticalEnd <= criticalStart {
 		criticalStart = (currentHour + 4) % 24
