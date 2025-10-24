@@ -21,26 +21,15 @@ func TestNewNotificationService(t *testing.T) {
 
 func TestNotificationEvent_Structure(t *testing.T) {
 	event := NotificationEvent{
-		Device:  "dishwasher",
-		Type:    "scheduled",
-		Message: "Dishwasher starts at 15:30, saving 10 percent!",
-		Data: map[string]interface{}{
-			"start_time":      "15:30",
-			"savings_percent": 10.5,
+		MessageKey: MessageDishwasherLater,
+		MessageData: map[string]string{
+			"time":    "3:30 PM",
+			"savings": "10",
 		},
 	}
 
-	if event.Device == "" {
-		t.Error("Device should be set")
-	}
-	if event.Type == "" {
-		t.Error("Type should be set")
-	}
-	if event.Message == "" {
-		t.Error("Message should be set")
-	}
-	if event.Data == nil {
-		t.Error("Data should be set")
+	if event.MessageKey == "" {
+		t.Error("MessageKey should be set")
 	}
 }
 
@@ -52,13 +41,11 @@ func TestNotificationEvent_Validation(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "valid event with all fields",
+			name: "valid event with data",
 			event: NotificationEvent{
-				Device:  "dishwasher",
-				Type:    "scheduled",
-				Message: "Test message",
-				Data: map[string]interface{}{
-					"start_time": "15:30",
+				MessageKey: MessageDishwasherLater,
+				MessageData: map[string]string{
+					"time": "3 PM",
 				},
 			},
 			wantErr: false,
@@ -66,66 +53,31 @@ func TestNotificationEvent_Validation(t *testing.T) {
 		{
 			name: "valid event without data",
 			event: NotificationEvent{
-				Device:  "dishwasher",
-				Type:    "started",
-				Message: "Test message",
+				MessageKey: MessageDishwasherNow,
 			},
 			wantErr: false,
 		},
 		{
-			name: "missing device",
-			event: NotificationEvent{
-				Type:    "scheduled",
-				Message: "Test message",
-			},
+			name:    "missing message_key",
+			event:   NotificationEvent{},
 			wantErr: true,
-			errMsg:  "device cannot be empty",
-		},
-		{
-			name: "missing type",
-			event: NotificationEvent{
-				Device:  "dishwasher",
-				Message: "Test message",
-			},
-			wantErr: true,
-			errMsg:  "type cannot be empty",
-		},
-		{
-			name: "missing message",
-			event: NotificationEvent{
-				Device: "dishwasher",
-				Type:   "scheduled",
-			},
-			wantErr: true,
-			errMsg:  "message cannot be empty",
+			errMsg:  "message_key cannot be empty",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// We can only test validation without firing actual events
-			if tt.event.Device == "" {
-				if tt.errMsg != "device cannot be empty" {
-					t.Error("Expected device validation error")
-				}
-				return
-			}
-			if tt.event.Type == "" {
-				if tt.errMsg != "type cannot be empty" {
-					t.Error("Expected type validation error")
-				}
-				return
-			}
-			if tt.event.Message == "" {
-				if tt.errMsg != "message cannot be empty" {
-					t.Error("Expected message validation error")
+			if tt.event.MessageKey == "" {
+				if tt.errMsg != "message_key cannot be empty" {
+					t.Error("Expected message_key validation error")
 				}
 				return
 			}
 
 			// Verify structure for valid events
-			if tt.event.Device == "" || tt.event.Type == "" || tt.event.Message == "" {
-				t.Error("Device, Type, and Message should all be required")
+			if tt.event.MessageKey == "" {
+				t.Error("MessageKey should be required")
 			}
 		})
 	}

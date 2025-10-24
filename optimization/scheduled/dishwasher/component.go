@@ -173,8 +173,13 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 			return
 		}
 
-		// Don't announce when starting immediately - nothing interesting to report
-		// (savings didn't meet threshold, so we're not actually optimizing)
+		// Announce immediate start with Terry
+		event := notifications.NotificationEvent{
+			MessageKey: notifications.MessageDishwasherNow,
+		}
+		if err := c.notificationService.Notify(event); err != nil {
+			log.Printf("WARNING: Notification event failed: %v", err)
+		}
 		return
 	}
 
@@ -250,20 +255,13 @@ func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent fl
 	// e.g., "3 PM", "3:30 PM", "noon", "midnight"
 	timeStr := notifications.FormatTimeForSpeech(startTime)
 
-	message := fmt.Sprintf(
-		"Dishwasher starts at %s, saving %.0f percent on electricity!",
-		timeStr,
-		savingsPercent,
-	)
-
+	// Send notification event with template key and data
+	// NotificationService will handle Terry voice transformation
 	event := notifications.NotificationEvent{
-		Device:  "dishwasher",
-		Type:    "scheduled",
-		Message: message,
-		Data: map[string]interface{}{
-			"start_time":      startTime.Format("15:04"),
-			"start_time_text": timeStr,
-			"savings_percent": savingsPercent,
+		MessageKey: notifications.MessageDishwasherLater,
+		MessageData: map[string]string{
+			"time":    timeStr,
+			"savings": fmt.Sprintf("%.0f", savingsPercent),
 		},
 	}
 
