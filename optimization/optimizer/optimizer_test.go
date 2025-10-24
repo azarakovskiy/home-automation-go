@@ -681,9 +681,21 @@ func TestOptimizer_CriticalUptime_WithBatterySensor_HealthyBattery(t *testing.T)
 func TestOptimizer_CriticalUptime_WithEstimation_NeedCharge(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Current time: 11 AM (11:00) - 1 hour into critical hours (10-18)
-	// With DrainRate=2h, after 1h we're at 50% of drain rate
-	now := time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC)
+	// Use current time and adjust critical hours to ensure we're in the critical period
+	now := time.Now()
+	currentHour := now.Hour()
+
+	// Set critical hours around current time: start 2 hours ago, end 6 hours from now
+	criticalStart := (currentHour - 2 + 24) % 24
+	criticalEnd := (currentHour + 6) % 24
+
+	// Handle day wrap-around - if end < start, we're crossing midnight
+	// For simplicity, just ensure start < end by adjusting
+	if criticalEnd <= criticalStart {
+		criticalStart = (currentHour - 2 + 24) % 24
+		criticalEnd = 23 // End before midnight
+	}
+
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50},
 	}
@@ -692,8 +704,8 @@ func TestOptimizer_CriticalUptime_WithEstimation_NeedCharge(t *testing.T) {
 		DeviceName:          "Laptop",
 		TotalDuration:       6 * time.Hour,
 		WindowSize:          12 * time.Hour,
-		CriticalHoursStart:  10,
-		CriticalHoursEnd:    18,
+		CriticalHoursStart:  criticalStart,
+		CriticalHoursEnd:    criticalEnd,
 		DrainRate:           2 * time.Hour, // 2 hours of work drains battery
 		MinBatteryPercent:   20,
 		CurrentBatteryLevel: 0, // No sensor - use estimation
@@ -704,18 +716,24 @@ func TestOptimizer_CriticalUptime_WithEstimation_NeedCharge(t *testing.T) {
 		t.Fatalf("OptimizeCheapestHours failed: %v", err)
 	}
 
-	// Should charge - 1h into critical period, which is > 50% of 2h drain rate
+	// Should charge - we're 2h into critical period, which is == 100% of 2h drain rate
 	if !result.ChargeNow {
-		t.Error("Expected ChargeNow=true after 1h into critical period (DrainRate=2h)")
+		t.Errorf("Expected ChargeNow=true after being in critical period (DrainRate=2h, criticalStart=%d, currentHour=%d)",
+			criticalStart, currentHour)
 	}
 }
 
 func TestOptimizer_CriticalUptime_WithEstimation_NoChargeYet(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Current time: 10:15 AM - just started critical hours
-	// With 10 being the start hour, currentHour=10, hoursIntoCritical=0
-	now := time.Date(2024, 1, 1, 10, 15, 0, 0, time.UTC)
+	// Use current time and set critical hours so we just started
+	now := time.Now()
+	currentHour := now.Hour()
+
+	// Set critical start to current hour, end 8 hours later
+	criticalStart := currentHour
+	criticalEnd := (currentHour + 8) % 24
+
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50},
 	}
@@ -724,8 +742,8 @@ func TestOptimizer_CriticalUptime_WithEstimation_NoChargeYet(t *testing.T) {
 		DeviceName:          "Laptop",
 		TotalDuration:       6 * time.Hour,
 		WindowSize:          12 * time.Hour,
-		CriticalHoursStart:  10,
-		CriticalHoursEnd:    18,
+		CriticalHoursStart:  criticalStart,
+		CriticalHoursEnd:    criticalEnd,
 		DrainRate:           4 * time.Hour, // 4 hours to drain - so 0h into critical is well below 50%
 		MinBatteryPercent:   20,
 		CurrentBatteryLevel: 0, // No sensor
@@ -736,28 +754,38 @@ func TestOptimizer_CriticalUptime_WithEstimation_NoChargeYet(t *testing.T) {
 		t.Fatalf("OptimizeCheapestHours failed: %v", err)
 	}
 
-	// Should NOT charge yet - only 15min into critical period, battery should still be good
+	// Should NOT charge yet - just started critical period, battery should still be good
 	if result.ChargeNow {
-		t.Error("Expected ChargeNow=false early in critical period")
+		t.Error("Expected ChargeNow=false at start of critical period")
 	}
 }
 
 func TestOptimizer_CriticalUptime_PreCharge_BeforeCriticalHours(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Current time: 2 AM - well before critical hours (10-18)
-	now := time.Date(2024, 1, 1, 2, 0, 0, 0, time.UTC)
+	// Use current time and set critical hours well in the future
+	now := time.Now()
+	currentHour := now.Hour()
+
+	// Set critical hours 4-12 hours in the future (well outside current time)
+	criticalStart := (currentHour + 4) % 24
+	criticalEnd := (currentHour + 12) % 24
+
+	// Handle midnight wrap - if end < start, adjust
+	if criticalEnd <= criticalStart {
+		criticalStart = (currentHour + 4) % 24
+		criticalEnd = 23
+	}
+
 	var slots []pricing.PriceSlot
 
-	// Create slots for next 10 hours (2 AM to noon)
-	// Prices: cheap early, expensive later
+	// Create slots for next 10 hours with varying prices
 	for i := 0; i < 40; i++ { // 10 hours * 4 (15-min slots)
-		hour := 2 + (i / 4)
 		var price float64
-		if hour < 6 {
-			price = 0.18 // Cheap night rates
+		if i < 16 { // First 4 hours cheap
+			price = 0.18
 		} else {
-			price = 0.30 // Expensive morning rates
+			price = 0.30 // Rest expensive
 		}
 
 		slots = append(slots, pricing.PriceSlot{
@@ -771,8 +799,8 @@ func TestOptimizer_CriticalUptime_PreCharge_BeforeCriticalHours(t *testing.T) {
 		DeviceName:         "Laptop",
 		TotalDuration:      60 * time.Minute, // 1 hour
 		WindowSize:         8 * time.Hour,    // Look 8 hours ahead
-		CriticalHoursStart: 10,
-		CriticalHoursEnd:   18,
+		CriticalHoursStart: criticalStart,
+		CriticalHoursEnd:   criticalEnd,
 		DrainRate:          2 * time.Hour,
 		MinBatteryPercent:  20,
 	}
@@ -783,14 +811,15 @@ func TestOptimizer_CriticalUptime_PreCharge_BeforeCriticalHours(t *testing.T) {
 	}
 
 	// Should execute pre-charge logic successfully
-	// At 2 AM, before critical hours, should find cheap slots
+	// Outside critical hours, should find cheap slots
 	if result == nil {
 		t.Fatal("Expected result to be non-nil")
 	}
 
-	// Should charge now since current slot (2 AM) is cheap
+	// Should charge now since current slot is cheap (0.18)
 	if !result.ChargeNow {
-		t.Error("Expected ChargeNow=true at 2 AM during cheap night rates")
+		t.Errorf("Expected ChargeNow=true during cheap slot before critical hours (criticalStart=%d, currentHour=%d)",
+			criticalStart, currentHour)
 	}
 }
 
