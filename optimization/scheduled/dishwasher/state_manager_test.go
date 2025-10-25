@@ -65,14 +65,14 @@ func TestStateManager_RestoreSchedule(t *testing.T) {
 			setupMocks: func(mockState *mocks.MockStateInterface, genericMgr *component.StateManager) {
 				// Mock the generic RestoreScheduleState to return a valid schedule
 				mockState.EXPECT().Get(entities.InputBoolean.KitchenDishwasherIsScheduled).Return(ga.EntityState{State: "on"}, nil)
-				mockState.EXPECT().Get(entities.InputSelect.KitchenDishwasherScheduledMode).Return(ga.EntityState{State: "eco"}, nil)
+				mockState.EXPECT().Get(entities.InputSelect.KitchenDishwasherScheduledMode).Return(ga.EntityState{State: "auto"}, nil)
 				mockState.EXPECT().Get(entities.InputDatetime.KitchenDishwasherScheduledStart).Return(ga.EntityState{State: futureTime.Format(time.RFC3339)}, nil)
 				mockState.EXPECT().Get(entities.InputNumber.KitchenDishwasherEstimatedCost).Return(ga.EntityState{State: "0.50"}, nil)
 				mockState.EXPECT().Get(entities.InputNumber.KitchenDishwasherCurrentCost).Return(ga.EntityState{State: "0.60"}, nil)
 				mockState.EXPECT().Get(entities.InputNumber.KitchenDishwasherSavingsPercent).Return(ga.EntityState{State: "16.67"}, nil)
 			},
 			wantSchedule: &PendingSchedule{
-				Mode:      ModeEco,
+				Mode:      ModeAuto,
 				StartTime: futureTime,
 				Result: &optimizer.OptimizationResult{
 					StartTime:      futureTime,

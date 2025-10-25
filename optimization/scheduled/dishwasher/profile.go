@@ -12,13 +12,6 @@ import (
 // Note: MinSavingsPercent is now calculated dynamically by the optimizer based on MaxDelayHours
 func GetProfileForMode(mode Mode) (scheduled.Profile, error) {
 	profiles := map[Mode]scheduled.Profile{
-		ModeEco: {
-			Mode:     string(ModeEco),
-			Duration: 4 * time.Hour,
-			// Pre-wash (low), Main wash (max - most important), Dry (medium)
-			StageWeights: []float64{scheduled.WeightLow, scheduled.WeightMax, scheduled.WeightMedium},
-			PowerKW:      0.8,
-		},
 		ModeAuto: {
 			Mode:     string(ModeAuto),
 			Duration: 137 * time.Minute, // Measured: exactly 137 minutes
@@ -55,20 +48,6 @@ func GetProfileForMode(mode Mode) (scheduled.Profile, error) {
 				scheduled.WeightIdle,   // 13. Final small stage
 			},
 			PowerKW: 2.0, // Measured: ~2000W during active washing
-		},
-		ModeIntensive: {
-			Mode:     string(ModeIntensive),
-			Duration: 3 * time.Hour,
-			// All stages use high power
-			StageWeights: []float64{scheduled.WeightMedium, scheduled.WeightMax, scheduled.WeightMedium},
-			PowerKW:      1.5,
-		},
-		ModeQuick: {
-			Mode:     string(ModeQuick),
-			Duration: 1 * time.Hour,
-			// Pre-wash (medium), Main wash (max - critical), No dry
-			StageWeights: []float64{scheduled.WeightMedium, scheduled.WeightMax, scheduled.WeightIdle},
-			PowerKW:      2.0,
 		},
 	}
 

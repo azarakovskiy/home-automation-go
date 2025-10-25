@@ -6,11 +6,8 @@ import (
 
 func TestMode_Constants(t *testing.T) {
 	modes := []Mode{
-		ModeEco,
 		ModeAuto,
 		ModeAutoQuick,
-		ModeIntensive,
-		ModeQuick,
 	}
 
 	// Verify all modes have string representations
@@ -34,11 +31,8 @@ func TestMode_Constants(t *testing.T) {
 		mode     Mode
 		expected string
 	}{
-		{ModeEco, "eco"},
 		{ModeAuto, "auto"},
 		{ModeAutoQuick, "auto_quick"},
-		{ModeIntensive, "intensive"},
-		{ModeQuick, "quick"},
 	}
 
 	for _, tt := range tests {

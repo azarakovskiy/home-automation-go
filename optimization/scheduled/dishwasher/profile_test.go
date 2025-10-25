@@ -14,13 +14,6 @@ func TestGetProfileForMode_AllModes(t *testing.T) {
 		wantPowerMax float64
 	}{
 		{
-			mode:         ModeEco,
-			wantDuration: 4 * time.Hour,
-			wantStages:   3,
-			wantPowerMin: 0.7,
-			wantPowerMax: 0.9,
-		},
-		{
 			mode:         ModeAuto,
 			wantDuration: 137 * time.Minute, // Measured: exactly 137 minutes
 			wantStages:   7,                 // Updated: 7 stages from measured data
@@ -32,20 +25,6 @@ func TestGetProfileForMode_AllModes(t *testing.T) {
 			wantDuration: 70 * time.Minute, // Measured: ~70 minutes
 			wantStages:   13,               // Measured: 13 distinct stages from power graph
 			wantPowerMin: 1.8,              // Real measured: ~2000W
-			wantPowerMax: 2.1,
-		},
-		{
-			mode:         ModeIntensive,
-			wantDuration: 3 * time.Hour,
-			wantStages:   3,
-			wantPowerMin: 1.4,
-			wantPowerMax: 1.6,
-		},
-		{
-			mode:         ModeQuick,
-			wantDuration: 1 * time.Hour,
-			wantStages:   3,
-			wantPowerMin: 1.8, // Real measured: ~2000W
 			wantPowerMax: 2.1,
 		},
 	}
@@ -124,11 +103,8 @@ func TestProfile_StageWeights(t *testing.T) {
 		mode               Mode
 		expectedStageCount int
 	}{
-		{ModeEco, 3},
 		{ModeAuto, 7},       // Updated: 7 stages from measured data
 		{ModeAutoQuick, 13}, // 13 stages based on measured power pattern
-		{ModeIntensive, 3},
-		{ModeQuick, 3},
 	}
 
 	for _, tt := range tests {
@@ -150,29 +126,5 @@ func TestProfile_StageWeights(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestProfile_EcoVsIntensive(t *testing.T) {
-	eco, err := GetProfileForMode(ModeEco)
-	if err != nil {
-		t.Fatalf("Failed to get eco profile: %v", err)
-	}
-
-	intensive, err := GetProfileForMode(ModeIntensive)
-	if err != nil {
-		t.Fatalf("Failed to get intensive profile: %v", err)
-	}
-
-	// Eco should take longer
-	if eco.GetDuration() <= intensive.GetDuration() {
-		t.Errorf("Eco duration (%s) should be longer than intensive (%s)",
-			eco.GetDuration(), intensive.GetDuration())
-	}
-
-	// Intensive should use more power
-	if intensive.GetPowerKW() <= eco.GetPowerKW() {
-		t.Errorf("Intensive power (%.2f) should be higher than eco (%.2f)",
-			intensive.GetPowerKW(), eco.GetPowerKW())
 	}
 }
