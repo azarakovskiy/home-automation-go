@@ -36,7 +36,7 @@ func (c *Controller) InitializeModeForScheduled(mode string) error {
 	log.Printf("Socket ON - User has 5 seconds to set mode to: %s", mode)
 
 	// Wait 5 seconds for user to set the mode on the dishwasher
-	time.Sleep(5 * time.Second)
+	time.Sleep(5 * time.Second) // todo: make this configurable
 
 	// Turn off socket to prevent immediate start
 	if err := c.turnOffSocket(); err != nil {

@@ -60,13 +60,11 @@ func GetTerryMessageOrDefault(key string, defaultMsg string) string {
 // Placeholders: {{savings}}, {{time}}, {{price}}, {{duration}}
 func GetTerryMessageWithData(key string, data map[string]string) string {
 	msg := GetTerryMessage(key)
-	
+
 	// Replace placeholders
 	for placeholder, value := range data {
 		msg = strings.ReplaceAll(msg, "{{"+placeholder+"}}", value)
 	}
-	
+
 	return msg
 }
-
-

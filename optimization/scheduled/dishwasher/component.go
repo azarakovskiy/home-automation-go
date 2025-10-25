@@ -173,7 +173,6 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 			return
 		}
 
-		// Announce immediate start with Terry
 		event := notifications.NotificationEvent{
 			MessageKey: notifications.MessageDishwasherNow,
 		}

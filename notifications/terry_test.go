@@ -129,9 +129,9 @@ func TestGetTerryMessageWithData(t *testing.T) {
 		contains string
 	}{
 		{
-			name: "Replace savings and time placeholders",
-			key:  "dishwasher_later",
-			data: map[string]string{"savings": "15", "time": "3 PM"},
+			name:     "Replace savings and time placeholders",
+			key:      "dishwasher_later",
+			data:     map[string]string{"savings": "15", "time": "3 PM"},
 			contains: "15",
 		},
 	}
@@ -158,7 +158,7 @@ func TestTerryTranslations_Count(t *testing.T) {
 	if count < 2 {
 		t.Errorf("Expected at least 2 Terry translations (now/later), got %d", count)
 	}
-	
+
 	// Each should have 10 variations
 	for key, variations := range TerryTranslations {
 		if len(variations) != 10 {
@@ -166,4 +166,3 @@ func TestTerryTranslations_Count(t *testing.T) {
 		}
 	}
 }
-
