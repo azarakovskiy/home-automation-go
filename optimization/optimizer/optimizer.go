@@ -480,7 +480,7 @@ func (o *Optimizer) optimizeCriticalUptime(req CheapestHoursRequest, priceSlots 
 	}
 
 	if inCriticalHours {
-		return o.handleCriticalHoursCharging(req, currentPrice)
+		return o.handleCriticalHoursCharging(req, priceSlots, currentPrice)
 	}
 
 	// Outside critical hours: charge opportunistically during cheapest slots
@@ -489,18 +489,32 @@ func (o *Optimizer) optimizeCriticalUptime(req CheapestHoursRequest, priceSlots 
 
 // handleCriticalHoursCharging decides whether to charge during critical hours
 // Uses actual battery sensor if available, otherwise estimates based on drain rate
-func (o *Optimizer) handleCriticalHoursCharging(req CheapestHoursRequest, currentPrice float64) (*CheapestHoursResult, error) {
+func (o *Optimizer) handleCriticalHoursCharging(req CheapestHoursRequest, priceSlots []pricing.PriceSlot, currentPrice float64) (*CheapestHoursResult, error) {
 	batteryLevel := req.CurrentBatteryLevel
 
+	// If no battery sensor or it might be stale (laptop lid closed), use time-based estimation
+	// Battery sensor is considered if > 0, but we should be conservative
 	if batteryLevel > 0 {
-		return o.handleCriticalHoursWithBatterySensor(req, batteryLevel, currentPrice)
+		return o.handleCriticalHoursWithBatterySensor(req, priceSlots, batteryLevel, currentPrice)
 	}
 
+	// Fallback to time-based estimation when sensor unavailable
 	return o.handleCriticalHoursWithEstimation(req, currentPrice)
 }
 
 // handleCriticalHoursWithBatterySensor handles charging during critical hours when battery sensor is available
-func (o *Optimizer) handleCriticalHoursWithBatterySensor(req CheapestHoursRequest, batteryLevel int, currentPrice float64) (*CheapestHoursResult, error) {
+func (o *Optimizer) handleCriticalHoursWithBatterySensor(req CheapestHoursRequest, priceSlots []pricing.PriceSlot, batteryLevel int, currentPrice float64) (*CheapestHoursResult, error) {
+	now := time.Now()
+	currentHour := now.Hour()
+	isWeekend := now.Weekday() == time.Saturday || now.Weekday() == time.Sunday
+
+	// Calculate hours remaining in critical period
+	hoursRemaining := req.CriticalHoursEnd - currentHour
+	if hoursRemaining < 0 {
+		hoursRemaining = 0
+	}
+
+	// Emergency charge if battery is critically low
 	if batteryLevel < req.MinBatteryPercent {
 		log.Printf("%s: CRITICAL - Battery at %d%% (below %d%%), charging despite expensive rates",
 			req.DeviceName, batteryLevel, req.MinBatteryPercent)
@@ -514,8 +528,92 @@ func (o *Optimizer) handleCriticalHoursWithBatterySensor(req CheapestHoursReques
 		}, nil
 	}
 
-	log.Printf("%s: In critical hours (%d-%d), battery at %d%%, skipping charge",
-		req.DeviceName, req.CriticalHoursStart, req.CriticalHoursEnd, batteryLevel)
+	// Weekdays (Mon-Fri): Smart charging based on actual prices, not fixed time slots
+	// Weekends (Sat-Sun): Allow aggressive drain to save money, only charge when necessary
+	if !isWeekend {
+		// Look at ALL available future price data (12-24h) to define what "cheap" means today
+		minPrice, avgPrice, maxPrice := o.getPriceStatistics(priceSlots, now)
+
+		if minPrice == 0 || maxPrice == 0 {
+			log.Printf("%s: [Weekday] No future price data available", req.DeviceName)
+			return &CheapestHoursResult{
+				ChargeNow:      false,
+				CheapestSlots:  []pricing.PriceSlot{},
+				AveragePrice:   currentPrice,
+				CurrentPrice:   currentPrice,
+				SavingsPercent: 0,
+				TotalDuration:  0,
+			}, nil
+		}
+
+		// Calculate dynamic thresholds based on today's price distribution
+		// "Cheap" = min + 25% of range (bottom quartile)
+		// "Very cheap" = min + 15% of range (bottom 15%)
+		priceRange := maxPrice - minPrice
+		cheapThreshold := minPrice + (priceRange * 0.25)
+		veryCheapThreshold := minPrice + (priceRange * 0.15)
+
+		// Weekday logic: Charge based on battery level and price
+		if batteryLevel < 60 {
+			// Low battery (< 60%): charge when price is "cheap"
+			if currentPrice <= cheapThreshold {
+				savingsPercent := ((avgPrice - currentPrice) / avgPrice) * 100
+				log.Printf("%s: [Weekday] Charging - battery at %d%%, cheap price %.4f (threshold: %.4f, range: %.4f-%.4f)",
+					req.DeviceName, batteryLevel, currentPrice, cheapThreshold, minPrice, maxPrice)
+				return &CheapestHoursResult{
+					ChargeNow:      true,
+					CheapestSlots:  []pricing.PriceSlot{},
+					AveragePrice:   avgPrice,
+					CurrentPrice:   currentPrice,
+					SavingsPercent: savingsPercent,
+					TotalDuration:  req.TotalDuration,
+				}, nil
+			}
+
+			log.Printf("%s: [Weekday] Battery at %d%%, waiting for cheap price (current: %.4f, cheap: %.4f)",
+				req.DeviceName, batteryLevel, currentPrice, cheapThreshold)
+		} else {
+			// Healthy battery (>= 60%): only charge when price is "very cheap"
+			if currentPrice <= veryCheapThreshold {
+				savingsPercent := ((avgPrice - currentPrice) / avgPrice) * 100
+				log.Printf("%s: [Weekday] Charging - battery at %d%%, very cheap price %.4f (threshold: %.4f, range: %.4f-%.4f)",
+					req.DeviceName, batteryLevel, currentPrice, veryCheapThreshold, minPrice, maxPrice)
+				return &CheapestHoursResult{
+					ChargeNow:      true,
+					CheapestSlots:  []pricing.PriceSlot{},
+					AveragePrice:   avgPrice,
+					CurrentPrice:   currentPrice,
+					SavingsPercent: savingsPercent,
+					TotalDuration:  req.TotalDuration,
+				}, nil
+			}
+
+			log.Printf("%s: [Weekday] Battery at %d%%, healthy - waiting for very cheap price (current: %.4f, threshold: %.4f)",
+				req.DeviceName, batteryLevel, currentPrice, veryCheapThreshold)
+		}
+	} else {
+		// Weekend logic: Allow aggressive drain to save money
+		if req.DrainRate > 0 && hoursRemaining > 0 {
+			drainPerHour := 100.0 / (req.DrainRate.Hours())
+			estimatedBatteryAtEnd := float64(batteryLevel) - (drainPerHour * float64(hoursRemaining))
+
+			if estimatedBatteryAtEnd < float64(req.MinBatteryPercent) {
+				log.Printf("%s: [Weekend] Charging - battery at %d%%, will drop to %.0f%% in %dh",
+					req.DeviceName, batteryLevel, estimatedBatteryAtEnd, hoursRemaining)
+				return &CheapestHoursResult{
+					ChargeNow:      true,
+					CheapestSlots:  []pricing.PriceSlot{},
+					AveragePrice:   currentPrice,
+					CurrentPrice:   currentPrice,
+					SavingsPercent: 0,
+					TotalDuration:  req.TotalDuration,
+				}, nil
+			}
+		}
+
+		log.Printf("%s: [Weekend] In critical hours, battery at %d%%, allowing drain",
+			req.DeviceName, batteryLevel)
+	}
 
 	return &CheapestHoursResult{
 		ChargeNow:      false,
@@ -607,17 +705,24 @@ func (o *Optimizer) shouldPreChargeNow(req CheapestHoursRequest, priceSlots []pr
 	criticalHoursAvg := o.getAveragePriceDuringCriticalHours(priceSlots, now, req.CriticalHoursStart, req.CriticalHoursEnd)
 	hoursUntilCritical := o.calculateHoursUntilCritical(now, req.CriticalHoursStart)
 
-	// Smart spike detection: if we're close to critical hours (≤4h) and current price is cheaper
-	// than critical hours average, charge now to avoid being caught with low battery during expensive peaks
+	// Strategy: Charge whenever current price is significantly cheaper than critical hours
+	// This ensures we pre-charge during cheap night hours even if not THE absolute cheapest slot
+	// Use a 20% threshold: charge if current price is at least 20% cheaper than critical hours average
+	priceRatio := currentPrice / criticalHoursAvg
+	significantlyCheaper := priceRatio < 0.80 // Current is 20%+ cheaper
+
+	// Emergency pre-charge if very close to critical hours (≤4h) and any amount cheaper
 	closeToCriticalHours := hoursUntilCritical <= 4
 	currentCheaperThanCriticalHours := currentPrice < criticalHoursAvg
-
 	shouldEmergencyPreCharge := currentCheaperThanCriticalHours && closeToCriticalHours
 
-	debug.Log("Pre-charge decision: current=%.4f, critical_avg=%.4f, hours_until_critical=%d, emergency=%v",
-		currentPrice, criticalHoursAvg, hoursUntilCritical, shouldEmergencyPreCharge)
+	// Charge if either: significantly cheaper OR emergency pre-charge
+	shouldCharge := significantlyCheaper || shouldEmergencyPreCharge
 
-	return shouldEmergencyPreCharge, criticalHoursAvg
+	debug.Log("Pre-charge decision: current=%.4f, critical_avg=%.4f, hours_until_critical=%d, ratio=%.2f, significantly_cheaper=%v, emergency=%v",
+		currentPrice, criticalHoursAvg, hoursUntilCritical, priceRatio, significantlyCheaper, shouldEmergencyPreCharge)
+
+	return shouldCharge, criticalHoursAvg
 }
 
 // calculateHoursUntilCritical calculates hours until critical hours start, handling day wrap-around
@@ -681,6 +786,41 @@ func (o *Optimizer) getWindowSlots(priceSlots []pricing.PriceSlot, now time.Time
 		}
 	}
 	return windowSlots
+}
+
+// getPriceStatistics calculates min, avg, max for ALL future price slots
+// This defines what "cheap" and "expensive" mean today
+func (o *Optimizer) getPriceStatistics(priceSlots []pricing.PriceSlot, now time.Time) (float64, float64, float64) {
+	var minPrice, avgPrice, maxPrice float64
+	var totalPrice float64
+	var count int
+	foundAny := false
+
+	for _, slot := range priceSlots {
+		// Include all future slots (not just critical hours)
+		if slot.From.After(now) || slot.From.Equal(now) {
+			if !foundAny {
+				minPrice = slot.Price
+				maxPrice = slot.Price
+				foundAny = true
+			} else {
+				if slot.Price < minPrice {
+					minPrice = slot.Price
+				}
+				if slot.Price > maxPrice {
+					maxPrice = slot.Price
+				}
+			}
+			totalPrice += slot.Price
+			count++
+		}
+	}
+
+	if count > 0 {
+		avgPrice = totalPrice / float64(count)
+	}
+
+	return minPrice, avgPrice, maxPrice
 }
 
 // getAveragePriceDuringCriticalHours calculates average price during critical hours to detect spikes
