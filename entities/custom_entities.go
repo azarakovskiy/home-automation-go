@@ -3,11 +3,29 @@ package entities
 type CustomEventsDomain struct {
 	ScheduledStart string
 	Notify         string
+	ReminderCreate string
+	ReminderAck    string
+	ReminderDelete string
 }
 
 var CustomEvents = CustomEventsDomain{
 	ScheduledStart: "event.custom_scheduled_start",
 	Notify:         "event.custom_notify",
+	ReminderCreate: "event.custom_reminder_create",
+	ReminderAck:    "event.custom_reminder_ack",
+	ReminderDelete: "event.custom_reminder_delete",
+}
+
+type CustomInputTextDomain struct {
+	RemindersConfig  string
+	RemindersRuntime string
+	RemindersViews   string
+}
+
+var CustomInputText = CustomInputTextDomain{
+	RemindersConfig:  "input_text.reminders_config",
+	RemindersRuntime: "input_text.reminders_runtime",
+	RemindersViews:   "input_text.reminders_views",
 }
 
 // CustomSensorsDomain contains sensors that are not auto-generated

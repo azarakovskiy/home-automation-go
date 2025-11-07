@@ -1,0 +1,61 @@
+alias: "[Reminder] Take your pills"
+description: ""
+triggers:
+  - trigger: time
+    at: "10:00:00"
+    weekday:
+      - mon
+      - wed
+      - fri
+      - tue
+      - sun
+      - thu
+      - sat
+conditions:
+  - condition: state
+    entity_id: input_select.house_mode
+    state: At home
+actions:
+  - action: input_boolean.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.vitamins_taken
+  - action: tts.speak
+    metadata: {}
+    data:
+      cache: true
+      media_player_entity_id: media_player.living_room_google_home
+      message: Chookity, time to take your pills!
+    target:
+      entity_id: tts.piper
+  - repeat:
+      until:
+        - condition: or
+          conditions:
+            - condition: state
+              entity_id: input_boolean.vitamins_taken
+              state: "on"
+            - condition: not
+              conditions:
+                - condition: state
+                  entity_id: input_select.house_mode
+                  state: At home
+      sequence:
+        - delay:
+            hours: 0
+            minutes: 20
+            seconds: 0
+            milliseconds: 0
+        - condition: state
+          entity_id: input_boolean.vitamins_taken
+          state: "off"
+        - action: tts.speak
+          metadata: {}
+          data:
+            cache: true
+            media_player_entity_id: media_player.living_room_google_home
+            message: Reminder to take your pills
+          target:
+            entity_id: tts.piper
+mode: single

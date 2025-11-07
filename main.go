@@ -11,6 +11,7 @@ import (
 	"home-go/optimization/continuous/vacuum"
 	"home-go/optimization/scheduled/dishwasher"
 	"home-go/pricing"
+	"home-go/reminder"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -47,6 +48,7 @@ func main() {
 	dishwasherComp := dishwasher.New(base, app.GetState(), priceService)
 	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
 	vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
+	reminderComp := reminder.New(base, app.GetState())
 
 	// Collect all components
 	components := []component.Component{
@@ -54,6 +56,7 @@ func main() {
 		dishwasherComp,
 		laptopChargerComp,
 		vacuumChargerComp,
+		reminderComp,
 	}
 
 	// Register all listeners from components
