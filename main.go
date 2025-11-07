@@ -41,7 +41,7 @@ func main() {
 
 	// Initialize shared services and base component
 	base := component.NewBase(app.GetService())
-	priceService := pricing.NewService(app.GetState())
+	priceService := pricing.NewService(app.GetService(), app.GetState())
 
 	// Initialize components - pass shared base and state
 	dishwasherComp := dishwasher.New(base, app.GetState(), priceService)
@@ -50,6 +50,7 @@ func main() {
 
 	// Collect all components
 	components := []component.Component{
+		priceService,
 		dishwasherComp,
 		laptopChargerComp,
 		vacuumChargerComp,

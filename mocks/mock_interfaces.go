@@ -10,6 +10,7 @@
 package mocks
 
 import (
+	notifications "home-go/notifications"
 	reflect "reflect"
 	time "time"
 
@@ -563,4 +564,42 @@ func (m *MockPricingServiceInterface) IsCurrentlyExpensive() (bool, error) {
 func (mr *MockPricingServiceInterfaceMockRecorder) IsCurrentlyExpensive() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsCurrentlyExpensive", reflect.TypeOf((*MockPricingServiceInterface)(nil).IsCurrentlyExpensive))
+}
+
+// MockNotificationSenderInterface is a mock of NotificationSenderInterface interface.
+type MockNotificationSenderInterface struct {
+	ctrl     *gomock.Controller
+	recorder *MockNotificationSenderInterfaceMockRecorder
+	isgomock struct{}
+}
+
+// MockNotificationSenderInterfaceMockRecorder is the mock recorder for MockNotificationSenderInterface.
+type MockNotificationSenderInterfaceMockRecorder struct {
+	mock *MockNotificationSenderInterface
+}
+
+// NewMockNotificationSenderInterface creates a new mock instance.
+func NewMockNotificationSenderInterface(ctrl *gomock.Controller) *MockNotificationSenderInterface {
+	mock := &MockNotificationSenderInterface{ctrl: ctrl}
+	mock.recorder = &MockNotificationSenderInterfaceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockNotificationSenderInterface) EXPECT() *MockNotificationSenderInterfaceMockRecorder {
+	return m.recorder
+}
+
+// Notify mocks base method.
+func (m *MockNotificationSenderInterface) Notify(event notifications.NotificationEvent) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Notify", event)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Notify indicates an expected call of Notify.
+func (mr *MockNotificationSenderInterfaceMockRecorder) Notify(event any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notify", reflect.TypeOf((*MockNotificationSenderInterface)(nil).Notify), event)
 }
