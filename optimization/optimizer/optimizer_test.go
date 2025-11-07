@@ -747,7 +747,10 @@ func TestOptimizer_CriticalUptime_DynamicThresholds(t *testing.T) {
 	optimizer := NewOptimizer()
 
 	// Use current time to avoid time.Now() mismatch
-	now := time.Now().Truncate(15 * time.Minute)
+	now := time.Date(2024, 1, 2, 10, 0, 0, 0, time.UTC) // Tuesday
+	originalNowFunc := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = originalNowFunc })
 
 	testScenarios := []struct {
 		name        string

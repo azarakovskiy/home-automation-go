@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"home-go/debug"
 	"home-go/dryrun"
 	"home-go/entities"
 	"home-go/notifications"
@@ -96,6 +97,7 @@ func (s *Service) Intervals() []ga.Interval {
 }
 
 func (s *Service) handlePriceSensorChange(service *ga.Service, state ga.State, data ga.EntityData) {
+	debug.Log("Pricing: entity update received for %s", data.TriggerEntityId)
 	if err := s.updateFromAttributes(data.ToAttributes); err != nil {
 		// Fall back to a direct fetch if event payload missed attributes
 		if fetchErr := s.refreshFromState(); fetchErr != nil {
@@ -109,8 +111,10 @@ func (s *Service) GetPriceSlots() ([]PriceSlot, error) {
 	now := s.now()
 	slots := s.getCachedSlots()
 
-	if !s.cacheNeedsRefresh(slots, now) {
+	if refresh, reason := s.cacheNeedsRefresh(slots, now); !refresh {
 		return slots, nil
+	} else {
+		log.Printf("Pricing: refreshing cached price slots (%s)", reason)
 	}
 
 	if err := s.refreshFromState(); err != nil {
@@ -205,9 +209,11 @@ func (s *Service) updateFromAttributes(attrs map[string]any) error {
 	}
 
 	if !s.updateCache(slots) {
+		debug.Log("Pricing: cache already up to date from entity event")
 		return nil
 	}
 
+	log.Printf("Pricing: cache updated from entity event with %d slots", len(slots))
 	s.ingestHistogram(slots)
 	s.maybeAnnounce(slots)
 	return nil
@@ -234,9 +240,11 @@ func (s *Service) refreshFromState() error {
 	}
 
 	if !s.updateCache(slots) {
+		debug.Log("Pricing: cache refresh skipped (identical data from HA sensor)")
 		return nil
 	}
 
+	log.Printf("Pricing: refreshed prices from HA sensor (%d slots)", len(slots))
 	s.ingestHistogram(slots)
 	s.maybeAnnounce(slots)
 	return nil
@@ -282,23 +290,23 @@ func equalPriceSlots(a, b []PriceSlot) bool {
 	return true
 }
 
-func (s *Service) cacheNeedsRefresh(slots []PriceSlot, now time.Time) bool {
+func (s *Service) cacheNeedsRefresh(slots []PriceSlot, now time.Time) (bool, string) {
 	if len(slots) == 0 {
-		return true
+		return true, "cache empty"
 	}
 
 	latest := slots[len(slots)-1]
 	if !latest.Till.After(now) {
-		return true
+		return true, "latest slot already expired"
 	}
 
 	for _, slot := range slots {
 		if !now.Before(slot.From) && now.Before(slot.Till) {
-			return false
+			return false, ""
 		}
 	}
 
-	return true
+	return true, "current slot not present in cache"
 }
 
 func parsePriceSlots(raw any) ([]PriceSlot, error) {
@@ -362,6 +370,8 @@ func (s *Service) ingestHistogram(slots []PriceSlot) {
 	if err := s.persistHistogramLocked(); err != nil {
 		log.Printf("WARNING: Failed to persist price histogram: %v", err)
 	}
+
+	debug.Log("Pricing: ingested %d slots into histogram (total buckets=%d)", len(slots), len(s.histogram))
 }
 
 func (s *Service) ensureHistogramLoaded() error {
@@ -386,6 +396,7 @@ func (s *Service) ensureHistogramLoaded() error {
 		s.mu.Lock()
 		s.histogramLoaded = true
 		s.mu.Unlock()
+		debug.Log("Pricing: histogram entity empty, starting fresh")
 		return nil
 	}
 
@@ -405,6 +416,7 @@ func (s *Service) ensureHistogramLoaded() error {
 		s.histogram[price] = weight
 	}
 	s.histogramLoaded = true
+	debug.Log("Pricing: loaded histogram from HA helper with %d buckets", len(s.histogram))
 
 	return nil
 }
@@ -424,14 +436,19 @@ func (s *Service) persistHistogramLocked() error {
 		return fmt.Errorf("failed to encode histogram payload: %w", err)
 	}
 
-	return dryrun.CallWithData(
+	if err := dryrun.CallWithData(
 		"InputText.Set",
 		entities.InputText.EnergyPriceHistogram,
 		string(data),
 		func() error {
 			return s.service.InputText.Set(entities.InputText.EnergyPriceHistogram, string(data))
 		},
-	)
+	); err != nil {
+		return err
+	}
+
+	debug.Log("Pricing: persisted histogram with %d buckets", len(payload))
+	return nil
 }
 
 func (s *Service) classifyPrice(price float64) PriceLevel {
@@ -531,6 +548,7 @@ func (s *Service) maybeAnnounce(slots []PriceSlot) {
 		return
 	}
 
+	log.Printf("Pricing: announcing %s prices for next %d hours (until %s)", window.Level.String(), hours, untilSpeech)
 	s.recordAnnouncement(window)
 }
 
