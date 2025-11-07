@@ -3,6 +3,8 @@ package mocks
 import (
 	"time"
 
+	"home-go/notifications"
+
 	ga "saml.dev/gome-assistant"
 )
 
@@ -61,6 +63,11 @@ type PricingServiceInterface interface {
 	GetPriceSlotsInWindow(from, until time.Time) ([]PriceSlot, error)
 	GetAveragePrice() (float64, error)
 	IsCurrentlyExpensive() (bool, error)
+}
+
+// NotificationSenderInterface mirrors pricing.notificationSender for testing
+type NotificationSenderInterface interface {
+	Notify(event notifications.NotificationEvent) error
 }
 
 // PriceSlot represents a time slot with its electricity price

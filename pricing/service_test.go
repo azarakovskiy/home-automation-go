@@ -14,16 +14,6 @@ import (
 	ga "saml.dev/gome-assistant"
 )
 
-type fakeNotifier struct {
-	events []notifications.NotificationEvent
-	err    error
-}
-
-func (f *fakeNotifier) Notify(event notifications.NotificationEvent) error {
-	f.events = append(f.events, event)
-	return f.err
-}
-
 func TestNewServiceInitializesState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -206,7 +196,19 @@ func TestMaybeAnnounceSendsSingleNotification(t *testing.T) {
 	now := time.Date(2025, 10, 23, 10, 0, 0, 0, time.UTC)
 	service := NewService(nil, nil)
 	service.now = func() time.Time { return now }
-	service.notificationSender = &fakeNotifier{}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockNotifier := mocks.NewMockNotificationSenderInterface(ctrl)
+	var events []notifications.NotificationEvent
+	mockNotifier.EXPECT().
+		Notify(gomock.Any()).
+		Do(func(event notifications.NotificationEvent) {
+			events = append(events, event)
+		}).
+		Times(1)
+	service.notificationSender = mockNotifier
 	service.isNightFn = func() (bool, error) { return false, nil }
 	service.isAwayFn = func() (bool, error) { return false, nil }
 	service.histogram = map[float64]float64{
@@ -223,18 +225,17 @@ func TestMaybeAnnounceSendsSingleNotification(t *testing.T) {
 
 	service.maybeAnnounce(slots)
 
-	notifier := service.notificationSender.(*fakeNotifier)
-	if len(notifier.events) != 1 {
-		t.Fatalf("expected 1 notification, got %d", len(notifier.events))
+	if len(events) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(events))
 	}
-	if !strings.Contains(notifier.events[0].Message, "cheap") {
-		t.Fatalf("expected message to mention cheap prices, got: %s", notifier.events[0].Message)
+	if !strings.Contains(events[0].Message, "cheap") {
+		t.Fatalf("expected message to mention cheap prices, got: %s", events[0].Message)
 	}
 
 	// Calling again with same data should not send duplicate
 	service.maybeAnnounce(slots)
-	if len(notifier.events) != 1 {
-		t.Fatalf("expected no duplicate notifications, got %d", len(notifier.events))
+	if len(events) != 1 {
+		t.Fatalf("expected no duplicate notifications, got %d", len(events))
 	}
 }
 
@@ -242,7 +243,10 @@ func TestMaybeAnnounceSkippedWhenNight(t *testing.T) {
 	now := time.Date(2025, 10, 23, 22, 0, 0, 0, time.UTC)
 	service := NewService(nil, nil)
 	service.now = func() time.Time { return now }
-	service.notificationSender = &fakeNotifier{}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	service.notificationSender = mocks.NewMockNotificationSenderInterface(ctrl)
 	service.isNightFn = func() (bool, error) { return true, nil }
 	service.isAwayFn = func() (bool, error) { return false, nil }
 	service.histogram = map[float64]float64{
@@ -256,9 +260,6 @@ func TestMaybeAnnounceSkippedWhenNight(t *testing.T) {
 	}
 
 	service.maybeAnnounce(slots)
-	if len(service.notificationSender.(*fakeNotifier).events) != 0 {
-		t.Fatalf("expected no notifications during night mode")
-	}
 }
 
 func TestMaybeAnnounceRespectsMinInterval(t *testing.T) {
@@ -267,7 +268,18 @@ func TestMaybeAnnounceRespectsMinInterval(t *testing.T) {
 
 	service := NewService(nil, nil)
 	service.now = func() time.Time { return current }
-	service.notificationSender = &fakeNotifier{}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockNotifier := mocks.NewMockNotificationSenderInterface(ctrl)
+	var events []notifications.NotificationEvent
+	mockNotifier.EXPECT().
+		Notify(gomock.Any()).
+		Do(func(event notifications.NotificationEvent) {
+			events = append(events, event)
+		}).
+		Times(2)
+	service.notificationSender = mockNotifier
 	service.isNightFn = func() (bool, error) { return false, nil }
 	service.isAwayFn = func() (bool, error) { return false, nil }
 	service.histogram = map[float64]float64{
@@ -287,21 +299,20 @@ func TestMaybeAnnounceRespectsMinInterval(t *testing.T) {
 	}
 
 	service.maybeAnnounce(cheapSlots)
-	notifier := service.notificationSender.(*fakeNotifier)
-	if len(notifier.events) != 1 {
-		t.Fatalf("expected initial notification, got %d", len(notifier.events))
+	if len(events) != 1 {
+		t.Fatalf("expected initial notification, got %d", len(events))
 	}
 
 	current = current.Add(time.Hour)
 	service.maybeAnnounce(expensiveSlots)
-	if len(notifier.events) != 1 {
-		t.Fatalf("expected throttling within 2h window, got %d notifications", len(notifier.events))
+	if len(events) != 1 {
+		t.Fatalf("expected throttling within 2h window, got %d notifications", len(events))
 	}
 
 	current = current.Add(time.Hour)
 	service.maybeAnnounce(expensiveSlots)
-	if len(notifier.events) != 2 {
-		t.Fatalf("expected notification after 2h window, got %d", len(notifier.events))
+	if len(events) != 2 {
+		t.Fatalf("expected notification after 2h window, got %d", len(events))
 	}
 }
 
