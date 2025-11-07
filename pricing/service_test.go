@@ -56,6 +56,7 @@ func TestServiceGetPriceSlotsCachesData(t *testing.T) {
 		Times(1)
 
 	service := NewService(nil, mockState)
+	service.now = func() time.Time { return time.Date(2025, 10, 23, 10, 30, 0, 0, time.UTC) }
 	service.histogramLoaded = true
 
 	// First call should hit HA
@@ -88,6 +89,41 @@ func TestServiceGetPriceSlotsPropagatesErrors(t *testing.T) {
 	}
 }
 
+func TestServiceGetPriceSlotsRefreshesStaleCache(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	now := time.Date(2025, 10, 23, 10, 30, 0, 0, time.UTC)
+	future := now.Add(30 * time.Hour)
+
+	firstState := samplePriceState()
+	secondState := samplePriceState()
+
+	mockState := mocks.NewMockStateInterface(ctrl)
+	gomock.InOrder(
+		mockState.EXPECT().
+			Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+			Return(firstState, nil),
+		mockState.EXPECT().
+			Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+			Return(secondState, nil),
+	)
+
+	service := NewService(nil, mockState)
+	currentTime := now
+	service.now = func() time.Time { return currentTime }
+	service.histogramLoaded = true
+
+	if _, err := service.GetPriceSlots(); err != nil {
+		t.Fatalf("first GetPriceSlots failed: %v", err)
+	}
+
+	currentTime = future
+	if _, err := service.GetPriceSlots(); err != nil {
+		t.Fatalf("second GetPriceSlots failed: %v", err)
+	}
+}
+
 func TestServiceGetCurrentPriceUsesCache(t *testing.T) {
 	service := NewService(nil, nil)
 
@@ -109,9 +145,11 @@ func TestServiceGetCurrentPriceUsesCache(t *testing.T) {
 
 func TestServiceGetAveragePrice(t *testing.T) {
 	service := NewService(nil, nil)
+	now := time.Date(2025, 10, 23, 10, 30, 0, 0, time.UTC)
+	service.now = func() time.Time { return now }
 	setCachedSlots(service, []PriceSlot{
-		{Price: 0.1},
-		{Price: 0.3},
+		{From: now.Add(-1 * time.Hour), Till: now, Price: 0.1},
+		{From: now, Till: now.Add(1 * time.Hour), Price: 0.3},
 	})
 
 	avg, err := service.GetAveragePrice()

@@ -106,8 +106,10 @@ func (s *Service) handlePriceSensorChange(service *ga.Service, state ga.State, d
 
 // GetPriceSlots returns cached price slots; falls back to direct sensor read when cache empty
 func (s *Service) GetPriceSlots() ([]PriceSlot, error) {
+	now := s.now()
 	slots := s.getCachedSlots()
-	if len(slots) > 0 {
+
+	if !s.cacheNeedsRefresh(slots, now) {
 		return slots, nil
 	}
 
@@ -115,7 +117,12 @@ func (s *Service) GetPriceSlots() ([]PriceSlot, error) {
 		return nil, err
 	}
 
-	return s.getCachedSlots(), nil
+	slots = s.getCachedSlots()
+	if len(slots) == 0 {
+		return nil, fmt.Errorf("no price slots available")
+	}
+
+	return slots, nil
 }
 
 // GetCurrentPrice returns the current electricity price
@@ -268,6 +275,25 @@ func equalPriceSlots(a, b []PriceSlot) bool {
 
 	for i := range a {
 		if !a[i].From.Equal(b[i].From) || !a[i].Till.Equal(b[i].Till) || a[i].Price != b[i].Price {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (s *Service) cacheNeedsRefresh(slots []PriceSlot, now time.Time) bool {
+	if len(slots) == 0 {
+		return true
+	}
+
+	latest := slots[len(slots)-1]
+	if !latest.Till.After(now) {
+		return true
+	}
+
+	for _, slot := range slots {
+		if !now.Before(slot.From) && now.Before(slot.Till) {
 			return false
 		}
 	}
