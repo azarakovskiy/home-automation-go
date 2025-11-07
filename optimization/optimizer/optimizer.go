@@ -11,6 +11,8 @@ import (
 	"home-go/pricing"
 )
 
+var nowFunc = time.Now
+
 // DeviceProfile defines characteristics of any device cycle
 // This is the generic interface that all devices must implement
 type DeviceProfile interface {
@@ -130,7 +132,7 @@ func (o *Optimizer) calculateSlotsNeeded(cycleDuration time.Duration, slotDurati
 }
 
 func (o *Optimizer) calculateStartTime(startAfter *time.Time) time.Time {
-	now := time.Now()
+	now := nowFunc()
 	if startAfter != nil && startAfter.After(now) {
 		return *startAfter
 	}
@@ -416,7 +418,7 @@ func (o *Optimizer) OptimizeCheapestHours(req CheapestHoursRequest, priceSlots [
 // optimizeOpportunistic implements simple cheapest-slots strategy
 // Just charges during the cheapest available slots, no special logic
 func (o *Optimizer) optimizeOpportunistic(req CheapestHoursRequest, priceSlots []pricing.PriceSlot) (*CheapestHoursResult, error) {
-	now := time.Now()
+	now := nowFunc()
 	currentPrice := o.getCurrentPriceFromSlots(priceSlots, now)
 
 	// Filter slots within window
@@ -465,7 +467,7 @@ func (o *Optimizer) optimizeOpportunistic(req CheapestHoursRequest, priceSlots [
 // Ensures device is charged before critical hours start, allows drain during expensive critical periods
 // Uses actual battery level if available, otherwise estimates based on DrainRate
 func (o *Optimizer) optimizeCriticalUptime(req CheapestHoursRequest, priceSlots []pricing.PriceSlot) (*CheapestHoursResult, error) {
-	now := time.Now()
+	now := nowFunc()
 	currentHour := now.Hour()
 	currentPrice := o.getCurrentPriceFromSlots(priceSlots, now)
 
@@ -504,7 +506,7 @@ func (o *Optimizer) handleCriticalHoursCharging(req CheapestHoursRequest, priceS
 
 // handleCriticalHoursWithBatterySensor handles charging during critical hours when battery sensor is available
 func (o *Optimizer) handleCriticalHoursWithBatterySensor(req CheapestHoursRequest, priceSlots []pricing.PriceSlot, batteryLevel int, currentPrice float64) (*CheapestHoursResult, error) {
-	now := time.Now()
+	now := nowFunc()
 	currentHour := now.Hour()
 	isWeekend := now.Weekday() == time.Saturday || now.Weekday() == time.Sunday
 
@@ -627,7 +629,7 @@ func (o *Optimizer) handleCriticalHoursWithBatterySensor(req CheapestHoursReques
 
 // handleCriticalHoursWithEstimation handles charging during critical hours using drain rate estimation
 func (o *Optimizer) handleCriticalHoursWithEstimation(req CheapestHoursRequest, currentPrice float64) (*CheapestHoursResult, error) {
-	now := time.Now()
+	now := nowFunc()
 	currentHour := now.Hour()
 	hoursIntoCritical := currentHour - req.CriticalHoursStart
 	criticalHoursRemaining := req.CriticalHoursEnd - currentHour

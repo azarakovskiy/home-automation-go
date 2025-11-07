@@ -619,6 +619,10 @@ func TestOptimizer_CriticalUptime_WithBatterySensor_LowBattery(t *testing.T) {
 
 	// Current time: 2 PM (14:00) - in critical hours (10-18)
 	now := time.Date(2024, 1, 1, 14, 0, 0, 0, time.UTC)
+	originalNowFunc := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = originalNowFunc })
+
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50}, // Expensive!
 	}
@@ -654,8 +658,13 @@ func TestOptimizer_CriticalUptime_WithBatterySensor_HealthyBattery(t *testing.T)
 
 	// Current time: 3 PM (15:00) - in critical hours
 	now := time.Date(2024, 1, 1, 15, 0, 0, 0, time.UTC)
+	originalNowFunc := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = originalNowFunc })
+
 	slots := []pricing.PriceSlot{
-		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50}, // Expensive
+		{From: now, Till: now.Add(15 * time.Minute), Price: 0.50},                      // Current expensive slot
+		{From: now.Add(15 * time.Minute), Till: now.Add(30 * time.Minute), Price: 0.2}, // Future cheap slot
 	}
 
 	req := CheapestHoursRequest{
@@ -686,6 +695,9 @@ func TestOptimizer_CriticalUptime_WithBatterySensor_LowButNotCritical(t *testing
 
 	// Monday 12:00 (weekday lunch) - in critical hours (9-19)
 	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC) // Jan 1, 2024 is Monday
+	originalNowFunc := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = originalNowFunc })
 
 	// Price slots with current price below average
 	slots := []pricing.PriceSlot{
@@ -956,28 +968,26 @@ func TestOptimizer_CriticalUptime_WithEstimation_NoChargeYet(t *testing.T) {
 func TestOptimizer_CriticalUptime_PreCharge_BeforeCriticalHours(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Use current time and set critical hours well in the future
-	now := time.Now()
+	// Fixed time: 19:00, critical hours start at 23:00 and wrap to 07:00
+	now := time.Date(2024, 1, 1, 19, 0, 0, 0, time.UTC)
 	currentHour := now.Hour()
+	originalNowFunc := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = originalNowFunc })
 
-	// Set critical hours 4-12 hours in the future (well outside current time)
-	criticalStart := (currentHour + 4) % 24
-	criticalEnd := (currentHour + 12) % 24
-
-	// Handle midnight wrap - if end < start, adjust
-	if criticalEnd <= criticalStart {
-		criticalStart = (currentHour + 4) % 24
-		criticalEnd = 23
-	}
-
+	criticalStart := 23
+	criticalEnd := 7
 	var slots []pricing.PriceSlot
 
 	// Create slots for next 10 hours with varying prices
 	for i := 0; i < 40; i++ { // 10 hours * 4 (15-min slots)
 		var price float64
-		if i < 16 { // First 4 hours cheap
+		switch {
+		case i == 0:
+			price = 0.15 // Current slot uniquely cheap
+		case i < 16: // Next 4 hours still cheap
 			price = 0.18
-		} else {
+		default:
 			price = 0.30 // Rest expensive
 		}
 
@@ -1067,19 +1077,14 @@ func TestOptimizer_CriticalUptime_StrategyAutoDetection(t *testing.T) {
 func TestOptimizer_CriticalUptime_SpikeDetection_MorningRamp(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Use current time and set critical hours in the future
-	// Simulate being 3 hours before critical hours (like 7 AM before 10 AM work)
-	now := time.Now()
-	currentHour := now.Hour()
+	// Fixed time 07:00 with critical hours 10:00-18:00
+	now := time.Date(2024, 1, 1, 7, 0, 0, 0, time.UTC)
+	originalNowFunc := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = originalNowFunc })
 
-	criticalStart := (currentHour + 3) % 24
-	criticalEnd := (currentHour + 11) % 24
-
-	// Handle wrap-around
-	if criticalEnd <= criticalStart {
-		criticalStart = (currentHour + 3) % 24
-		criticalEnd = 23
-	}
+	criticalStart := 10
+	criticalEnd := 18
 
 	var slots []pricing.PriceSlot
 	// Create 24 hours of price data with a spike pattern

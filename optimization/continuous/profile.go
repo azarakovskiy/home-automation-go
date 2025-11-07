@@ -76,7 +76,7 @@ var (
 		CriticalHoursStart: 9,              // Work starts at 9 AM (morning peak)
 		CriticalHoursEnd:   19,             // Work ends at 19:00 (after evening peak)
 		DrainRate:          3 * time.Hour,  // Measured: 100% → 20% in 3h
-		BatteryEntity:      entities.Sensor.OfficeLaptopWorkInternalBatteryLevel,
+		BatteryEntity:      entities.CustomSensors.OfficeLaptopWorkInternalBatteryLevel,
 		MinBatteryPercent:  10, // Allow aggressive drain to 10% by end of work day
 		Description:        "Work laptop - charged by 9 AM, drains through work, charges overnight",
 	}
