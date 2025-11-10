@@ -15,12 +15,17 @@ import (
 	ga "saml.dev/gome-assistant"
 )
 
+// NotificationSender defines the minimal notification surface needed by the dishwasher.
+type NotificationSender interface {
+	Notify(notifications.NotificationEvent) error
+}
+
 // Dishwasher handles all dishwasher-related automation
 type Dishwasher struct {
 	component.Base // Embed Base to get default implementations and common services
 
 	priceService        *pricing.Service
-	notificationService *notifications.NotificationService
+	notificationService NotificationSender
 	controller          *Controller
 	optimizer           *optimizer.Optimizer
 	stateManager        ScheduleStateStore
@@ -269,6 +274,10 @@ func (c *Dishwasher) checkPendingStart(service *ga.Service, state ga.State) {
 
 // announceDelayedStart fires a notification event for a scheduled dishwasher start
 func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent float64) {
+	if c.notificationService == nil {
+		return
+	}
+
 	// Format time in a natural way for speech
 	// e.g., "3 PM", "3:30 PM", "noon", "midnight"
 	timeStr := notifications.FormatTimeForSpeech(startTime)
@@ -287,6 +296,36 @@ func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent fl
 			"start_time":      startTime.Format("15:04"),
 			"start_time_text": timeStr,
 			"savings_percent": savingsPercent,
+		},
+	}
+
+	if err := c.notificationService.Notify(event); err != nil {
+		log.Printf("WARNING: Notification event failed: %v", err)
+	}
+}
+
+// announceCancellation informs the household that a pending schedule was cancelled.
+func (c *Dishwasher) announceCancellation(schedule *PendingSchedule, reason string) {
+	if c.notificationService == nil || schedule == nil {
+		return
+	}
+
+	timeStr := notifications.FormatTimeForSpeech(schedule.StartTime)
+	message := fmt.Sprintf("Dishwasher schedule for %s was cancelled", timeStr)
+	if suffix := cancellationReasonToSpeech(reason); suffix != "" {
+		message = fmt.Sprintf("%s %s.", message, suffix)
+	} else {
+		message += "."
+	}
+
+	event := notifications.NotificationEvent{
+		Device:  "dishwasher",
+		Type:    "cancelled",
+		Message: message,
+		Data: map[string]interface{}{
+			"start_time":      schedule.StartTime.Format("15:04"),
+			"start_time_text": timeStr,
+			"reason":          reason,
 		},
 	}
 
@@ -336,10 +375,28 @@ func (c *Dishwasher) cancelPendingSchedule(reason string) {
 		log.Printf("Cancellation requested (%s) but no pending dishwasher schedule", reason)
 	} else {
 		log.Printf("Cancelling pending dishwasher schedule (%s)", reason)
+		schedule := c.pendingSchedule
 		c.pendingSchedule = nil
+		c.announceCancellation(schedule, reason)
 	}
 
 	if err := c.stateManager.ClearSchedule(); err != nil {
 		log.Printf("ERROR: Failed to clear schedule state: %v", err)
+	}
+}
+
+func cancellationReasonToSpeech(reason string) string {
+	switch reason {
+	case "cancel event":
+		return "after a cancel request"
+	case "scheduled flag turned off":
+		return "because the schedule toggle was turned off"
+	case "input_boolean turned off":
+		return "manually from Home Assistant"
+	default:
+		if reason == "" {
+			return ""
+		}
+		return fmt.Sprintf("(%s)", reason)
 	}
 }
