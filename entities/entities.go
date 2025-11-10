@@ -2,324 +2,14 @@
 package entities
 
 
-type UpdateDomain struct {
-	HomeAssistantSupervisorUpdate string
-	HomeAssistantCoreUpdate string
-	FileEditorUpdate string
-	AdvancedSshWebTerminalUpdate string
-	MosquittoBrokerUpdate string
-	Zigbee2mqttUpdate string
-	PiperUpdate string
-	WhisperUpdate string
-	Tydom2mqttUpdate string
-	StudioCodeServerUpdate string
-	HomeAssistantOperatingSystemUpdate string
-	MiniGraphCardUpdate string
-	FrankEnergieUpdate string
-	HomeConnectAltUpdate string
-	HacsUpdate string
-	ApexchartsCardUpdate string
-	MushroomUpdate string
-	NeakasaUpdate string
-	PyscriptUpdate string
-	XiaomiMiotAutoUpdate string
-	TpLinkDecoUpdate string
-	BubbleCardUpdate string
-	_0xa4c13873fc1eb98f string
-	_0xa4c138e62d1b24a4 string
-	LivingRoomVacuumSocket string
-	BedroomSpaceSocket string
-	DoorbellFirmware string
-}
-
-var Update = UpdateDomain{
-	HomeAssistantSupervisorUpdate: "update.home_assistant_supervisor_update",
-	HomeAssistantCoreUpdate: "update.home_assistant_core_update",
-	FileEditorUpdate: "update.file_editor_update",
-	AdvancedSshWebTerminalUpdate: "update.advanced_ssh_web_terminal_update",
-	MosquittoBrokerUpdate: "update.mosquitto_broker_update",
-	Zigbee2mqttUpdate: "update.zigbee2mqtt_update",
-	PiperUpdate: "update.piper_update",
-	WhisperUpdate: "update.whisper_update",
-	Tydom2mqttUpdate: "update.tydom2mqtt_update",
-	StudioCodeServerUpdate: "update.studio_code_server_update",
-	HomeAssistantOperatingSystemUpdate: "update.home_assistant_operating_system_update",
-	MiniGraphCardUpdate: "update.mini_graph_card_update",
-	FrankEnergieUpdate: "update.frank_energie_update",
-	HomeConnectAltUpdate: "update.home_connect_alt_update",
-	HacsUpdate: "update.hacs_update",
-	ApexchartsCardUpdate: "update.apexcharts_card_update",
-	MushroomUpdate: "update.mushroom_update",
-	NeakasaUpdate: "update.neakasa_update",
-	PyscriptUpdate: "update.pyscript_update",
-	XiaomiMiotAutoUpdate: "update.xiaomi_miot_auto_update",
-	TpLinkDecoUpdate: "update.tp_link_deco_update",
-	BubbleCardUpdate: "update.bubble_card_update",
-	_0xa4c13873fc1eb98f: "update.0xa4c13873fc1eb98f",
-	_0xa4c138e62d1b24a4: "update.0xa4c138e62d1b24a4",
-	LivingRoomVacuumSocket: "update.living_room_vacuum_socket",
-	BedroomSpaceSocket: "update.bedroom_space_socket",
-	DoorbellFirmware: "update.doorbell_firmware",
-}
-
-type SwitchDomain struct {
-	WashingMachinePower string
-	Zigbee2mqttBridgePermitJoin string
-	KitchenDishwasherSocket string
-	_0xa4c13873fc1eb98fChildLock string
-	OfficeLaptopSocket string
-	_0xa4c138e62d1b24a4ChildLock string
-	LivingRoomVacuumSocket string
-	LivingRoomVacuumSocketOutletControlProtect string
-	BedroomSpaceSocket string
-	BedroomSpaceSocketOutletControlProtect string
-	DoorbellInfraredLightsInNightMode string
-	DoorbellRecordAudio string
-	DoorbellSirenOnEvent string
-	DoorbellDoorbellButtonSound string
-	DoorbellPrivacyMode string
-	DoorbellEmailOnEvent string
-	DoorbellFtpUpload string
-	DoorbellPushNotifications string
-	DoorbellRecord string
-	ReolinkChimeLed string
-}
-
-var Switch = SwitchDomain{
-	WashingMachinePower: "switch.washing_machine_power",
-	Zigbee2mqttBridgePermitJoin: "switch.zigbee2mqtt_bridge_permit_join",
-	KitchenDishwasherSocket: "switch.kitchen_dishwasher_socket",
-	_0xa4c13873fc1eb98fChildLock: "switch.0xa4c13873fc1eb98f_child_lock",
-	OfficeLaptopSocket: "switch.office_laptop_socket",
-	_0xa4c138e62d1b24a4ChildLock: "switch.0xa4c138e62d1b24a4_child_lock",
-	LivingRoomVacuumSocket: "switch.living_room_vacuum_socket",
-	LivingRoomVacuumSocketOutletControlProtect: "switch.living_room_vacuum_socket_outlet_control_protect",
-	BedroomSpaceSocket: "switch.bedroom_space_socket",
-	BedroomSpaceSocketOutletControlProtect: "switch.bedroom_space_socket_outlet_control_protect",
-	DoorbellInfraredLightsInNightMode: "switch.doorbell_infrared_lights_in_night_mode",
-	DoorbellRecordAudio: "switch.doorbell_record_audio",
-	DoorbellSirenOnEvent: "switch.doorbell_siren_on_event",
-	DoorbellDoorbellButtonSound: "switch.doorbell_doorbell_button_sound",
-	DoorbellPrivacyMode: "switch.doorbell_privacy_mode",
-	DoorbellEmailOnEvent: "switch.doorbell_email_on_event",
-	DoorbellFtpUpload: "switch.doorbell_ftp_upload",
-	DoorbellPushNotifications: "switch.doorbell_push_notifications",
-	DoorbellRecord: "switch.doorbell_record",
-	ReolinkChimeLed: "switch.reolink_chime_led",
-}
-
-type PersonDomain struct {
-	Alexey string
-	Pok string
-}
-
-var Person = PersonDomain{
-	Alexey: "person.alexey",
-	Pok: "person.pok",
-}
-
-type TodoDomain struct {
-	ShoppingList string
-}
-
-var Todo = TodoDomain{
-	ShoppingList: "todo.shopping_list",
-}
-
-type SttDomain struct {
-	FasterWhisper string
-}
-
-var Stt = SttDomain{
-	FasterWhisper: "stt.faster_whisper",
-}
-
-type BinarySensorDomain struct {
-	OdidoRouterWanStatus string
-	TrainNearby string
-	WashingMachineConnectivity string
-	WashingMachineRemoteControl string
-	WashingMachineRemoteStart string
-	WashingMachineLocalControl string
-	Zigbee2mqttBridgeConnectionState string
-	DoorbellMotion string
-	DoorbellPerson string
-	DoorbellVehicle string
-	DoorbellPet string
-	DoorbellPackage string
-	DoorbellVisitor string
-}
-
-var BinarySensor = BinarySensorDomain{
-	OdidoRouterWanStatus: "binary_sensor.odido_router_wan_status",
-	TrainNearby: "binary_sensor.train_nearby",
-	WashingMachineConnectivity: "binary_sensor.washing_machine_connectivity",
-	WashingMachineRemoteControl: "binary_sensor.washing_machine_remote_control",
-	WashingMachineRemoteStart: "binary_sensor.washing_machine_remote_start",
-	WashingMachineLocalControl: "binary_sensor.washing_machine_local_control",
-	Zigbee2mqttBridgeConnectionState: "binary_sensor.zigbee2mqtt_bridge_connection_state",
-	DoorbellMotion: "binary_sensor.doorbell_motion",
-	DoorbellPerson: "binary_sensor.doorbell_person",
-	DoorbellVehicle: "binary_sensor.doorbell_vehicle",
-	DoorbellPet: "binary_sensor.doorbell_pet",
-	DoorbellPackage: "binary_sensor.doorbell_package",
-	DoorbellVisitor: "binary_sensor.doorbell_visitor",
-}
-
-type ClimateDomain struct {
-	OfficeAlexeyIrHeater string
-	Mqtt17046296971704629697 string
-}
-
-var Climate = ClimateDomain{
-	OfficeAlexeyIrHeater: "climate.office_alexey_ir_heater",
-	Mqtt17046296971704629697: "climate.mqtt_1704629697_1704629697",
-}
-
-type InputSelectDomain struct {
-	KitchenDishwasherScheduledMode string
-	HouseMode string
-	DaytimeMode string
-}
-
-var InputSelect = InputSelectDomain{
-	KitchenDishwasherScheduledMode: "input_select.kitchen_dishwasher_scheduled_mode",
-	HouseMode: "input_select.house_mode",
-	DaytimeMode: "input_select.daytime_mode",
-}
-
-type SunDomain struct {
-	Sun string
-}
-
-var Sun = SunDomain{
-	Sun: "sun.sun",
-}
-
-type MediaPlayerDomain struct {
-	BedroomGoogleHome string
-	LivingRoomTv3 string
-	LivingRoomGoogleHome string
-	LivingRoomChromecast string
-	LivingRoomTv2 string
-}
-
-var MediaPlayer = MediaPlayerDomain{
-	BedroomGoogleHome: "media_player.bedroom_google_home",
-	LivingRoomTv3: "media_player.living_room_tv_3",
-	LivingRoomGoogleHome: "media_player.living_room_google_home",
-	LivingRoomChromecast: "media_player.living_room_chromecast",
-	LivingRoomTv2: "media_player.living_room_tv_2",
-}
-
-type TtsDomain struct {
-	GoogleTranslateEnCom string
-	Piper string
-}
-
-var Tts = TtsDomain{
-	GoogleTranslateEnCom: "tts.google_translate_en_com",
-	Piper: "tts.piper",
-}
-
-type RemoteDomain struct {
-	LivingRoomChromecast string
-	LivingRoomTv string
-}
-
-var Remote = RemoteDomain{
-	LivingRoomChromecast: "remote.living_room_chromecast",
-	LivingRoomTv: "remote.living_room_tv",
-}
-
-type InputNumberDomain struct {
-	KitchenDishwasherEstimatedCost string
-	KitchenDishwasherCurrentCost string
-	KitchenDishwasherSavingsPercent string
-	InfraDishwasherAutoOptimalDelay string
-}
-
-var InputNumber = InputNumberDomain{
-	KitchenDishwasherEstimatedCost: "input_number.kitchen_dishwasher_estimated_cost",
-	KitchenDishwasherCurrentCost: "input_number.kitchen_dishwasher_current_cost",
-	KitchenDishwasherSavingsPercent: "input_number.kitchen_dishwasher_savings_percent",
-	InfraDishwasherAutoOptimalDelay: "input_number.infra_dishwasher_auto_optimal_delay",
-}
-
 type WeatherDomain struct {
-	Buienradar string
 	ForecastHome string
+	Buienradar string
 }
 
 var Weather = WeatherDomain{
-	Buienradar: "weather.buienradar",
 	ForecastHome: "weather.forecast_home",
-}
-
-type ScriptDomain struct {
-	KitchenStartDishwasher string
-	LaundryScheduleWashingMachine string
-	FireScheduleEvent string
-}
-
-var Script = ScriptDomain{
-	KitchenStartDishwasher: "script.kitchen_start_dishwasher",
-	LaundryScheduleWashingMachine: "script.laundry_schedule_washing_machine",
-	FireScheduleEvent: "script.fire_schedule_event",
-}
-
-type ZoneDomain struct {
-	Home string
-}
-
-var Zone = ZoneDomain{
-	Home: "zone.home",
-}
-
-type InputDatetimeDomain struct {
-	KitchenDishwasherScheduledStart string
-	WashingMachineFinishTime string
-}
-
-var InputDatetime = InputDatetimeDomain{
-	KitchenDishwasherScheduledStart: "input_datetime.kitchen_dishwasher_scheduled_start",
-	WashingMachineFinishTime: "input_datetime.washing_machine_finish_time",
-}
-
-type InputTextDomain struct {
-	CachedTrainNearbyTimeKersenboogerdHoofddorp4100 string
-	CachedTrainNearbyTimeHoofddorpKersenboogerd4100 string
-	CachedTrainNearbyTimeEnkhuizenAmsterdamViaPurmerend3700 string
-	CachedTrainNearbyTimeAmsterdamEnkhuizenViaPurmerend3700 string
-	CachedTrainNearbyTimeEnkhuizenMaastrict2900 string
-	CachedTrainNearbyTimeMaastrictEnkhuizen2900 string
-	CachedTrainNearbyTimeEnkhuizenVeerlen3900 string
-	CachedTrainNearbyTimeMaastrictEnkhuizen3900 string
-	EnergyPriceHistogram string
-	InfraDishwasherAutoOptimalTime string
-	InfraDishwasherAutoOptimalSavings string
-}
-
-var InputText = InputTextDomain{
-	CachedTrainNearbyTimeKersenboogerdHoofddorp4100: "input_text.cached_train_nearby_time_kersenboogerd_hoofddorp_4100",
-	CachedTrainNearbyTimeHoofddorpKersenboogerd4100: "input_text.cached_train_nearby_time_hoofddorp_kersenboogerd_4100",
-	CachedTrainNearbyTimeEnkhuizenAmsterdamViaPurmerend3700: "input_text.cached_train_nearby_time_enkhuizen_amsterdam_via_purmerend_3700",
-	CachedTrainNearbyTimeAmsterdamEnkhuizenViaPurmerend3700: "input_text.cached_train_nearby_time_amsterdam_enkhuizen_via_purmerend_3700",
-	CachedTrainNearbyTimeEnkhuizenMaastrict2900: "input_text.cached_train_nearby_time_enkhuizen_maastrict_2900",
-	CachedTrainNearbyTimeMaastrictEnkhuizen2900: "input_text.cached_train_nearby_time_maastrict_enkhuizen_2900",
-	CachedTrainNearbyTimeEnkhuizenVeerlen3900: "input_text.cached_train_nearby_time_enkhuizen_veerlen_3900",
-	CachedTrainNearbyTimeMaastrictEnkhuizen3900: "input_text.cached_train_nearby_time_maastrict_enkhuizen_3900",
-	EnergyPriceHistogram: "input_text.energy_price_histogram",
-	InfraDishwasherAutoOptimalTime: "input_text.infra_dishwasher_auto_optimal_time",
-	InfraDishwasherAutoOptimalSavings: "input_text.infra_dishwasher_auto_optimal_savings",
-}
-
-type CameraDomain struct {
-	DoorbellFluent string
-}
-
-var Camera = CameraDomain{
-	DoorbellFluent: "camera.doorbell_fluent",
+	Buienradar: "weather.buienradar",
 }
 
 type SensorDomain struct {
@@ -343,18 +33,18 @@ type SensorDomain struct {
 	AlexeyWatchBatteryLevel string
 	AlexeyWatchBatteryState string
 	AlexeyWatchChargerType string
-	PrecipitationIntensity string
-	PrecipitationForecastAverage string
-	PrecipitationForecastTotal string
+	MiPadBatteryLevel string
+	MiPadBatteryState string
+	MiPadChargerType string
 	OdidoRouterExternalIp string
 	OdidoRouterDownloadSpeed string
 	OdidoRouterUploadSpeed string
-	BubbleCardModules string
 	Purmerend string
 	PurmerendSloterdijk string
-	WashingMachineProgramFinished string
-	WashingMachineOperationState string
-	WashingMachineDoor string
+	BubbleCardModules string
+	PrecipitationIntensity string
+	PrecipitationForecastAverage string
+	PrecipitationForecastTotal string
 	Zigbee2mqttBridgeVersion string
 	_0x00158d0007075415Battery string
 	_0x00158d0007075415Voltage string
@@ -389,6 +79,16 @@ type SensorDomain struct {
 	BedroomSpaceSocketEnergyToday string
 	BedroomSpaceSocketEnergyMonth string
 	BedroomSpaceSocketOverloadProtection string
+	ZhimiMc2A727Temperature string
+	ZhimiCpa465f7FilterLifeLevel string
+	ZhimiCpa465f7FilterLeftTime string
+	ZhimiCpa465f7FilterUsedTime string
+	ZhimiCpa465f7Pm25Density string
+	Mi8289913996Message string
+	WashingMachineProgramFinished string
+	WashingMachineOperationState string
+	WashingMachineDoor string
+	Mi8289913996279001108530SceneHistory string
 	DoorbellDayNightState string
 	FrankEnergiePricesCurrentElectricityPriceAllIn string
 	FrankEnergiePricesCurrentElectricityMarketPrice string
@@ -527,18 +227,18 @@ var Sensor = SensorDomain{
 	AlexeyWatchBatteryLevel: "sensor.alexey_watch_battery_level",
 	AlexeyWatchBatteryState: "sensor.alexey_watch_battery_state",
 	AlexeyWatchChargerType: "sensor.alexey_watch_charger_type",
-	PrecipitationIntensity: "sensor.precipitation_intensity",
-	PrecipitationForecastAverage: "sensor.precipitation_forecast_average",
-	PrecipitationForecastTotal: "sensor.precipitation_forecast_total",
+	MiPadBatteryLevel: "sensor.mi_pad_battery_level",
+	MiPadBatteryState: "sensor.mi_pad_battery_state",
+	MiPadChargerType: "sensor.mi_pad_charger_type",
 	OdidoRouterExternalIp: "sensor.odido_router_external_ip",
 	OdidoRouterDownloadSpeed: "sensor.odido_router_download_speed",
 	OdidoRouterUploadSpeed: "sensor.odido_router_upload_speed",
-	BubbleCardModules: "sensor.bubble_card_modules",
 	Purmerend: "sensor.purmerend",
 	PurmerendSloterdijk: "sensor.purmerend_sloterdijk",
-	WashingMachineProgramFinished: "sensor.washing_machine_program_finished",
-	WashingMachineOperationState: "sensor.washing_machine_operation_state",
-	WashingMachineDoor: "sensor.washing_machine_door",
+	BubbleCardModules: "sensor.bubble_card_modules",
+	PrecipitationIntensity: "sensor.precipitation_intensity",
+	PrecipitationForecastAverage: "sensor.precipitation_forecast_average",
+	PrecipitationForecastTotal: "sensor.precipitation_forecast_total",
 	Zigbee2mqttBridgeVersion: "sensor.zigbee2mqtt_bridge_version",
 	_0x00158d0007075415Battery: "sensor.0x00158d0007075415_battery",
 	_0x00158d0007075415Voltage: "sensor.0x00158d0007075415_voltage",
@@ -573,6 +273,16 @@ var Sensor = SensorDomain{
 	BedroomSpaceSocketEnergyToday: "sensor.bedroom_space_socket_energy_today",
 	BedroomSpaceSocketEnergyMonth: "sensor.bedroom_space_socket_energy_month",
 	BedroomSpaceSocketOverloadProtection: "sensor.bedroom_space_socket_overload_protection",
+	ZhimiMc2A727Temperature: "sensor.zhimi_mc2_a727_temperature",
+	ZhimiCpa465f7FilterLifeLevel: "sensor.zhimi_cpa4_65f7_filter_life_level",
+	ZhimiCpa465f7FilterLeftTime: "sensor.zhimi_cpa4_65f7_filter_left_time",
+	ZhimiCpa465f7FilterUsedTime: "sensor.zhimi_cpa4_65f7_filter_used_time",
+	ZhimiCpa465f7Pm25Density: "sensor.zhimi_cpa4_65f7_pm25_density",
+	Mi8289913996Message: "sensor.mi_8289913996_message",
+	WashingMachineProgramFinished: "sensor.washing_machine_program_finished",
+	WashingMachineOperationState: "sensor.washing_machine_operation_state",
+	WashingMachineDoor: "sensor.washing_machine_door",
+	Mi8289913996279001108530SceneHistory: "sensor.mi_8289913996_279001108530_scene_history",
 	DoorbellDayNightState: "sensor.doorbell_day_night_state",
 	FrankEnergiePricesCurrentElectricityPriceAllIn: "sensor.frank_energie_prices_current_electricity_price_all_in",
 	FrankEnergiePricesCurrentElectricityMarketPrice: "sensor.frank_energie_prices_current_electricity_market_price",
@@ -690,74 +400,66 @@ var Sensor = SensorDomain{
 	FrankEnergieUsageDeliveredFeedInYesterday: "sensor.frank_energie_usage_delivered_feed_in_yesterday",
 }
 
-type SceneDomain struct {
-	WatchingTvLight string
+type MediaPlayerDomain struct {
+	LivingRoomChromecast string
+	Moonlight string
+	BedroomGoogleHome string
+	LivingRoomGoogleHome string
+	LivingRoomTv3 string
+	LivingRoomTv2 string
 }
 
-var Scene = SceneDomain{
-	WatchingTvLight: "scene.watching_tv_light",
+var MediaPlayer = MediaPlayerDomain{
+	LivingRoomChromecast: "media_player.living_room_chromecast",
+	Moonlight: "media_player.moonlight",
+	BedroomGoogleHome: "media_player.bedroom_google_home",
+	LivingRoomGoogleHome: "media_player.living_room_google_home",
+	LivingRoomTv3: "media_player.living_room_tv_3",
+	LivingRoomTv2: "media_player.living_room_tv_2",
 }
 
-type SelectDomain struct {
-	WashingMachineActiveProgram string
-	WashingMachineSelectedProgram string
-	Zigbee2mqttBridgeLogLevel string
-	_0xa4c13873fc1eb98fPowerOutageMemory string
-	_0xa4c13873fc1eb98fIndicatorMode string
-	_0xa4c138e62d1b24a4PowerOutageMemory string
-	_0xa4c138e62d1b24a4IndicatorMode string
-	LivingRoomVacuumSocketPowerOnBehavior string
-	BedroomSpaceSocketPowerOnBehavior string
-	DoorbellDayNightMode string
-	DoorbellPlayQuickReplyMessage string
-	DoorbellAutoQuickReplyMessage string
-	DoorbellDoorbellLed string
-	ReolinkChimeMotionRingtone string
-	ReolinkChimePersonRingtone string
-	ReolinkChimeVehicleRingtone string
-	ReolinkChimeVisitorRingtone string
-	ReolinkChimePackageRingtone string
+type TodoDomain struct {
+	ShoppingList string
 }
 
-var Select = SelectDomain{
-	WashingMachineActiveProgram: "select.washing_machine_active_program",
-	WashingMachineSelectedProgram: "select.washing_machine_selected_program",
-	Zigbee2mqttBridgeLogLevel: "select.zigbee2mqtt_bridge_log_level",
-	_0xa4c13873fc1eb98fPowerOutageMemory: "select.0xa4c13873fc1eb98f_power_outage_memory",
-	_0xa4c13873fc1eb98fIndicatorMode: "select.0xa4c13873fc1eb98f_indicator_mode",
-	_0xa4c138e62d1b24a4PowerOutageMemory: "select.0xa4c138e62d1b24a4_power_outage_memory",
-	_0xa4c138e62d1b24a4IndicatorMode: "select.0xa4c138e62d1b24a4_indicator_mode",
-	LivingRoomVacuumSocketPowerOnBehavior: "select.living_room_vacuum_socket_power_on_behavior",
-	BedroomSpaceSocketPowerOnBehavior: "select.bedroom_space_socket_power_on_behavior",
-	DoorbellDayNightMode: "select.doorbell_day_night_mode",
-	DoorbellPlayQuickReplyMessage: "select.doorbell_play_quick_reply_message",
-	DoorbellAutoQuickReplyMessage: "select.doorbell_auto_quick_reply_message",
-	DoorbellDoorbellLed: "select.doorbell_doorbell_led",
-	ReolinkChimeMotionRingtone: "select.reolink_chime_motion_ringtone",
-	ReolinkChimePersonRingtone: "select.reolink_chime_person_ringtone",
-	ReolinkChimeVehicleRingtone: "select.reolink_chime_vehicle_ringtone",
-	ReolinkChimeVisitorRingtone: "select.reolink_chime_visitor_ringtone",
-	ReolinkChimePackageRingtone: "select.reolink_chime_package_ringtone",
+var Todo = TodoDomain{
+	ShoppingList: "todo.shopping_list",
 }
 
-type InputBooleanDomain struct {
-	KitchenDishwasherIsScheduled string
-	DaytimeModeAuto string
-	OfficeLaptopChargeOptimizationAuto string
-	LivingRoomVacuumChargeOptimizationAuto string
-	HeadHealed string
-	BedroomSpaceSocketAutomationOn string
-	VitaminsTaken string
+type SttDomain struct {
+	FasterWhisper string
 }
 
-var InputBoolean = InputBooleanDomain{
-	KitchenDishwasherIsScheduled: "input_boolean.kitchen_dishwasher_is_scheduled",
-	DaytimeModeAuto: "input_boolean.daytime_mode_auto",
-	OfficeLaptopChargeOptimizationAuto: "input_boolean.office_laptop_charge_optimization_auto",
-	LivingRoomVacuumChargeOptimizationAuto: "input_boolean.living_room_vacuum_charge_optimization_auto",
-	HeadHealed: "input_boolean.head_healed",
-	BedroomSpaceSocketAutomationOn: "input_boolean.bedroom_space_socket_automation_on",
-	VitaminsTaken: "input_boolean.vitamins_taken",
+var Stt = SttDomain{
+	FasterWhisper: "stt.faster_whisper",
+}
+
+type ConversationDomain struct {
+	HomeAssistant string
+}
+
+var Conversation = ConversationDomain{
+	HomeAssistant: "conversation.home_assistant",
+}
+
+type InputDatetimeDomain struct {
+	KitchenDishwasherScheduledStart string
+	WashingMachineFinishTime string
+}
+
+var InputDatetime = InputDatetimeDomain{
+	KitchenDishwasherScheduledStart: "input_datetime.kitchen_dishwasher_scheduled_start",
+	WashingMachineFinishTime: "input_datetime.washing_machine_finish_time",
+}
+
+type RemoteDomain struct {
+	LivingRoomChromecast string
+	LivingRoomTv string
+}
+
+var Remote = RemoteDomain{
+	LivingRoomChromecast: "remote.living_room_chromecast",
+	LivingRoomTv: "remote.living_room_tv",
 }
 
 type AutomationDomain struct {
@@ -792,11 +494,461 @@ var Automation = AutomationDomain{
 	OfficeTurnOffTheHeaterEveryDay: "automation.office_turn_off_the_heater_every_day",
 }
 
+type ClimateDomain struct {
+	OfficeAlexeyIrHeater string
+	Mqtt17046296971704629697 string
+	BedroomSmartHeater string
+}
+
+var Climate = ClimateDomain{
+	OfficeAlexeyIrHeater: "climate.office_alexey_ir_heater",
+	Mqtt17046296971704629697: "climate.mqtt_1704629697_1704629697",
+	BedroomSmartHeater: "climate.bedroom_smart_heater",
+}
+
+type PersonDomain struct {
+	Alexey string
+	Pok string
+}
+
+var Person = PersonDomain{
+	Alexey: "person.alexey",
+	Pok: "person.pok",
+}
+
+type InputTextDomain struct {
+	CachedTrainNearbyTimeKersenboogerdHoofddorp4100 string
+	CachedTrainNearbyTimeHoofddorpKersenboogerd4100 string
+	CachedTrainNearbyTimeEnkhuizenAmsterdamViaPurmerend3700 string
+	CachedTrainNearbyTimeAmsterdamEnkhuizenViaPurmerend3700 string
+	CachedTrainNearbyTimeEnkhuizenMaastrict2900 string
+	CachedTrainNearbyTimeMaastrictEnkhuizen2900 string
+	CachedTrainNearbyTimeEnkhuizenVeerlen3900 string
+	CachedTrainNearbyTimeMaastrictEnkhuizen3900 string
+	EnergyPriceHistogram string
+	HomeGoRemindersConfigChunk1 string
+	HomeGoRemindersConfigChunk2 string
+	HomeGoRemindersConfigChunk3 string
+	HomeGoRemindersConfigChunk4 string
+	HomeGoRemindersConfigChunk5 string
+	HomeGoRemindersConfigChunk6 string
+	HomeGoRemindersConfigChunk7 string
+	HomeGoRemindersConfigChunk8 string
+	HomeGoRemindersRuntimeChunk1 string
+	HomeGoRemindersRuntimeChunk2 string
+	HomeGoRemindersRuntimeChunk3 string
+	HomeGoRemindersRuntimeChunk4 string
+	HomeGoRemindersRuntimeChunk5 string
+	HomeGoRemindersRuntimeChunk6 string
+	HomeGoRemindersRuntimeChunk7 string
+	HomeGoRemindersRuntimeChunk8 string
+	HomeGoRemindersViewsChunk1 string
+	HomeGoRemindersViewsChunk2 string
+	HomeGoRemindersViewsChunk3 string
+	HomeGoRemindersViewsChunk4 string
+	HomeGoRemindersViewsChunk5 string
+	HomeGoRemindersViewsChunk6 string
+	HomeGoRemindersViewsChunk7 string
+	HomeGoRemindersViewsChunk8 string
+	InfraDishwasherAutoOptimalTime string
+	InfraDishwasherAutoOptimalSavings string
+}
+
+var InputText = InputTextDomain{
+	CachedTrainNearbyTimeKersenboogerdHoofddorp4100: "input_text.cached_train_nearby_time_kersenboogerd_hoofddorp_4100",
+	CachedTrainNearbyTimeHoofddorpKersenboogerd4100: "input_text.cached_train_nearby_time_hoofddorp_kersenboogerd_4100",
+	CachedTrainNearbyTimeEnkhuizenAmsterdamViaPurmerend3700: "input_text.cached_train_nearby_time_enkhuizen_amsterdam_via_purmerend_3700",
+	CachedTrainNearbyTimeAmsterdamEnkhuizenViaPurmerend3700: "input_text.cached_train_nearby_time_amsterdam_enkhuizen_via_purmerend_3700",
+	CachedTrainNearbyTimeEnkhuizenMaastrict2900: "input_text.cached_train_nearby_time_enkhuizen_maastrict_2900",
+	CachedTrainNearbyTimeMaastrictEnkhuizen2900: "input_text.cached_train_nearby_time_maastrict_enkhuizen_2900",
+	CachedTrainNearbyTimeEnkhuizenVeerlen3900: "input_text.cached_train_nearby_time_enkhuizen_veerlen_3900",
+	CachedTrainNearbyTimeMaastrictEnkhuizen3900: "input_text.cached_train_nearby_time_maastrict_enkhuizen_3900",
+	EnergyPriceHistogram: "input_text.energy_price_histogram",
+	HomeGoRemindersConfigChunk1: "input_text.home_go_reminders_config_chunk_1",
+	HomeGoRemindersConfigChunk2: "input_text.home_go_reminders_config_chunk_2",
+	HomeGoRemindersConfigChunk3: "input_text.home_go_reminders_config_chunk_3",
+	HomeGoRemindersConfigChunk4: "input_text.home_go_reminders_config_chunk_4",
+	HomeGoRemindersConfigChunk5: "input_text.home_go_reminders_config_chunk_5",
+	HomeGoRemindersConfigChunk6: "input_text.home_go_reminders_config_chunk_6",
+	HomeGoRemindersConfigChunk7: "input_text.home_go_reminders_config_chunk_7",
+	HomeGoRemindersConfigChunk8: "input_text.home_go_reminders_config_chunk_8",
+	HomeGoRemindersRuntimeChunk1: "input_text.home_go_reminders_runtime_chunk_1",
+	HomeGoRemindersRuntimeChunk2: "input_text.home_go_reminders_runtime_chunk_2",
+	HomeGoRemindersRuntimeChunk3: "input_text.home_go_reminders_runtime_chunk_3",
+	HomeGoRemindersRuntimeChunk4: "input_text.home_go_reminders_runtime_chunk_4",
+	HomeGoRemindersRuntimeChunk5: "input_text.home_go_reminders_runtime_chunk_5",
+	HomeGoRemindersRuntimeChunk6: "input_text.home_go_reminders_runtime_chunk_6",
+	HomeGoRemindersRuntimeChunk7: "input_text.home_go_reminders_runtime_chunk_7",
+	HomeGoRemindersRuntimeChunk8: "input_text.home_go_reminders_runtime_chunk_8",
+	HomeGoRemindersViewsChunk1: "input_text.home_go_reminders_views_chunk_1",
+	HomeGoRemindersViewsChunk2: "input_text.home_go_reminders_views_chunk_2",
+	HomeGoRemindersViewsChunk3: "input_text.home_go_reminders_views_chunk_3",
+	HomeGoRemindersViewsChunk4: "input_text.home_go_reminders_views_chunk_4",
+	HomeGoRemindersViewsChunk5: "input_text.home_go_reminders_views_chunk_5",
+	HomeGoRemindersViewsChunk6: "input_text.home_go_reminders_views_chunk_6",
+	HomeGoRemindersViewsChunk7: "input_text.home_go_reminders_views_chunk_7",
+	HomeGoRemindersViewsChunk8: "input_text.home_go_reminders_views_chunk_8",
+	InfraDishwasherAutoOptimalTime: "input_text.infra_dishwasher_auto_optimal_time",
+	InfraDishwasherAutoOptimalSavings: "input_text.infra_dishwasher_auto_optimal_savings",
+}
+
+type DeviceTrackerDomain struct {
+	AlexeyPhone string
+	Pixel8Pro string
+	AlexeyWatch string
+	MiPad string
+}
+
+var DeviceTracker = DeviceTrackerDomain{
+	AlexeyPhone: "device_tracker.alexey_phone",
+	Pixel8Pro: "device_tracker.pixel_8_pro",
+	AlexeyWatch: "device_tracker.alexey_watch",
+	MiPad: "device_tracker.mi_pad",
+}
+
+type TtsDomain struct {
+	GoogleTranslateEnCom string
+	Piper string
+}
+
+var Tts = TtsDomain{
+	GoogleTranslateEnCom: "tts.google_translate_en_com",
+	Piper: "tts.piper",
+}
+
+type BinarySensorDomain struct {
+	OdidoRouterWanStatus string
+	TrainNearby string
+	Zigbee2mqttBridgeConnectionState string
+	WashingMachineConnectivity string
+	WashingMachineRemoteControl string
+	WashingMachineRemoteStart string
+	WashingMachineLocalControl string
+	DoorbellMotion string
+	DoorbellPerson string
+	DoorbellVehicle string
+	DoorbellPet string
+	DoorbellPackage string
+	DoorbellVisitor string
+}
+
+var BinarySensor = BinarySensorDomain{
+	OdidoRouterWanStatus: "binary_sensor.odido_router_wan_status",
+	TrainNearby: "binary_sensor.train_nearby",
+	Zigbee2mqttBridgeConnectionState: "binary_sensor.zigbee2mqtt_bridge_connection_state",
+	WashingMachineConnectivity: "binary_sensor.washing_machine_connectivity",
+	WashingMachineRemoteControl: "binary_sensor.washing_machine_remote_control",
+	WashingMachineRemoteStart: "binary_sensor.washing_machine_remote_start",
+	WashingMachineLocalControl: "binary_sensor.washing_machine_local_control",
+	DoorbellMotion: "binary_sensor.doorbell_motion",
+	DoorbellPerson: "binary_sensor.doorbell_person",
+	DoorbellVehicle: "binary_sensor.doorbell_vehicle",
+	DoorbellPet: "binary_sensor.doorbell_pet",
+	DoorbellPackage: "binary_sensor.doorbell_package",
+	DoorbellVisitor: "binary_sensor.doorbell_visitor",
+}
+
+type ScriptDomain struct {
+	KitchenStartDishwasher string
+	LaundryScheduleWashingMachine string
+	FireScheduleEvent string
+	_1762698068910 string
+	RemindersDevCreate string
+	RemindersDevAck string
+	RemindersDevDelete string
+}
+
+var Script = ScriptDomain{
+	KitchenStartDishwasher: "script.kitchen_start_dishwasher",
+	LaundryScheduleWashingMachine: "script.laundry_schedule_washing_machine",
+	FireScheduleEvent: "script.fire_schedule_event",
+	_1762698068910: "script.1762698068910",
+	RemindersDevCreate: "script.reminders_dev_create",
+	RemindersDevAck: "script.reminders_dev_ack",
+	RemindersDevDelete: "script.reminders_dev_delete",
+}
+
+type SelectDomain struct {
+	Zigbee2mqttBridgeLogLevel string
+	_0xa4c13873fc1eb98fPowerOutageMemory string
+	_0xa4c138e62d1b24a4PowerOutageMemory string
+	LivingRoomVacuumSocketPowerOnBehavior string
+	BedroomSpaceSocketPowerOnBehavior string
+	WashingMachineActiveProgram string
+	WashingMachineSelectedProgram string
+	DoorbellDayNightMode string
+	DoorbellPlayQuickReplyMessage string
+	DoorbellAutoQuickReplyMessage string
+	DoorbellDoorbellLed string
+	ReolinkChimeMotionRingtone string
+	ReolinkChimePersonRingtone string
+	ReolinkChimeVehicleRingtone string
+	ReolinkChimeVisitorRingtone string
+	ReolinkChimePackageRingtone string
+}
+
+var Select = SelectDomain{
+	Zigbee2mqttBridgeLogLevel: "select.zigbee2mqtt_bridge_log_level",
+	_0xa4c13873fc1eb98fPowerOutageMemory: "select.0xa4c13873fc1eb98f_power_outage_memory",
+	_0xa4c138e62d1b24a4PowerOutageMemory: "select.0xa4c138e62d1b24a4_power_outage_memory",
+	LivingRoomVacuumSocketPowerOnBehavior: "select.living_room_vacuum_socket_power_on_behavior",
+	BedroomSpaceSocketPowerOnBehavior: "select.bedroom_space_socket_power_on_behavior",
+	WashingMachineActiveProgram: "select.washing_machine_active_program",
+	WashingMachineSelectedProgram: "select.washing_machine_selected_program",
+	DoorbellDayNightMode: "select.doorbell_day_night_mode",
+	DoorbellPlayQuickReplyMessage: "select.doorbell_play_quick_reply_message",
+	DoorbellAutoQuickReplyMessage: "select.doorbell_auto_quick_reply_message",
+	DoorbellDoorbellLed: "select.doorbell_doorbell_led",
+	ReolinkChimeMotionRingtone: "select.reolink_chime_motion_ringtone",
+	ReolinkChimePersonRingtone: "select.reolink_chime_person_ringtone",
+	ReolinkChimeVehicleRingtone: "select.reolink_chime_vehicle_ringtone",
+	ReolinkChimeVisitorRingtone: "select.reolink_chime_visitor_ringtone",
+	ReolinkChimePackageRingtone: "select.reolink_chime_package_ringtone",
+}
+
+type UpdateDomain struct {
+	HomeAssistantSupervisorUpdate string
+	HomeAssistantCoreUpdate string
+	FileEditorUpdate string
+	AdvancedSshWebTerminalUpdate string
+	MosquittoBrokerUpdate string
+	Zigbee2mqttUpdate string
+	PiperUpdate string
+	WhisperUpdate string
+	Tydom2mqttUpdate string
+	StudioCodeServerUpdate string
+	HomeAssistantOperatingSystemUpdate string
+	DeclutteringCardUpdate string
+	HacsUpdate string
+	LayoutCardUpdate string
+	HomeConnectAltUpdate string
+	PyscriptUpdate string
+	ApexchartsCardUpdate string
+	FrankEnergieUpdate string
+	CardModUpdate string
+	ButtonCardUpdate string
+	MiniGraphCardUpdate string
+	MushroomUpdate string
+	NeakasaUpdate string
+	TpLinkDecoUpdate string
+	BrowserModUpdate string
+	BubbleCardUpdate string
+	XiaomiMiotAutoUpdate string
+	_0xa4c13873fc1eb98f string
+	_0xa4c138e62d1b24a4 string
+	LivingRoomVacuumSocket string
+	BedroomSpaceSocket string
+	DoorbellFirmware string
+}
+
+var Update = UpdateDomain{
+	HomeAssistantSupervisorUpdate: "update.home_assistant_supervisor_update",
+	HomeAssistantCoreUpdate: "update.home_assistant_core_update",
+	FileEditorUpdate: "update.file_editor_update",
+	AdvancedSshWebTerminalUpdate: "update.advanced_ssh_web_terminal_update",
+	MosquittoBrokerUpdate: "update.mosquitto_broker_update",
+	Zigbee2mqttUpdate: "update.zigbee2mqtt_update",
+	PiperUpdate: "update.piper_update",
+	WhisperUpdate: "update.whisper_update",
+	Tydom2mqttUpdate: "update.tydom2mqtt_update",
+	StudioCodeServerUpdate: "update.studio_code_server_update",
+	HomeAssistantOperatingSystemUpdate: "update.home_assistant_operating_system_update",
+	DeclutteringCardUpdate: "update.decluttering_card_update",
+	HacsUpdate: "update.hacs_update",
+	LayoutCardUpdate: "update.layout_card_update",
+	HomeConnectAltUpdate: "update.home_connect_alt_update",
+	PyscriptUpdate: "update.pyscript_update",
+	ApexchartsCardUpdate: "update.apexcharts_card_update",
+	FrankEnergieUpdate: "update.frank_energie_update",
+	CardModUpdate: "update.card_mod_update",
+	ButtonCardUpdate: "update.button_card_update",
+	MiniGraphCardUpdate: "update.mini_graph_card_update",
+	MushroomUpdate: "update.mushroom_update",
+	NeakasaUpdate: "update.neakasa_update",
+	TpLinkDecoUpdate: "update.tp_link_deco_update",
+	BrowserModUpdate: "update.browser_mod_update",
+	BubbleCardUpdate: "update.bubble_card_update",
+	XiaomiMiotAutoUpdate: "update.xiaomi_miot_auto_update",
+	_0xa4c13873fc1eb98f: "update.0xa4c13873fc1eb98f",
+	_0xa4c138e62d1b24a4: "update.0xa4c138e62d1b24a4",
+	LivingRoomVacuumSocket: "update.living_room_vacuum_socket",
+	BedroomSpaceSocket: "update.bedroom_space_socket",
+	DoorbellFirmware: "update.doorbell_firmware",
+}
+
+type ButtonDomain struct {
+	Zigbee2mqttBridgeRestart string
+	YeelinkStrip2Fc2fInfo string
+	YeelinkStrip2Fc2fToggle string
+	YeelinkColor437d1Info string
+	YeelinkColor437d1Toggle string
+	YeelinkColor4F547Info string
+	YeelinkColor4F547Toggle string
+	YeelinkColor40d71Info string
+	YeelinkColor40d71Toggle string
+	YeelinkColor42316Info string
+	YeelinkColor42316Toggle string
+	ZhimiMc2A727Info string
+	ZhimiCpa465f7Info string
+	WashingMachineStopProgram string
+	RefreshFrankEnergiePrices string
+}
+
+var Button = ButtonDomain{
+	Zigbee2mqttBridgeRestart: "button.zigbee2mqtt_bridge_restart",
+	YeelinkStrip2Fc2fInfo: "button.yeelink_strip2_fc2f_info",
+	YeelinkStrip2Fc2fToggle: "button.yeelink_strip2_fc2f_toggle",
+	YeelinkColor437d1Info: "button.yeelink_color4_37d1_info",
+	YeelinkColor437d1Toggle: "button.yeelink_color4_37d1_toggle",
+	YeelinkColor4F547Info: "button.yeelink_color4_f547_info",
+	YeelinkColor4F547Toggle: "button.yeelink_color4_f547_toggle",
+	YeelinkColor40d71Info: "button.yeelink_color4_0d71_info",
+	YeelinkColor40d71Toggle: "button.yeelink_color4_0d71_toggle",
+	YeelinkColor42316Info: "button.yeelink_color4_2316_info",
+	YeelinkColor42316Toggle: "button.yeelink_color4_2316_toggle",
+	ZhimiMc2A727Info: "button.zhimi_mc2_a727_info",
+	ZhimiCpa465f7Info: "button.zhimi_cpa4_65f7_info",
+	WashingMachineStopProgram: "button.washing_machine_stop_program",
+	RefreshFrankEnergiePrices: "button.refresh_frank_energie_prices",
+}
+
+type EventDomain struct {
+	BackupAutomaticBackup string
+}
+
+var Event = EventDomain{
+	BackupAutomaticBackup: "event.backup_automatic_backup",
+}
+
+type SwitchDomain struct {
+	Zigbee2mqttBridgePermitJoin string
+	KitchenDishwasherSocket string
+	_0xa4c13873fc1eb98fChildLock string
+	OfficeLaptopSocket string
+	_0xa4c138e62d1b24a4ChildLock string
+	LivingRoomVacuumSocket string
+	LivingRoomVacuumSocketOutletControlProtect string
+	BedroomSpaceSocket string
+	BedroomSpaceSocketOutletControlProtect string
+	ZhimiMc2A727Alarm string
+	ZhimiMc2A727PhysicalControlLocked string
+	ZhimiMc2A727SwitchStatus string
+	ZhimiCpa465f7Alarm string
+	ZhimiCpa465f7PhysicalControlLocked string
+	ZhimiCpa465f7SwitchStatus string
+	WashingMachinePower string
+	DoorbellInfraredLightsInNightMode string
+	DoorbellRecordAudio string
+	DoorbellSirenOnEvent string
+	DoorbellDoorbellButtonSound string
+	DoorbellPrivacyMode string
+	DoorbellEmailOnEvent string
+	DoorbellFtpUpload string
+	DoorbellPushNotifications string
+	DoorbellRecord string
+	ReolinkChimeLed string
+}
+
+var Switch = SwitchDomain{
+	Zigbee2mqttBridgePermitJoin: "switch.zigbee2mqtt_bridge_permit_join",
+	KitchenDishwasherSocket: "switch.kitchen_dishwasher_socket",
+	_0xa4c13873fc1eb98fChildLock: "switch.0xa4c13873fc1eb98f_child_lock",
+	OfficeLaptopSocket: "switch.office_laptop_socket",
+	_0xa4c138e62d1b24a4ChildLock: "switch.0xa4c138e62d1b24a4_child_lock",
+	LivingRoomVacuumSocket: "switch.living_room_vacuum_socket",
+	LivingRoomVacuumSocketOutletControlProtect: "switch.living_room_vacuum_socket_outlet_control_protect",
+	BedroomSpaceSocket: "switch.bedroom_space_socket",
+	BedroomSpaceSocketOutletControlProtect: "switch.bedroom_space_socket_outlet_control_protect",
+	ZhimiMc2A727Alarm: "switch.zhimi_mc2_a727_alarm",
+	ZhimiMc2A727PhysicalControlLocked: "switch.zhimi_mc2_a727_physical_control_locked",
+	ZhimiMc2A727SwitchStatus: "switch.zhimi_mc2_a727_switch_status",
+	ZhimiCpa465f7Alarm: "switch.zhimi_cpa4_65f7_alarm",
+	ZhimiCpa465f7PhysicalControlLocked: "switch.zhimi_cpa4_65f7_physical_control_locked",
+	ZhimiCpa465f7SwitchStatus: "switch.zhimi_cpa4_65f7_switch_status",
+	WashingMachinePower: "switch.washing_machine_power",
+	DoorbellInfraredLightsInNightMode: "switch.doorbell_infrared_lights_in_night_mode",
+	DoorbellRecordAudio: "switch.doorbell_record_audio",
+	DoorbellSirenOnEvent: "switch.doorbell_siren_on_event",
+	DoorbellDoorbellButtonSound: "switch.doorbell_doorbell_button_sound",
+	DoorbellPrivacyMode: "switch.doorbell_privacy_mode",
+	DoorbellEmailOnEvent: "switch.doorbell_email_on_event",
+	DoorbellFtpUpload: "switch.doorbell_ftp_upload",
+	DoorbellPushNotifications: "switch.doorbell_push_notifications",
+	DoorbellRecord: "switch.doorbell_record",
+	ReolinkChimeLed: "switch.reolink_chime_led",
+}
+
+type SirenDomain struct {
+	DoorbellSiren string
+}
+
+var Siren = SirenDomain{
+	DoorbellSiren: "siren.doorbell_siren",
+}
+
+type ZoneDomain struct {
+	Home string
+}
+
+var Zone = ZoneDomain{
+	Home: "zone.home",
+}
+
+type InputBooleanDomain struct {
+	KitchenDishwasherIsScheduled string
+	DaytimeModeAuto string
+	OfficeLaptopChargeOptimizationAuto string
+	LivingRoomVacuumChargeOptimizationAuto string
+	HeadHealed string
+	BedroomSpaceSocketAutomationOn string
+	VitaminsTaken string
+}
+
+var InputBoolean = InputBooleanDomain{
+	KitchenDishwasherIsScheduled: "input_boolean.kitchen_dishwasher_is_scheduled",
+	DaytimeModeAuto: "input_boolean.daytime_mode_auto",
+	OfficeLaptopChargeOptimizationAuto: "input_boolean.office_laptop_charge_optimization_auto",
+	LivingRoomVacuumChargeOptimizationAuto: "input_boolean.living_room_vacuum_charge_optimization_auto",
+	HeadHealed: "input_boolean.head_healed",
+	BedroomSpaceSocketAutomationOn: "input_boolean.bedroom_space_socket_automation_on",
+	VitaminsTaken: "input_boolean.vitamins_taken",
+}
+
+type InputNumberDomain struct {
+	KitchenDishwasherEstimatedCost string
+	KitchenDishwasherCurrentCost string
+	KitchenDishwasherSavingsPercent string
+	InfraDishwasherAutoOptimalDelay string
+}
+
+var InputNumber = InputNumberDomain{
+	KitchenDishwasherEstimatedCost: "input_number.kitchen_dishwasher_estimated_cost",
+	KitchenDishwasherCurrentCost: "input_number.kitchen_dishwasher_current_cost",
+	KitchenDishwasherSavingsPercent: "input_number.kitchen_dishwasher_savings_percent",
+	InfraDishwasherAutoOptimalDelay: "input_number.infra_dishwasher_auto_optimal_delay",
+}
+
+type InputSelectDomain struct {
+	KitchenDishwasherScheduledMode string
+	HouseMode string
+	DaytimeMode string
+}
+
+var InputSelect = InputSelectDomain{
+	KitchenDishwasherScheduledMode: "input_select.kitchen_dishwasher_scheduled_mode",
+	HouseMode: "input_select.house_mode",
+	DaytimeMode: "input_select.daytime_mode",
+}
+
 type NumberDomain struct {
-	WashingMachineIDos1BaseLevel string
-	WashingMachineIDos2BaseLevel string
 	DishwasherSocketCountdown string
 	LaptopSocketCountdown string
+	YeelinkColor4F547OffDelayTime string
+	YeelinkColor40d71OffDelayTime string
+	ZhimiMc2A727CountdownTime string
+	ZhimiCpa465f7FavoriteLevel string
+	WashingMachineIDos1BaseLevel string
+	WashingMachineIDos2BaseLevel string
 	DoorbellVolume string
 	DoorbellSpeakVolume string
 	DoorbellDoorbellVolume string
@@ -811,10 +963,14 @@ type NumberDomain struct {
 }
 
 var Number = NumberDomain{
-	WashingMachineIDos1BaseLevel: "number.washing_machine_i_dos_1_base_level",
-	WashingMachineIDos2BaseLevel: "number.washing_machine_i_dos_2_base_level",
 	DishwasherSocketCountdown: "number.dishwasher_socket_countdown",
 	LaptopSocketCountdown: "number.laptop_socket_countdown",
+	YeelinkColor4F547OffDelayTime: "number.yeelink_color4_f547_off_delay_time",
+	YeelinkColor40d71OffDelayTime: "number.yeelink_color4_0d71_off_delay_time",
+	ZhimiMc2A727CountdownTime: "number.zhimi_mc2_a727_countdown_time",
+	ZhimiCpa465f7FavoriteLevel: "number.zhimi_cpa4_65f7_favorite_level",
+	WashingMachineIDos1BaseLevel: "number.washing_machine_i_dos_1_base_level",
+	WashingMachineIDos2BaseLevel: "number.washing_machine_i_dos_2_base_level",
 	DoorbellVolume: "number.doorbell_volume",
 	DoorbellSpeakVolume: "number.doorbell_speak_volume",
 	DoorbellDoorbellVolume: "number.doorbell_doorbell_volume",
@@ -828,51 +984,49 @@ var Number = NumberDomain{
 	ChimeSilentTime: "number.chime_silent_time",
 }
 
-type ConversationDomain struct {
-	HomeAssistant string
+type LightDomain struct {
+	YeelinkStrip2Fc2fLight string
+	LivingRoomBlackLamp string
+	YeelinkColor40d71Light string
+	ZhimiMc2A727IndicatorLight string
 }
 
-var Conversation = ConversationDomain{
-	HomeAssistant: "conversation.home_assistant",
+var Light = LightDomain{
+	YeelinkStrip2Fc2fLight: "light.yeelink_strip2_fc2f_light",
+	LivingRoomBlackLamp: "light.living_room_black_lamp",
+	YeelinkColor40d71Light: "light.yeelink_color4_0d71_light",
+	ZhimiMc2A727IndicatorLight: "light.zhimi_mc2_a727_indicator_light",
 }
 
-type EventDomain struct {
-	BackupAutomaticBackup string
+type CameraDomain struct {
+	DoorbellFluent string
 }
 
-var Event = EventDomain{
-	BackupAutomaticBackup: "event.backup_automatic_backup",
+var Camera = CameraDomain{
+	DoorbellFluent: "camera.doorbell_fluent",
 }
 
-type DeviceTrackerDomain struct {
-	AlexeyPhone string
-	Pixel8Pro string
-	AlexeyWatch string
+type SceneDomain struct {
+	WatchingTvLight string
 }
 
-var DeviceTracker = DeviceTrackerDomain{
-	AlexeyPhone: "device_tracker.alexey_phone",
-	Pixel8Pro: "device_tracker.pixel_8_pro",
-	AlexeyWatch: "device_tracker.alexey_watch",
+var Scene = SceneDomain{
+	WatchingTvLight: "scene.watching_tv_light",
 }
 
-type ButtonDomain struct {
-	WashingMachineStopProgram string
-	Zigbee2mqttBridgeRestart string
-	RefreshFrankEnergiePrices string
+type FanDomain struct {
+	ZhimiCpa465f7AirPurifier string
 }
 
-var Button = ButtonDomain{
-	WashingMachineStopProgram: "button.washing_machine_stop_program",
-	Zigbee2mqttBridgeRestart: "button.zigbee2mqtt_bridge_restart",
-	RefreshFrankEnergiePrices: "button.refresh_frank_energie_prices",
+var Fan = FanDomain{
+	ZhimiCpa465f7AirPurifier: "fan.zhimi_cpa4_65f7_air_purifier",
 }
 
-type SirenDomain struct {
-	DoorbellSiren string
+type SunDomain struct {
+	Sun string
 }
 
-var Siren = SirenDomain{
-	DoorbellSiren: "siren.doorbell_siren",
+var Sun = SunDomain{
+	Sun: "sun.sun",
 }
 

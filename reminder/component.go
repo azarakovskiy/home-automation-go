@@ -19,13 +19,46 @@ import (
 	ga "saml.dev/gome-assistant"
 )
 
+var (
+	configChunkIDs = []string{
+		entities.InputText.HomeGoRemindersConfigChunk1,
+		entities.InputText.HomeGoRemindersConfigChunk2,
+		entities.InputText.HomeGoRemindersConfigChunk3,
+		entities.InputText.HomeGoRemindersConfigChunk4,
+		entities.InputText.HomeGoRemindersConfigChunk5,
+		entities.InputText.HomeGoRemindersConfigChunk6,
+		entities.InputText.HomeGoRemindersConfigChunk7,
+		entities.InputText.HomeGoRemindersConfigChunk8,
+	}
+	runtimeChunkIDs = []string{
+		entities.InputText.HomeGoRemindersRuntimeChunk1,
+		entities.InputText.HomeGoRemindersRuntimeChunk2,
+		entities.InputText.HomeGoRemindersRuntimeChunk3,
+		entities.InputText.HomeGoRemindersRuntimeChunk4,
+		entities.InputText.HomeGoRemindersRuntimeChunk5,
+		entities.InputText.HomeGoRemindersRuntimeChunk6,
+		entities.InputText.HomeGoRemindersRuntimeChunk7,
+		entities.InputText.HomeGoRemindersRuntimeChunk8,
+	}
+	viewChunkIDs = []string{
+		entities.InputText.HomeGoRemindersViewsChunk1,
+		entities.InputText.HomeGoRemindersViewsChunk2,
+		entities.InputText.HomeGoRemindersViewsChunk3,
+		entities.InputText.HomeGoRemindersViewsChunk4,
+		entities.InputText.HomeGoRemindersViewsChunk5,
+		entities.InputText.HomeGoRemindersViewsChunk6,
+		entities.InputText.HomeGoRemindersViewsChunk7,
+		entities.InputText.HomeGoRemindersViewsChunk8,
+	}
+)
+
 // Component orchestrates reminder creation, scheduling, and notifications.
 type Component struct {
 	component.Base
 
-	definitionStore *jsonstore.Store[map[string]ReminderDefinition]
-	runtimeStore    *jsonstore.Store[map[string]ReminderRuntime]
-	viewStore       *jsonstore.Store[map[string][]ReminderView]
+	definitionStore *jsonstore.Store[definitionStoreData]
+	runtimeStore    *jsonstore.Store[runtimeStoreData]
+	viewStore       *jsonstore.Store[viewStoreData]
 
 	definitions map[string]ReminderDefinition
 	runtimes    map[string]ReminderRuntime
@@ -49,9 +82,9 @@ func New(base component.Base, state ga.State) *Component {
 		Base:                base,
 		definitions:         make(map[string]ReminderDefinition),
 		runtimes:            make(map[string]ReminderRuntime),
-		definitionStore:     jsonstore.New[map[string]ReminderDefinition](base.Service, state, entities.CustomInputText.RemindersConfig),
-		runtimeStore:        jsonstore.New[map[string]ReminderRuntime](base.Service, state, entities.CustomInputText.RemindersRuntime),
-		viewStore:           jsonstore.New[map[string][]ReminderView](base.Service, state, entities.CustomInputText.RemindersViews),
+		definitionStore:     jsonstore.New[definitionStoreData](base.Service, state, configChunkIDs...),
+		runtimeStore:        jsonstore.New[runtimeStoreData](base.Service, state, runtimeChunkIDs...),
+		viewStore:           jsonstore.New[viewStoreData](base.Service, state, viewChunkIDs...),
 		notificationService: notifications.NewNotificationService(base.Service),
 	}
 
@@ -98,10 +131,10 @@ func (c *Component) handleCreateEvent(service *ga.Service, state ga.State, paylo
 	runtimeSnapshot := cloneRuntimes(c.runtimes)
 	c.mu.Unlock()
 
-	if err := c.definitionStore.Save(defSnapshot); err != nil {
+	if err := c.definitionStore.Save(mapToDefinitionStoreData(defSnapshot)); err != nil {
 		log.Printf("WARNING: failed to persist reminder definitions: %v", err)
 	}
-	if err := c.runtimeStore.Save(runtimeSnapshot); err != nil {
+	if err := c.runtimeStore.Save(mapToRuntimeStoreData(runtimeSnapshot)); err != nil {
 		log.Printf("WARNING: failed to persist reminder runtime: %v", err)
 	}
 	c.refreshViewsFromSnapshot(defSnapshot, runtimeSnapshot)
@@ -141,12 +174,12 @@ func (c *Component) handleAckEvent(service *ga.Service, state ga.State, payload 
 	c.mu.Unlock()
 
 	if isSingle {
-		if err := c.definitionStore.Save(defSnapshot); err != nil {
+		if err := c.definitionStore.Save(mapToDefinitionStoreData(defSnapshot)); err != nil {
 			log.Printf("WARNING: failed to persist reminder definitions: %v", err)
 		}
 	}
 
-	if err := c.runtimeStore.Save(runtimeSnapshot); err != nil {
+	if err := c.runtimeStore.Save(mapToRuntimeStoreData(runtimeSnapshot)); err != nil {
 		log.Printf("WARNING: failed to persist reminder runtime: %v", err)
 	}
 	c.refreshViewsFromSnapshot(defSnapshot, runtimeSnapshot)
@@ -160,10 +193,10 @@ func (c *Component) handleDeleteEvent(service *ga.Service, state ga.State, paylo
 	runtimeSnapshot := cloneRuntimes(c.runtimes)
 	c.mu.Unlock()
 
-	if err := c.definitionStore.Save(defSnapshot); err != nil {
+	if err := c.definitionStore.Save(mapToDefinitionStoreData(defSnapshot)); err != nil {
 		log.Printf("WARNING: failed to persist reminder definitions: %v", err)
 	}
-	if err := c.runtimeStore.Save(runtimeSnapshot); err != nil {
+	if err := c.runtimeStore.Save(mapToRuntimeStoreData(runtimeSnapshot)); err != nil {
 		log.Printf("WARNING: failed to persist reminder runtime: %v", err)
 	}
 	c.refreshViewsFromSnapshot(defSnapshot, runtimeSnapshot)
@@ -197,7 +230,7 @@ func (c *Component) runScheduler(service *ga.Service, state ga.State) {
 	c.mu.Unlock()
 
 	if changed {
-		if err := c.runtimeStore.Save(runtimeSnapshot); err != nil {
+		if err := c.runtimeStore.Save(mapToRuntimeStoreData(runtimeSnapshot)); err != nil {
 			log.Printf("WARNING: failed to persist reminder runtime: %v", err)
 		}
 		c.refreshViewsFromSnapshot(defSnapshot, runtimeSnapshot)
@@ -315,24 +348,24 @@ func (c *Component) bootstrapRuntime(def *ReminderDefinition, now time.Time) Rem
 }
 
 func (c *Component) restoreState() {
-	defs, err := c.definitionStore.Load()
+	defData, err := c.definitionStore.Load()
 	if err != nil {
 		log.Printf("WARNING: failed to restore reminder definitions: %v", err)
 	}
-	runtimes, rErr := c.runtimeStore.Load()
+	runData, rErr := c.runtimeStore.Load()
 	if rErr != nil {
 		log.Printf("WARNING: failed to restore reminder runtime: %v", rErr)
 	}
 
 	c.mu.Lock()
-	if defs != nil {
-		c.definitions = defs
+	if mapData := defData.toMap(); len(mapData) > 0 {
+		c.definitions = mapData
 	} else if c.definitions == nil {
 		c.definitions = make(map[string]ReminderDefinition)
 	}
 
-	if runtimes != nil {
-		c.runtimes = runtimes
+	if runtimeMap := runData.toMap(); len(runtimeMap) > 0 {
+		c.runtimes = runtimeMap
 	} else if c.runtimes == nil {
 		c.runtimes = make(map[string]ReminderRuntime)
 	}
@@ -619,7 +652,7 @@ func (c *Component) refreshViewsFromSnapshot(defs map[string]ReminderDefinition,
 		views[key] = list
 	}
 
-	if err := c.viewStore.Save(views); err != nil {
+	if err := c.viewStore.Save(mapToViewStoreData(views)); err != nil {
 		log.Printf("WARNING: failed to persist reminder views: %v", err)
 	}
 }
