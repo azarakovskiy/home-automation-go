@@ -390,9 +390,9 @@ func (c *Component) buildDefinition(payload events.ReminderCreateEvent, now time
 	profile := normalizeProfile(payload.Profile)
 	mode := normalizeMode(payload.Mode, payload.OneTime)
 
-	initial := intOrDefault(payload.InitialRepeatMin, DefaultInitialRepeatMinutes)
-	minRepeat := intOrDefault(payload.MinRepeatMin, DefaultMinRepeatMinutes)
-	maxRepeat := intOrDefault(payload.MaxRepeatMin, DefaultMaxRepeatMinutes)
+	initial := intOrDefault(payload.InitialRepeatMin.Ptr(), DefaultInitialRepeatMinutes)
+	minRepeat := intOrDefault(payload.MinRepeatMin.Ptr(), DefaultMinRepeatMinutes)
+	maxRepeat := intOrDefault(payload.MaxRepeatMin.Ptr(), DefaultMaxRepeatMinutes)
 
 	if minRepeat <= 0 {
 		minRepeat = DefaultMinRepeatMinutes

@@ -11,9 +11,9 @@ type CustomEventsDomain struct {
 var CustomEvents = CustomEventsDomain{
 	ScheduledStart: "event.custom_scheduled_start",
 	Notify:         "event.custom_notify",
-	ReminderCreate: "event.custom_reminder_create",
-	ReminderAck:    "event.custom_reminder_ack",
-	ReminderDelete: "event.custom_reminder_delete",
+	ReminderCreate: "event.home_go_reminder_create",
+	ReminderAck:    "event.home_go_reminder_ack",
+	ReminderDelete: "event.home_go_reminder_delete",
 }
 
 type CustomInputTextDomain struct {
@@ -23,9 +23,9 @@ type CustomInputTextDomain struct {
 }
 
 var CustomInputText = CustomInputTextDomain{
-	RemindersConfig:  "input_text.reminders_config",
-	RemindersRuntime: "input_text.reminders_runtime",
-	RemindersViews:   "input_text.reminders_views",
+	RemindersConfig:  "input_text.home_go_reminders_config",
+	RemindersRuntime: "input_text.home_go_reminders_runtime",
+	RemindersViews:   "input_text.home_go_reminders_views",
 }
 
 // CustomSensorsDomain contains sensors that are not auto-generated
