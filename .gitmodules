@@ -1,0 +1,3 @@
+[submodule "home-automation"]
+	path = home-automation
+	url = git@github.com:azarakovskiy/home-automation.git
