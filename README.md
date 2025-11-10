@@ -124,7 +124,7 @@ card:
     ]]]
 ```
 
-This creates one chip per reminder; tapping a chip acknowledges it, while holding deletes it. Duplicate the card for other household members by swapping the helper (e.g., use `input_text.home_go_reminders_ui_pok` for Pok).
+This creates one chip per reminder; tapping a chip acknowledges it, while holding deletes it. Duplicate the card for other household members by swapping the helper (e.g., `input_text.home_go_reminders_ui_pok`).
 
 ---
 
