@@ -23,7 +23,7 @@ type Dishwasher struct {
 	notificationService *notifications.NotificationService
 	controller          *Controller
 	optimizer           *optimizer.Optimizer
-	stateManager        *StateManager
+	stateManager        ScheduleStateStore
 
 	pendingSchedule *PendingSchedule
 }
@@ -33,6 +33,17 @@ type PendingSchedule struct {
 	Mode      Mode
 	StartTime time.Time
 	Result    *optimizer.OptimizationResult
+}
+
+// ScheduleStateStore captures the persistence surface used by the component.
+// It allows us to inject fakes in tests without touching Home Assistant services.
+//
+//go:generate mockgen -destination=../../../mocks/optimization/scheduled/dishwasher/scheduled_state_store.go -package=dishwasher home-go/optimization/scheduled/dishwasher ScheduleStateStore
+type ScheduleStateStore interface {
+	SaveSchedule(*PendingSchedule) error
+	RestoreSchedule() (*PendingSchedule, error)
+	ClearSchedule() error
+	IsScheduleCancelled() (bool, error)
 }
 
 // New creates a new dishwasher component
@@ -74,6 +85,16 @@ func (c *Dishwasher) EventListeners() []ga.EventListener {
 	return []ga.EventListener{handler.Build()}
 }
 
+// EntityListeners listens for manual cancellations via the scheduled flag helper
+func (c *Dishwasher) EntityListeners() []ga.EntityListener {
+	listener := ga.NewEntityListener().
+		EntityIds(entities.InputBoolean.KitchenDishwasherIsScheduled).
+		Call(c.handleScheduleFlagChange).
+		Build()
+
+	return []ga.EntityListener{listener}
+}
+
 // Intervals returns intervals for this component
 func (c *Dishwasher) Intervals() []ga.Interval {
 	// Check every 5 minutes if it's time to start pending dishwasher
@@ -84,9 +105,6 @@ func (c *Dishwasher) Intervals() []ga.Interval {
 
 	return []ga.Interval{checkInterval}
 }
-
-// Note: EntityListeners() and Schedules() are not defined here.
-// They use the default empty implementations from component.Base.
 
 // handleScheduleRequest processes strongly-typed dishwasher schedule events
 // The TypedEventHandler automatically parses the event, so we receive typed data directly
@@ -100,6 +118,12 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 	}
 
 	mode := Mode(request.Mode)
+	if mode == ModeCancel {
+		log.Printf("Received cancel request via scheduled event")
+		c.cancelPendingSchedule("cancel event")
+		return
+	}
+
 	log.Printf("Processing dishwasher schedule: mode=%s, max_delay=%d hours",
 		mode, request.MaxDelayHours)
 
@@ -220,8 +244,7 @@ func (c *Dishwasher) checkPendingStart(service *ga.Service, state ga.State) {
 	if err != nil {
 		log.Printf("ERROR: Failed to check if schedule was cancelled: %v", err)
 	} else if cancelled {
-		log.Printf("Schedule was manually cancelled by user")
-		c.pendingSchedule = nil
+		c.cancelPendingSchedule("scheduled flag turned off")
 		return
 	}
 
@@ -292,4 +315,31 @@ func (c *Dishwasher) shouldDelayStart(
 
 	// Normal mode: use dynamic threshold
 	return c.optimizer.ShouldDelay(result, maxDelayHours)
+}
+
+// handleScheduleFlagChange reacts to Home Assistant helper changes
+func (c *Dishwasher) handleScheduleFlagChange(service *ga.Service, state ga.State, data ga.EntityData) {
+	if data.ToState != "off" {
+		return
+	}
+
+	if c.pendingSchedule == nil {
+		return
+	}
+
+	c.cancelPendingSchedule("input_boolean turned off")
+}
+
+// cancelPendingSchedule clears local + HA state for a pending run
+func (c *Dishwasher) cancelPendingSchedule(reason string) {
+	if c.pendingSchedule == nil {
+		log.Printf("Cancellation requested (%s) but no pending dishwasher schedule", reason)
+	} else {
+		log.Printf("Cancelling pending dishwasher schedule (%s)", reason)
+		c.pendingSchedule = nil
+	}
+
+	if err := c.stateManager.ClearSchedule(); err != nil {
+		log.Printf("ERROR: Failed to clear schedule state: %v", err)
+	}
 }
