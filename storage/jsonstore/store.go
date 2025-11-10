@@ -1,4 +1,4 @@
-package reminder
+package jsonstore
 
 import (
 	"encoding/json"
@@ -10,26 +10,32 @@ import (
 	ga "saml.dev/gome-assistant"
 )
 
-type jsonStore[T any] struct {
+// Store persists arbitrary JSON serializable data into an Home Assistant input_text entity.
+type Store[T any] struct {
 	service  *ga.Service
 	state    ga.State
 	entityID string
 }
 
-func newJSONStore[T any](service *ga.Service, state ga.State, entityID string) *jsonStore[T] {
-	return &jsonStore[T]{service: service, state: state, entityID: entityID}
+// New returns a new Store bound to an input_text entity.
+func New[T any](service *ga.Service, state ga.State, entityID string) *Store[T] {
+	return &Store[T]{
+		service:  service,
+		state:    state,
+		entityID: entityID,
+	}
 }
 
-func (s *jsonStore[T]) Load() (T, error) {
+// Load deserializes the current entity value.
+func (s *Store[T]) Load() (T, error) {
 	var zero T
-
 	if s.state == nil {
 		return zero, fmt.Errorf("state is not initialized for %s", s.entityID)
 	}
 
 	entityState, err := s.state.Get(s.entityID)
 	if err != nil {
-		log.Printf("WARNING: failed to read %s: %v (defaulting to empty state)", s.entityID, err)
+		log.Printf("WARNING: failed to read %s: %v (defaulting to zero value)", s.entityID, err)
 		return zero, nil
 	}
 
@@ -45,7 +51,8 @@ func (s *jsonStore[T]) Load() (T, error) {
 	return value, nil
 }
 
-func (s *jsonStore[T]) Save(value T) error {
+// Save serializes and writes the value to Home Assistant.
+func (s *Store[T]) Save(value T) error {
 	bytes, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("failed to marshal %s: %w", s.entityID, err)

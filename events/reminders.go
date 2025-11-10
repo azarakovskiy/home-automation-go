@@ -13,6 +13,8 @@ type ReminderCreateEvent struct {
 	Title               string             `json:"title"`
 	Message             string             `json:"message"`
 	Profile             string             `json:"profile"`
+	Mode                string             `json:"mode"`
+	OneTime             *bool              `json:"one_time,omitempty"`
 	StartTime           string             `json:"start_time"`
 	InitialRepeatMin    *int               `json:"initial_repeat_minutes,omitempty"`
 	MinRepeatMin        *int               `json:"min_repeat_minutes,omitempty"`

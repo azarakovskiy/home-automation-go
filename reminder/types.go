@@ -16,6 +16,14 @@ const (
 	ProfileQuiet    ReminderProfile = "quiet"
 )
 
+// ReminderMode describes whether the reminder repeats or is a one-time notification.
+type ReminderMode string
+
+const (
+	ModeRepeating ReminderMode = "repeating"
+	ModeSingle    ReminderMode = "single"
+)
+
 const (
 	DefaultInitialRepeatMinutes = 20
 	DefaultMinRepeatMinutes     = 2
@@ -38,6 +46,7 @@ type ReminderDefinition struct {
 	Title            string            `json:"title"`
 	Message          string            `json:"message"`
 	Profile          ReminderProfile   `json:"profile"`
+	Mode             ReminderMode      `json:"mode"`
 	StartTime        time.Time         `json:"start_time"`
 	InitialRepeatMin int               `json:"initial_repeat_minutes"`
 	MinRepeatMin     int               `json:"min_repeat_minutes"`
@@ -65,6 +74,7 @@ type ReminderRuntime struct {
 	AcknowledgedAt  time.Time `json:"acknowledged_at,omitempty"`
 	LastFailure     string    `json:"last_failure,omitempty"`
 	LastFailureTime time.Time `json:"last_failure_time,omitempty"`
+	AwaitingAck     bool      `json:"awaiting_ack"`
 }
 
 // ReminderView is what the dashboard consumes.
@@ -74,12 +84,14 @@ type ReminderView struct {
 	Message     string          `json:"message"`
 	NextTrigger time.Time       `json:"next_trigger"`
 	Profile     ReminderProfile `json:"profile"`
+	Mode        ReminderMode    `json:"mode"`
 	VisibleTo   []string        `json:"visible_to,omitempty"`
 	RepeatCount int             `json:"repeat_count"`
 	Completed   bool            `json:"completed"`
 	Cancelled   bool            `json:"cancelled"`
 	Speaker     string          `json:"speaker_entity,omitempty"`
 	Phone       string          `json:"phone_notifier,omitempty"`
+	AwaitingAck bool            `json:"awaiting_ack"`
 }
 
 func (q QuietHoursConfig) isQuiet(now time.Time) bool {

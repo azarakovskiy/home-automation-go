@@ -14,6 +14,7 @@ import (
 	"home-go/entities"
 	"home-go/events"
 	"home-go/notifications"
+	"home-go/storage/jsonstore"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -22,9 +23,9 @@ import (
 type Component struct {
 	component.Base
 
-	definitionStore *jsonStore[map[string]ReminderDefinition]
-	runtimeStore    *jsonStore[map[string]ReminderRuntime]
-	viewStore       *jsonStore[map[string][]ReminderView]
+	definitionStore *jsonstore.Store[map[string]ReminderDefinition]
+	runtimeStore    *jsonstore.Store[map[string]ReminderRuntime]
+	viewStore       *jsonstore.Store[map[string][]ReminderView]
 
 	definitions map[string]ReminderDefinition
 	runtimes    map[string]ReminderRuntime
@@ -48,9 +49,9 @@ func New(base component.Base, state ga.State) *Component {
 		Base:                base,
 		definitions:         make(map[string]ReminderDefinition),
 		runtimes:            make(map[string]ReminderRuntime),
-		definitionStore:     newJSONStore[map[string]ReminderDefinition](base.Service, state, entities.CustomInputText.RemindersConfig),
-		runtimeStore:        newJSONStore[map[string]ReminderRuntime](base.Service, state, entities.CustomInputText.RemindersRuntime),
-		viewStore:           newJSONStore[map[string][]ReminderView](base.Service, state, entities.CustomInputText.RemindersViews),
+		definitionStore:     jsonstore.New[map[string]ReminderDefinition](base.Service, state, entities.CustomInputText.RemindersConfig),
+		runtimeStore:        jsonstore.New[map[string]ReminderRuntime](base.Service, state, entities.CustomInputText.RemindersRuntime),
+		viewStore:           jsonstore.New[map[string][]ReminderView](base.Service, state, entities.CustomInputText.RemindersViews),
 		notificationService: notifications.NewNotificationService(base.Service),
 	}
 
@@ -81,73 +82,18 @@ func (c *Component) Intervals() []ga.Interval {
 }
 
 func (c *Component) handleCreateEvent(service *ga.Service, state ga.State, payload events.ReminderCreateEvent) {
-	if strings.TrimSpace(payload.ID) == "" {
-		log.Printf("WARNING: reminder create event missing id")
-		return
-	}
-	if strings.TrimSpace(payload.Message) == "" {
-		log.Printf("WARNING: reminder %s missing message", payload.ID)
-		return
-	}
-
 	now := time.Now()
-	profile := normalizeProfile(payload.Profile)
-	initial := intOrDefault(payload.InitialRepeatMin, DefaultInitialRepeatMinutes)
-	minRepeat := intOrDefault(payload.MinRepeatMin, DefaultMinRepeatMinutes)
-	maxRepeat := intOrDefault(payload.MaxRepeatMin, DefaultMaxRepeatMinutes)
-	if minRepeat <= 0 {
-		minRepeat = DefaultMinRepeatMinutes
-	}
-	if initial < minRepeat {
-		initial = minRepeat
-	}
-	if maxRepeat < minRepeat {
-		maxRepeat = minRepeat
-	}
-	if maxRepeat < initial {
-		maxRepeat = initial
-	}
-
-	quiet := DefaultQuietHours
-	if payload.QuietHours != nil {
-		quiet.Enabled = payload.QuietHours.Enabled
-		if payload.QuietHours.Start != "" {
-			quiet.Start = payload.QuietHours.Start
-		}
-		if payload.QuietHours.End != "" {
-			quiet.End = payload.QuietHours.End
-		}
-	}
-
-	nightAllowed := boolOrDefault(payload.NightModeAllowed, false)
-	presenceRequired := boolOrDefault(payload.PresenceRequired, true)
-
-	startTime := resolveStartTime(payload, now)
-
-	definition := ReminderDefinition{
-		ID:               payload.ID,
-		Title:            firstNonEmpty(payload.Title, payload.Message),
-		Message:          payload.Message,
-		Profile:          profile,
-		StartTime:        startTime,
-		InitialRepeatMin: initial,
-		MinRepeatMin:     minRepeat,
-		MaxRepeatMin:     maxRepeat,
-		SpeakerEntity:    payload.SpeakerEntity,
-		PhoneNotifier:    payload.PhoneNotifier,
-		VisibleTo:        uniqueStrings(payload.VisibleTo),
-		NightModeAllowed: nightAllowed,
-		PresenceRequired: presenceRequired,
-		QuietHours:       quiet,
-		Metadata:         payload.Metadata,
-		CreatedAt:        now,
+	definition, err := c.buildDefinition(payload, now)
+	if err != nil {
+		log.Printf("WARNING: invalid reminder create payload: %v", err)
+		return
 	}
 
 	runtime := c.bootstrapRuntime(definition, now)
 
 	c.mu.Lock()
-	c.definitions[payload.ID] = definition
-	c.runtimes[payload.ID] = runtime
+	c.definitions[definition.ID] = *definition
+	c.runtimes[definition.ID] = runtime
 	defSnapshot := cloneDefinitions(c.definitions)
 	runtimeSnapshot := cloneRuntimes(c.runtimes)
 	c.mu.Unlock()
@@ -169,19 +115,36 @@ func (c *Component) handleAckEvent(service *ga.Service, state ga.State, payload 
 		log.Printf("WARNING: reminder %s acked but not found", payload.ID)
 		return
 	}
-	if runtime.Completed {
+	def, defExists := c.definitions[payload.ID]
+	now := time.Now()
+	if runtime.Completed && defExists && def.Mode != ModeSingle {
 		c.mu.Unlock()
 		return
 	}
-	now := time.Now()
+
 	runtime.Completed = true
 	runtime.AcknowledgedBy = payload.User
 	runtime.AcknowledgedAt = now
 	runtime.NextTrigger = time.Time{}
-	c.runtimes[payload.ID] = runtime
+	runtime.AwaitingAck = false
+
+	isSingle := defExists && def.Mode == ModeSingle
+	if isSingle {
+		delete(c.definitions, payload.ID)
+		delete(c.runtimes, payload.ID)
+	} else {
+		c.runtimes[payload.ID] = runtime
+	}
+
 	defSnapshot := cloneDefinitions(c.definitions)
 	runtimeSnapshot := cloneRuntimes(c.runtimes)
 	c.mu.Unlock()
+
+	if isSingle {
+		if err := c.definitionStore.Save(defSnapshot); err != nil {
+			log.Printf("WARNING: failed to persist reminder definitions: %v", err)
+		}
+	}
 
 	if err := c.runtimeStore.Save(runtimeSnapshot); err != nil {
 		log.Printf("WARNING: failed to persist reminder runtime: %v", err)
@@ -214,7 +177,8 @@ func (c *Component) runScheduler(service *ga.Service, state ga.State) {
 	for id, def := range c.definitions {
 		runtime, ok := c.runtimes[id]
 		if !ok {
-			runtime = c.bootstrapRuntime(def, now)
+			localDef := def
+			runtime = c.bootstrapRuntime(&localDef, now)
 		}
 
 		updated, modified := c.evaluateReminder(def, runtime, now)
@@ -242,6 +206,10 @@ func (c *Component) runScheduler(service *ga.Service, state ga.State) {
 
 func (c *Component) evaluateReminder(def ReminderDefinition, runtime ReminderRuntime, now time.Time) (ReminderRuntime, bool) {
 	if runtime.Completed || runtime.Cancelled {
+		return runtime, false
+	}
+
+	if def.Mode == ModeSingle && runtime.AwaitingAck {
 		return runtime, false
 	}
 
@@ -290,6 +258,7 @@ func (c *Component) triggerReminder(def ReminderDefinition, runtime ReminderRunt
 		"reminder_id":  def.ID,
 		"title":        def.Title,
 		"repeat_count": runtime.RepeatCount,
+		"mode":         def.Mode,
 	}
 	if def.SpeakerEntity != "" {
 		notifyData["speaker_entity"] = def.SpeakerEntity
@@ -313,6 +282,13 @@ func (c *Component) triggerReminder(def ReminderDefinition, runtime ReminderRunt
 	if runtime.LastIntervalMin == 0 {
 		runtime.LastIntervalMin = def.InitialRepeatMin
 	}
+
+	if def.Mode == ModeSingle {
+		runtime.AwaitingAck = true
+		runtime.NextTrigger = time.Time{}
+		return runtime
+	}
+
 	interval, cancel := nextIntervalDuration(def.Profile, def, runtime.LastIntervalMin)
 	if cancel {
 		runtime.Cancelled = true
@@ -324,7 +300,7 @@ func (c *Component) triggerReminder(def ReminderDefinition, runtime ReminderRunt
 	return runtime
 }
 
-func (c *Component) bootstrapRuntime(def ReminderDefinition, now time.Time) ReminderRuntime {
+func (c *Component) bootstrapRuntime(def *ReminderDefinition, now time.Time) ReminderRuntime {
 	next := def.StartTime
 	if next.IsZero() || next.Before(now) {
 		next = now
@@ -334,6 +310,7 @@ func (c *Component) bootstrapRuntime(def ReminderDefinition, now time.Time) Remi
 		NextTrigger:     next,
 		RepeatCount:     0,
 		LastIntervalMin: def.InitialRepeatMin,
+		AwaitingAck:     false,
 	}
 }
 
@@ -363,7 +340,8 @@ func (c *Component) restoreState() {
 	now := time.Now()
 	for id, def := range c.definitions {
 		if _, ok := c.runtimes[id]; !ok {
-			c.runtimes[id] = c.bootstrapRuntime(def, now)
+			localDef := def
+			c.runtimes[id] = c.bootstrapRuntime(&localDef, now)
 		}
 	}
 
@@ -385,6 +363,86 @@ func normalizeProfile(profile string) ReminderProfile {
 	}
 }
 
+func normalizeMode(mode string, legacyOneTime *bool) ReminderMode {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case string(ModeSingle), "one_time", "one-time":
+		return ModeSingle
+	case string(ModeRepeating), "repeat":
+		return ModeRepeating
+	}
+	if legacyOneTime != nil && *legacyOneTime {
+		return ModeSingle
+	}
+	return ModeRepeating
+}
+
+func (c *Component) buildDefinition(payload events.ReminderCreateEvent, now time.Time) (*ReminderDefinition, error) {
+	id := strings.TrimSpace(payload.ID)
+	if id == "" {
+		return nil, fmt.Errorf("id cannot be empty")
+	}
+
+	message := strings.TrimSpace(payload.Message)
+	if message == "" {
+		return nil, fmt.Errorf("message cannot be empty")
+	}
+
+	profile := normalizeProfile(payload.Profile)
+	mode := normalizeMode(payload.Mode, payload.OneTime)
+
+	initial := intOrDefault(payload.InitialRepeatMin, DefaultInitialRepeatMinutes)
+	minRepeat := intOrDefault(payload.MinRepeatMin, DefaultMinRepeatMinutes)
+	maxRepeat := intOrDefault(payload.MaxRepeatMin, DefaultMaxRepeatMinutes)
+
+	if minRepeat <= 0 {
+		minRepeat = DefaultMinRepeatMinutes
+	}
+	if initial < minRepeat {
+		initial = minRepeat
+	}
+	if maxRepeat < initial {
+		maxRepeat = initial
+	}
+
+	quiet := DefaultQuietHours
+	if payload.QuietHours != nil {
+		quiet.Enabled = payload.QuietHours.Enabled
+		if strings.TrimSpace(payload.QuietHours.Start) != "" {
+			quiet.Start = payload.QuietHours.Start
+		}
+		if strings.TrimSpace(payload.QuietHours.End) != "" {
+			quiet.End = payload.QuietHours.End
+		}
+	}
+
+	startTime, err := resolveStartTime(payload, now)
+	if err != nil {
+		return nil, err
+	}
+
+	definition := &ReminderDefinition{
+		ID:               id,
+		Title:            firstNonEmpty(payload.Title, message),
+		Message:          message,
+		Profile:          profile,
+		Mode:             mode,
+		StartTime:        startTime,
+		InitialRepeatMin: initial,
+		MinRepeatMin:     minRepeat,
+		MaxRepeatMin:     maxRepeat,
+		SpeakerEntity:    strings.TrimSpace(payload.SpeakerEntity),
+		PhoneNotifier:    strings.TrimSpace(payload.PhoneNotifier),
+		VisibleTo:        uniqueStrings(payload.VisibleTo),
+		NightModeAllowed: boolOrDefault(payload.NightModeAllowed, false),
+		PresenceRequired: boolOrDefault(payload.PresenceRequired, true),
+		QuietHours:       quiet,
+		Metadata:         payload.Metadata,
+		CreatedAt:        now,
+	}
+
+	return definition, nil
+}
+
 func intOrDefault(value *int, fallback int) int {
 	if value == nil {
 		return fallback
@@ -402,20 +460,24 @@ func boolOrDefault(value *bool, fallback bool) bool {
 	return *value
 }
 
-func resolveStartTime(payload events.ReminderCreateEvent, now time.Time) time.Time {
+func resolveStartTime(payload events.ReminderCreateEvent, now time.Time) (time.Time, error) {
 	if payload.InitialDelayMinutes != nil {
-		return now.Add(time.Duration(*payload.InitialDelayMinutes) * time.Minute)
+		return now.Add(time.Duration(*payload.InitialDelayMinutes) * time.Minute), nil
 	}
-	if payload.StartTime == "" {
-		return now
+
+	startStr := strings.TrimSpace(payload.StartTime)
+	if startStr == "" {
+		return now, nil
 	}
-	if parsed, err := parseAbsoluteTime(payload.StartTime, now.Location()); err == nil {
-		return parsed
+
+	if parsed, err := parseAbsoluteTime(startStr, now.Location()); err == nil {
+		return parsed, nil
 	}
-	if parsed, err := parseClockTime(payload.StartTime, now); err == nil {
-		return parsed
+	if parsed, err := parseClockTime(startStr, now); err == nil {
+		return parsed, nil
 	}
-	return now
+
+	return now, fmt.Errorf("invalid start_time: %s", startStr)
 }
 
 func parseAbsoluteTime(value string, loc *time.Location) (time.Time, error) {
@@ -530,12 +592,14 @@ func (c *Component) refreshViewsFromSnapshot(defs map[string]ReminderDefinition,
 			Message:     def.Message,
 			NextTrigger: runtime.NextTrigger,
 			Profile:     def.Profile,
+			Mode:        def.Mode,
 			VisibleTo:   def.VisibleTo,
 			RepeatCount: runtime.RepeatCount,
 			Completed:   runtime.Completed,
 			Cancelled:   runtime.Cancelled,
 			Speaker:     def.SpeakerEntity,
 			Phone:       def.PhoneNotifier,
+			AwaitingAck: runtime.AwaitingAck,
 		}
 
 		if len(def.VisibleTo) == 0 {
