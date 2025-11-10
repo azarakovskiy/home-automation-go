@@ -1,192 +1,142 @@
-# home-go
+# Home Automation (Go)
 
-Event-driven home automation in Go with intelligent electricity price optimization.
+Event-driven Home Assistant automations written in Go. Components talk to HA purely through entities and custom events so UI automations stay declarative while logic lives here.
 
-Built on [gome-assistant](https://github.com/saml-dev/gome-assistant) library.
+---
 
-## Features
+## Working Locally
 
-### Smart Charger Optimization
-Intelligent electricity price-based charging for battery-powered devices:
-- **Laptop Charger**: 6h charging optimized within 12h window
-- **Vacuum Charger**: 1h charging optimized within 12h window
-- 15-minute optimization cycles aligned with pricing granularity
-- Automatic safety shutoff when away >2h
-- Finds cheapest time slots for continuous charging
-
-### Dishwasher Scheduler
-Automatically schedules dishwasher to run during cheapest electricity periods:
-- 5 operating modes with measured durations: Auto (137min), AutoQuick (70min), Eco (4h), Intensive (3h), Quick (1h)
-- Price optimization with weighted stage importance based on actual power consumption
-- Dynamic savings threshold using exponential decay
-- Night mode: accepts any positive savings
-- State persistence survives service restarts
-- Human-readable TTS notifications via Home Assistant
-- Custom event trigger from Home Assistant
-
-### Price Optimization Engine
-Unified optimizer supporting two strategies:
-- **Scheduled Optimization**: Best start time for fixed-duration cycles (dishwasher, dryer)
-- **Continuous Optimization**: Cheapest time slots within a window (chargers, heating)
-- Weighted cost optimization (prioritize high-power stages)
-- Dynamic savings thresholds based on available wait time
-- Graceful degradation with insufficient data
-
-### Architecture
-- Component-based system with self-contained modules
-- Type-safe event handling using Go generics
-- 4 listener types: EventListener, EntityListener, DailySchedule, Interval
-- Presence detection with house mode integration
-- Event-based notifications (TTS via Home Assistant automations)
-- Dry-run mode for safe testing
-
-## Quick Start
-
-### Prerequisites
-
-- Go 1.23+
-- Home Assistant instance
-- Long-lived access token from Home Assistant
-
-### Setup
-
-1. **Clone and build**:
+1. **Clone & init submodule**
    ```bash
-   git clone <your-repo>
+   git clone git@github.com:azarakovskiy/home-automation-go.git
    cd home-automation-go
-   make build
+   git submodule update --init --recursive   # pulls the HA config into ./home-automation
    ```
-
-2. **Configure environment**:
+2. **Create local env**
    ```bash
    cp env.example .env
-   # Edit .env with your HA_URL and HA_AUTH_TOKEN
-   # Optional: Set DRY_RUN=true for testing without device control
+   # edit HA_URL and HA_AUTH_TOKEN (long-lived token)
    ```
-
-3. **Generate entities** (optional):
+3. **Generate entity constants (whenever HA helpers change)**
    ```bash
-   cp entities/gen.yaml.example entities/gen.yaml
-   # Edit entities/gen.yaml with your HA details
+   cp gen.yaml.example gen.yaml   # only first time
+   # edit with HA URL/token if different from .env
    make generate
    ```
-
-4. **Run**:
+4. **Run**
    ```bash
-   make run
+   make run           # normal mode
+   DRY_RUN=true make run   # logs actions without touching devices
    ```
 
-## Docker
+> The `home-automation/` submodule contains the HA YAML (helpers, scripts, dashboards). Edit it there, reload helpers in HA, then rerun `make generate` so `entities/entities.go` stays in sync.
 
-### Local Development
-```bash
-docker compose up -d
+---
+
+## Automations
+
+| Automation | Description | Key Entities |
+|------------|-------------|--------------|
+| **Dishwasher Scheduler** | Listens for `event.custom_scheduled_start`, optimizes start time vs energy prices, persists state across restarts, and announces savings via TTS. | Input helpers under `input_boolean.kitchen_dishwasher_*`, `input_datetime.kitchen_dishwasher_scheduled_start`, price sensors. |
+| **Laptop Charger Optimizer** | Every 15 min finds the cheapest slots in the next 12 h to deliver a 6 h charge. Disables charging when house is away >2 h. | `input_boolean.office_laptop_charge_optimization_auto`, charger switch/sensor entities. |
+| **Vacuum Charger Optimizer** | Same algorithm with 1 h budget to keep the robot topped off without peak prices. | `input_boolean.living_room_vacuum_charge_optimization_auto`, vacuum dock switch/sensors. |
+| **Reminder Service** | Fully event-driven reminders stored in chunked HA helpers. Supports “normal/annoying/quiet” profiles, repeating or one-time mode, optional speaker & phone targets, and per-user visibility. Persists config/runtime/views through compressed HA helper chunks so reminders survive restarts. | `input_text.home_go_reminders_*_chunk_<n>`, scripts `script.reminders_dev_*` for manual testing. |
+| **Notification Relay** | Device components raise `event.custom_notify` with a ready-to-speak sentence; HA automations fan that out to TTS or mobile push. | `event.custom_notify`, `script.[speaker]_announce_*`. |
+
+---
+
+## Event Catalog
+
+### Dishwasher Scheduling
+| Event | Payload | Purpose |
+|-------|---------|---------|
+| `event.custom_scheduled_start` | `device` (`"dishwasher"`), `mode` (`auto`, `eco`, etc.), `max_delay_hours` | Fired from HA scripts/buttons to request a new optimized cycle. |
+
+### Reminder Service
+| Event | Payload Highlights | Notes |
+|-------|--------------------|-------|
+| `event.home_go_reminder_create` | `id`, `message`, optional `title`, `profile` (`normal`/`annoying`/`quiet`), `mode` (`repeating`/`single`), `start_time` or `initial_delay_minutes`, optional `speaker_entity`, `phone_notifier`, `visible_to`, quiet-hours config. | Creates or updates a reminder definition. Missing values fall back to sensible defaults. |
+| `event.home_go_reminder_ack` | `id`, optional `user`. | Marks a reminder done. Single-time reminders are deleted immediately after ack. |
+| `event.home_go_reminder_delete` | `id`. | Removes reminder definition/runtime/view state. |
+
+### Notification Relay
+| Event | Payload | Purpose |
+|-------|---------|---------|
+| `event.custom_notify` | `device`, `type`, `message`, optional data (speaker, push target, etc.). | Common event all components fire when they want HA to handle TTS/push delivery. |
+
+---
+
+## Dashboard Example – Mushroom Chips
+
+The reminder component now writes a UI-friendly helper per user (e.g., `input_text.home_go_reminders_ui_alexey`). Its value is a semicolon-separated list like `rem-1|Take pills;rem-2|Stretch`, which keeps Lovelace simple. The following card turns those entries into interactive Mushroom chips:
+
+```yaml
+type: custom:config-template-card
+entities:
+  - input_text.home_go_reminders_ui_alexey
+variables:
+  reminders: >
+    [[[ const raw = states['input_text.home_go_reminders_ui_alexey'].state;
+        if (!raw || raw === 'unknown') return [];
+        return raw.split(';').filter(Boolean).map((entry) => {
+          const [id, label] = entry.split('|');
+          return { id, label };
+        });
+    ]]]
+card:
+  type: custom:mushroom-chips-card
+  chips: >
+    [[[
+      const chips = [];
+      variables.reminders.forEach((rem) => {
+        chips.push({
+          type: "template",
+          icon: rem.icon || "mdi:alarm",
+          content: rem.label,
+          multiline: true,
+          tap_action: {
+            action: "call-service",
+            service: "event.fire",
+            data: {
+              event_type: "home_go_reminder_ack",
+              event_data: { id: rem.id, user: "alexey" },
+            },
+          },
+          hold_action: {
+            action: "call-service",
+            service: "event.fire",
+            data: {
+              event_type: "home_go_reminder_delete",
+              event_data: { id: rem.id },
+            },
+          },
+        });
+      });
+      if (!chips.length) {
+        chips.push({
+          type: "template",
+          icon: "mdi:check-circle",
+          content: "No reminders 🎉",
+          tap_action: { action: "none" },
+        });
+      }
+      return chips;
+    ]]]
 ```
 
-### Production (GHCR)
-```bash
-# Pull latest image
-docker pull ghcr.io/<your-username>/home-go:main
+This creates one chip per reminder; tapping a chip acknowledges it, while holding deletes it. Duplicate the card for other household members by swapping the helper (e.g., use `input_text.home_go_reminders_ui_pok` for Pok).
 
-# Run container
-docker run -d --name home-go-automation \
-  -e HA_URL=http://<ha-host>:8123 \
-  -e HA_AUTH_TOKEN=<your-token> \
-  --restart unless-stopped \
-  ghcr.io/<your-username>/home-go:main
-```
+---
 
-## Development
+## Commands You’ll Actually Use
+| Command | Description |
+|---------|-------------|
+| `make run` | Compile & run against `.env`. |
+| `DRY_RUN=true make run` | Exercise logic without touching devices. |
+| `make test` | Go test suite (includes reminder/jsonstore tests). |
+| `make generate` | Refresh `entities/entities.go` from HA. |
+| `make build` | Produce `bin/home-go`. |
 
-### Available Commands
-- `make build` - Build binary
-- `make run` - Build and run
-- `make test` - Run tests with coverage
-- `make lint` - Run linter
-- `make fmt` - Format code
-- `make generate` - Generate entities from HA
-- `make mocks` - Generate test mocks
-- `make install-mockgen` - Install mockgen tool
-- `make tidy` - Clean up dependencies
+---
 
-### Dry-Run Mode
-Test automation logic without controlling real devices:
-```bash
-DRY_RUN=true make run
-```
-All device control calls will be logged but not executed. Perfect for:
-- Testing logic without affecting physical devices
-- Development without Home Assistant connection
-- Validating automation flows safely
-
-### CI/CD
-- **PRs**: Run linting and tests
-- **Push to main**: Build and publish Docker image to GHCR
-- **Tags**: Create tagged releases
-
-### Test Coverage
-```
-pricing:    96.6%
-optimizer:  90.5%
-component:  43.7%
-dishwasher: 13.8%
-```
-
-Run tests with coverage:
-```bash
-make test
-```
-
-## Configuration
-
-### Environment Variables
-- `HA_URL` - Home Assistant URL (default: http://192.168.1.43:8123)
-- `HA_AUTH_TOKEN` - Long-lived access token
-- `DRY_RUN` - Enable dry-run mode (logs actions without execution)
-- `DEBUG` - Enable verbose debug logging
-
-### Entity Generation
-The `entities/` directory contains generated type-safe constants for your Home Assistant entities. Regenerate when you add new entities:
-
-```bash
-make generate
-```
-
-## Project Structure
-
-```
-├── component/          # Component framework
-│   ├── component.go   # Component interface & Base with house mode helpers
-│   └── event_handler.go # Type-safe event handling
-├── pricing/           # Electricity pricing service
-│   └── service.go
-├── scheduler/
-│   ├── optimizer/     # Unified optimization engine
-│   │   └── optimizer.go  # Scheduled & continuous optimization
-│   ├── profile.go     # Generic profile for scheduled devices
-│   └── dishwasher/    # Dishwasher implementation
-│       ├── component.go
-│       ├── profile.go # Device-specific profiles
-│       └── types.go
-├── charger/
-│   ├── profiles.go    # Charging profiles (Laptop, Vacuum)
-│   ├── laptop/        # Laptop charger component
-│   └── vacuum/        # Vacuum charger component
-├── notifications/     # Event-based notification service
-│   └── service.go
-├── debug/             # Debug logging utility
-├── dryrun/            # Dry-run mode wrapper
-├── entities/          # Generated HA entities
-│   ├── entities.go    # Generated constants
-│   └── custom_entities.go # Custom events
-├── mocks/             # Generated test mocks
-├── main.go            # Application entry
-├── AGENTS.md          # AI agent instructions
-├── Dockerfile
-├── docker-compose.yml
-└── Makefile
-```
-
-## License
-
-MIT
+Questions / tweaks? Update `AGENTS.md` for coding conventions and keep HA + Go changes in lockstep (submodule commit + parent repo commit).***

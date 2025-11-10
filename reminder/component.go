@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"home-go/component"
+	"home-go/dryrun"
 	"home-go/entities"
 	"home-go/events"
 	"home-go/notifications"
@@ -49,6 +50,10 @@ var (
 		entities.InputText.HomeGoRemindersViewsChunk6,
 		entities.InputText.HomeGoRemindersViewsChunk7,
 		entities.InputText.HomeGoRemindersViewsChunk8,
+	}
+	uiDisplayEntities = map[string]string{
+		"alexey": entities.InputText.HomeGoRemindersUiAlexey,
+		"pok":    entities.InputText.HomeGoRemindersUiPok,
 	}
 )
 
@@ -655,4 +660,53 @@ func (c *Component) refreshViewsFromSnapshot(defs map[string]ReminderDefinition,
 	if err := c.viewStore.Save(mapToViewStoreData(views)); err != nil {
 		log.Printf("WARNING: failed to persist reminder views: %v", err)
 	}
+
+	c.updateUiEntities(views)
+}
+
+func (c *Component) updateUiEntities(views map[string][]ReminderView) {
+	for user, entityID := range uiDisplayEntities {
+		payload := buildUiPayload(views[user])
+		if err := dryrun.CallWithData("InputText.Set", entityID, payload, func() error {
+			return c.Service.InputText.Set(entityID, payload)
+		}); err != nil {
+			log.Printf("WARNING: failed to update reminder UI entity %s: %v", entityID, err)
+		}
+	}
+}
+
+const maxUiLabelLen = 40
+
+func buildUiPayload(entries []ReminderView) string {
+	var builder strings.Builder
+	for _, view := range entries {
+		if view.ID == "" || view.Completed || view.Cancelled {
+			continue
+		}
+		label := strings.TrimSpace(view.Title)
+		if label == "" {
+			label = strings.TrimSpace(view.Message)
+		}
+		if label == "" {
+			continue
+		}
+		if len(label) > maxUiLabelLen {
+			label = label[:maxUiLabelLen-1] + "…"
+		}
+
+		chip := fmt.Sprintf("%s|%s", view.ID, label)
+		nextLen := builder.Len()
+		if nextLen > 0 {
+			nextLen += 1 // semicolon
+		}
+		nextLen += len(chip)
+		if nextLen > 255 {
+			break
+		}
+		if builder.Len() > 0 {
+			builder.WriteRune(';')
+		}
+		builder.WriteString(chip)
+	}
+	return builder.String()
 }
