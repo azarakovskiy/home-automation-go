@@ -8,7 +8,6 @@ import (
 	"home-go/debug"
 	"home-go/dryrun"
 	"home-go/optimization/continuous/laptop"
-	"home-go/optimization/continuous/vacuum"
 	"home-go/optimization/scheduled/dishwasher"
 	"home-go/pricing"
 
@@ -46,14 +45,14 @@ func main() {
 	// Initialize components - pass shared base and state
 	dishwasherComp := dishwasher.New(base, app.GetState(), priceService)
 	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
-	vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
+	// vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
 
 	// Collect all components
 	components := []component.Component{
 		priceService,
 		dishwasherComp,
 		laptopChargerComp,
-		vacuumChargerComp,
+		// vacuumChargerComp,
 	}
 
 	// Register all listeners from components
