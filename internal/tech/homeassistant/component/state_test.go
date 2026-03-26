@@ -16,7 +16,7 @@ func TestNewStateManager(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockService := &ga.Service{}
-	mockState := mocks.NewMockStateInterface(ctrl)
+	mockState := mocks.NewMockState(ctrl)
 	config := StateConfig{
 		IsScheduledEntity: "input_boolean.test_scheduled",
 		ModeEntity:        "input_select.test_mode",
@@ -52,7 +52,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 	tests := []struct {
 		name         string
 		config       StateConfig
-		setupMock    func(*mocks.MockStateInterface)
+		setupMock    func(*mocks.MockState)
 		wantSchedule *ScheduleState
 		wantErr      bool
 	}{
@@ -66,7 +66,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 				CurrentCostEntity:    "input_number.test_current",
 				SavingsPercentEntity: "input_number.test_savings",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{State: "on"}, nil)
 				m.EXPECT().Get("input_select.test_mode").Return(ga.EntityState{State: "eco"}, nil)
 				m.EXPECT().Get("input_datetime.test_start").Return(ga.EntityState{State: startTime.Format(time.RFC3339)}, nil)
@@ -89,7 +89,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 			config: StateConfig{
 				IsScheduledEntity: "input_boolean.test_scheduled",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{State: "off"}, nil)
 			},
 			wantSchedule: nil,
@@ -105,7 +105,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 				CurrentCostEntity:    "input_number.test_current",
 				SavingsPercentEntity: "input_number.test_savings",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{State: "on"}, nil)
 				m.EXPECT().Get("input_select.test_mode").Return(ga.EntityState{State: "auto"}, nil)
 				m.EXPECT().Get("input_datetime.test_start").Return(ga.EntityState{State: "2025-10-23 15:00:00"}, nil)
@@ -128,7 +128,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 			config: StateConfig{
 				IsScheduledEntity: "input_boolean.test_scheduled",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{}, fmt.Errorf("entity not found"))
 			},
 			wantErr: true,
@@ -139,7 +139,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 				IsScheduledEntity: "input_boolean.test_scheduled",
 				ModeEntity:        "input_select.test_mode",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{State: "on"}, nil)
 				m.EXPECT().Get("input_select.test_mode").Return(ga.EntityState{}, fmt.Errorf("entity error"))
 			},
@@ -152,7 +152,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 				ModeEntity:        "input_select.test_mode",
 				StartTimeEntity:   "input_datetime.test_start",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{State: "on"}, nil)
 				m.EXPECT().Get("input_select.test_mode").Return(ga.EntityState{State: "eco"}, nil)
 				m.EXPECT().Get("input_datetime.test_start").Return(ga.EntityState{State: "invalid-date"}, nil)
@@ -169,7 +169,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 				CurrentCostEntity:    "input_number.test_current",
 				SavingsPercentEntity: "input_number.test_savings",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{State: "on"}, nil)
 				m.EXPECT().Get("input_select.test_mode").Return(ga.EntityState{State: "eco"}, nil)
 				m.EXPECT().Get("input_datetime.test_start").Return(ga.EntityState{State: startTime.Format(time.RFC3339)}, nil)
@@ -187,7 +187,7 @@ func TestStateManager_RestoreScheduleState(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockState := mocks.NewMockStateInterface(ctrl)
+			mockState := mocks.NewMockState(ctrl)
 			tt.setupMock(mockState)
 
 			// Create minimal ga.Service for testing
@@ -232,7 +232,7 @@ func TestStateManager_IsScheduleCancelled(t *testing.T) {
 	tests := []struct {
 		name          string
 		config        StateConfig
-		setupMock     func(*mocks.MockStateInterface)
+		setupMock     func(*mocks.MockState)
 		wantCancelled bool
 		wantErr       bool
 	}{
@@ -241,7 +241,7 @@ func TestStateManager_IsScheduleCancelled(t *testing.T) {
 			config: StateConfig{
 				IsScheduledEntity: "input_boolean.test_scheduled",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{State: "on"}, nil)
 			},
 			wantCancelled: false,
@@ -252,7 +252,7 @@ func TestStateManager_IsScheduleCancelled(t *testing.T) {
 			config: StateConfig{
 				IsScheduledEntity: "input_boolean.test_scheduled",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{State: "off"}, nil)
 			},
 			wantCancelled: true,
@@ -263,7 +263,7 @@ func TestStateManager_IsScheduleCancelled(t *testing.T) {
 			config: StateConfig{
 				IsScheduledEntity: "input_boolean.test_scheduled",
 			},
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get("input_boolean.test_scheduled").Return(ga.EntityState{}, fmt.Errorf("entity error"))
 			},
 			wantErr: true,
@@ -275,7 +275,7 @@ func TestStateManager_IsScheduleCancelled(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockState := mocks.NewMockStateInterface(ctrl)
+			mockState := mocks.NewMockState(ctrl)
 			tt.setupMock(mockState)
 
 			sm := NewStateManager(&ga.Service{}, mockState, tt.config)

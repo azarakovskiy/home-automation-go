@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	domainnotifications "home-go/internal/domain/notifications"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/domain/scheduler"
 	"home-go/internal/tech/homeassistant/component"
@@ -17,7 +18,7 @@ import (
 
 // NotificationSender defines the minimal notification surface needed by the dishwasher.
 type NotificationSender interface {
-	Notify(notifications.NotificationEvent) error
+	Notify(domainnotifications.Event) error
 }
 
 // Dishwasher handles all dishwasher-related automation
@@ -281,7 +282,7 @@ func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent fl
 
 	// Format time in a natural way for speech
 	// e.g., "3 PM", "3:30 PM", "noon", "midnight"
-	timeStr := notifications.FormatTimeForSpeech(startTime)
+	timeStr := domainnotifications.FormatTimeForSpeech(startTime)
 
 	message := fmt.Sprintf(
 		"Dishwasher starts at %s, saving %.0f percent on electricity!",
@@ -289,7 +290,7 @@ func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent fl
 		savingsPercent,
 	)
 
-	event := notifications.NotificationEvent{
+	event := domainnotifications.Event{
 		Device:  "dishwasher",
 		Type:    "scheduled",
 		Message: message,
@@ -311,14 +312,14 @@ func (c *Dishwasher) announceImmediateStart(startTime time.Time, savingsPercent 
 		return
 	}
 
-	timeStr := notifications.FormatTimeForSpeech(startTime)
+	timeStr := domainnotifications.FormatTimeForSpeech(startTime)
 
 	message := fmt.Sprintf(
 		"Dishwasher starts now, saving %.0f percent on electricity!",
 		savingsPercent,
 	)
 
-	event := notifications.NotificationEvent{
+	event := domainnotifications.Event{
 		Device:  "dishwasher",
 		Type:    "started",
 		Message: message,
@@ -340,7 +341,7 @@ func (c *Dishwasher) announceCancellation(schedule *PendingSchedule, reason stri
 		return
 	}
 
-	timeStr := notifications.FormatTimeForSpeech(schedule.StartTime)
+	timeStr := domainnotifications.FormatTimeForSpeech(schedule.StartTime)
 	message := fmt.Sprintf("Dishwasher schedule for %s was cancelled", timeStr)
 	if suffix := cancellationReasonToSpeech(reason); suffix != "" {
 		message = fmt.Sprintf("%s %s.", message, suffix)
@@ -348,7 +349,7 @@ func (c *Dishwasher) announceCancellation(schedule *PendingSchedule, reason stri
 		message += "."
 	}
 
-	event := notifications.NotificationEvent{
+	event := domainnotifications.Event{
 		Device:  "dishwasher",
 		Type:    "cancelled",
 		Message: message,

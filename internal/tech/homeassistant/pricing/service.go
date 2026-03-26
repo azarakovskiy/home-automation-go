@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	domainnotifications "home-go/internal/domain/notifications"
 	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/homeassistant/notifications"
@@ -25,7 +26,7 @@ type PriceSlot = domainpricing.PriceSlot
 const minAnnouncementInterval = 2 * time.Hour
 
 type notificationSender interface {
-	Notify(event notifications.NotificationEvent) error
+	Notify(event domainnotifications.Event) error
 }
 
 // Service provides electricity pricing information from Home Assistant
@@ -526,12 +527,12 @@ func (s *Service) maybeAnnounce(slots []PriceSlot) {
 	if hours <= 0 {
 		hours = 1
 	}
-	untilSpeech := notifications.FormatTimeForSpeech(window.End)
+	untilSpeech := domainnotifications.FormatTimeForSpeech(window.End)
 
 	message := fmt.Sprintf("For the next %d hours, electricity prices are %s until %s.",
 		hours, window.Level.HumanString(), untilSpeech)
 
-	if err := s.notificationSender.Notify(notifications.NotificationEvent{
+	if err := s.notificationSender.Notify(domainnotifications.Event{
 		Device:  "pricing",
 		Type:    fmt.Sprintf("price_%s_window", window.Level.String()),
 		Message: message,

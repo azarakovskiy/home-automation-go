@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	domainnotifications "home-go/internal/domain/notifications"
 	ga "saml.dev/gome-assistant"
 )
 
@@ -20,7 +21,7 @@ func TestNewNotificationService(t *testing.T) {
 }
 
 func TestNotificationEvent_Structure(t *testing.T) {
-	event := NotificationEvent{
+	event := domainnotifications.Event{
 		Device:  "dishwasher",
 		Type:    "scheduled",
 		Message: "Dishwasher starts at 15:30, saving 10 percent!",
@@ -47,13 +48,13 @@ func TestNotificationEvent_Structure(t *testing.T) {
 func TestNotificationEvent_Validation(t *testing.T) {
 	tests := []struct {
 		name    string
-		event   NotificationEvent
+		event   domainnotifications.Event
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name: "valid event with all fields",
-			event: NotificationEvent{
+			event: domainnotifications.Event{
 				Device:  "dishwasher",
 				Type:    "scheduled",
 				Message: "Test message",
@@ -65,7 +66,7 @@ func TestNotificationEvent_Validation(t *testing.T) {
 		},
 		{
 			name: "valid event without data",
-			event: NotificationEvent{
+			event: domainnotifications.Event{
 				Device:  "dishwasher",
 				Type:    "started",
 				Message: "Test message",
@@ -74,7 +75,7 @@ func TestNotificationEvent_Validation(t *testing.T) {
 		},
 		{
 			name: "missing device",
-			event: NotificationEvent{
+			event: domainnotifications.Event{
 				Type:    "scheduled",
 				Message: "Test message",
 			},
@@ -83,7 +84,7 @@ func TestNotificationEvent_Validation(t *testing.T) {
 		},
 		{
 			name: "missing type",
-			event: NotificationEvent{
+			event: domainnotifications.Event{
 				Device:  "dishwasher",
 				Message: "Test message",
 			},
@@ -92,7 +93,7 @@ func TestNotificationEvent_Validation(t *testing.T) {
 		},
 		{
 			name: "missing message",
-			event: NotificationEvent{
+			event: domainnotifications.Event{
 				Device: "dishwasher",
 				Type:   "scheduled",
 			},
@@ -228,7 +229,7 @@ func TestFormatTimeForSpeech(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a time with the specified hour and minute
 			testTime := time.Date(2025, 10, 23, tt.hour, tt.minute, 0, 0, time.UTC)
-			result := FormatTimeForSpeech(testTime)
+			result := domainnotifications.FormatTimeForSpeech(testTime)
 
 			if result != tt.expected {
 				t.Errorf("FormatTimeForSpeech(%d:%02d) = %q, want %q",

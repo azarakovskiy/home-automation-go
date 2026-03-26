@@ -6,19 +6,28 @@ import (
 	"testing"
 	"time"
 
+	domainnotifications "home-go/internal/domain/notifications"
 	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/mocks"
-	"home-go/internal/tech/homeassistant/notifications"
 
 	"go.uber.org/mock/gomock"
 	ga "saml.dev/gome-assistant"
 )
 
+type notificationRecorder struct {
+	events []domainnotifications.Event
+}
+
+func (r *notificationRecorder) Notify(event domainnotifications.Event) error {
+	r.events = append(r.events, event)
+	return nil
+}
+
 func TestNewServiceInitializesState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockState := mocks.NewMockStateInterface(ctrl)
+	mockState := mocks.NewMockState(ctrl)
 	service := NewService(nil, mockState)
 
 	if service == nil {
@@ -39,7 +48,7 @@ func TestServiceGetPriceSlotsCachesData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockState := mocks.NewMockStateInterface(ctrl)
+	mockState := mocks.NewMockState(ctrl)
 	mockState.EXPECT().
 		Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
 		Return(samplePriceState(), nil).
@@ -68,7 +77,7 @@ func TestServiceGetPriceSlotsPropagatesErrors(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockState := mocks.NewMockStateInterface(ctrl)
+	mockState := mocks.NewMockState(ctrl)
 	mockState.EXPECT().
 		Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
 		Return(ga.EntityState{}, errors.New("sensor not found"))
@@ -89,7 +98,7 @@ func TestServiceGetPriceSlotsRefreshesStaleCache(t *testing.T) {
 	firstState := samplePriceState()
 	secondState := samplePriceState()
 
-	mockState := mocks.NewMockStateInterface(ctrl)
+	mockState := mocks.NewMockState(ctrl)
 	gomock.InOrder(
 		mockState.EXPECT().
 			Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
@@ -200,15 +209,8 @@ func TestMaybeAnnounceSendsSingleNotification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifier := mocks.NewMockNotificationSenderInterface(ctrl)
-	var events []notifications.NotificationEvent
-	mockNotifier.EXPECT().
-		Notify(gomock.Any()).
-		Do(func(event notifications.NotificationEvent) {
-			events = append(events, event)
-		}).
-		Times(1)
-	service.notificationSender = mockNotifier
+	notifier := &notificationRecorder{}
+	service.notificationSender = notifier
 	service.isNightFn = func() (bool, error) { return false, nil }
 	service.isAwayFn = func() (bool, error) { return false, nil }
 	service.histogram = map[float64]float64{
@@ -225,17 +227,17 @@ func TestMaybeAnnounceSendsSingleNotification(t *testing.T) {
 
 	service.maybeAnnounce(slots)
 
-	if len(events) != 1 {
-		t.Fatalf("expected 1 notification, got %d", len(events))
+	if len(notifier.events) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(notifier.events))
 	}
-	if !strings.Contains(events[0].Message, "cheap") {
-		t.Fatalf("expected message to mention cheap prices, got: %s", events[0].Message)
+	if !strings.Contains(notifier.events[0].Message, "cheap") {
+		t.Fatalf("expected message to mention cheap prices, got: %s", notifier.events[0].Message)
 	}
 
 	// Calling again with same data should not send duplicate
 	service.maybeAnnounce(slots)
-	if len(events) != 1 {
-		t.Fatalf("expected no duplicate notifications, got %d", len(events))
+	if len(notifier.events) != 1 {
+		t.Fatalf("expected no duplicate notifications, got %d", len(notifier.events))
 	}
 }
 
@@ -246,7 +248,7 @@ func TestMaybeAnnounceSkippedWhenNight(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	service.notificationSender = mocks.NewMockNotificationSenderInterface(ctrl)
+	service.notificationSender = &notificationRecorder{}
 	service.isNightFn = func() (bool, error) { return true, nil }
 	service.isAwayFn = func() (bool, error) { return false, nil }
 	service.histogram = map[float64]float64{
@@ -271,15 +273,8 @@ func TestMaybeAnnounceRespectsMinInterval(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNotifier := mocks.NewMockNotificationSenderInterface(ctrl)
-	var events []notifications.NotificationEvent
-	mockNotifier.EXPECT().
-		Notify(gomock.Any()).
-		Do(func(event notifications.NotificationEvent) {
-			events = append(events, event)
-		}).
-		Times(2)
-	service.notificationSender = mockNotifier
+	notifier := &notificationRecorder{}
+	service.notificationSender = notifier
 	service.isNightFn = func() (bool, error) { return false, nil }
 	service.isAwayFn = func() (bool, error) { return false, nil }
 	service.histogram = map[float64]float64{
@@ -299,20 +294,20 @@ func TestMaybeAnnounceRespectsMinInterval(t *testing.T) {
 	}
 
 	service.maybeAnnounce(cheapSlots)
-	if len(events) != 1 {
-		t.Fatalf("expected initial notification, got %d", len(events))
+	if len(notifier.events) != 1 {
+		t.Fatalf("expected initial notification, got %d", len(notifier.events))
 	}
 
 	current = current.Add(time.Hour)
 	service.maybeAnnounce(expensiveSlots)
-	if len(events) != 1 {
-		t.Fatalf("expected throttling within 2h window, got %d notifications", len(events))
+	if len(notifier.events) != 1 {
+		t.Fatalf("expected throttling within 2h window, got %d notifications", len(notifier.events))
 	}
 
 	current = current.Add(time.Hour)
 	service.maybeAnnounce(expensiveSlots)
-	if len(events) != 2 {
-		t.Fatalf("expected notification after 2h window, got %d", len(events))
+	if len(notifier.events) != 2 {
+		t.Fatalf("expected notification after 2h window, got %d", len(notifier.events))
 	}
 }
 

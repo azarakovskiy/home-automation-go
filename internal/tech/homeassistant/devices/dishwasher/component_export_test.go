@@ -3,9 +3,9 @@ package dishwasher
 import (
 	"sync"
 
+	domainnotifications "home-go/internal/domain/notifications"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/domain/scheduler"
-	"home-go/internal/tech/homeassistant/notifications"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -47,7 +47,7 @@ func (d *Dishwasher) HandleScheduleRequestForTest(request scheduler.ScheduleRequ
 // TestNotificationService captures notifications for assertions.
 type TestNotificationService struct {
 	mu     sync.Mutex
-	events []notifications.NotificationEvent
+	events []domainnotifications.Event
 	Err    error
 }
 
@@ -57,7 +57,7 @@ func NewTestNotificationService() *TestNotificationService {
 }
 
 // Notify records the event for later assertions.
-func (t *TestNotificationService) Notify(event notifications.NotificationEvent) error {
+func (t *TestNotificationService) Notify(event domainnotifications.Event) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.events = append(t.events, event)
@@ -65,20 +65,20 @@ func (t *TestNotificationService) Notify(event notifications.NotificationEvent) 
 }
 
 // Events returns a copy of all recorded events.
-func (t *TestNotificationService) Events() []notifications.NotificationEvent {
+func (t *TestNotificationService) Events() []domainnotifications.Event {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	out := make([]notifications.NotificationEvent, len(t.events))
+	out := make([]domainnotifications.Event, len(t.events))
 	copy(out, t.events)
 	return out
 }
 
 // LastEvent returns the last recorded event, if any.
-func (t *TestNotificationService) LastEvent() (notifications.NotificationEvent, bool) {
+func (t *TestNotificationService) LastEvent() (domainnotifications.Event, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if len(t.events) == 0 {
-		return notifications.NotificationEvent{}, false
+		return domainnotifications.Event{}, false
 	}
 	return t.events[len(t.events)-1], true
 }

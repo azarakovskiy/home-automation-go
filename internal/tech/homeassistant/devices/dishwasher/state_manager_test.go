@@ -19,7 +19,7 @@ func TestNewStateManager(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockService := &ga.Service{}
-	mockState := mocks.NewMockStateInterface(ctrl)
+	mockState := mocks.NewMockState(ctrl)
 	mockController := &Controller{service: mockService}
 
 	sm := NewStateManager(mockService, mockState, mockController)
@@ -56,13 +56,13 @@ func TestStateManager_RestoreSchedule(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		setupMocks   func(*mocks.MockStateInterface, *component.StateManager)
+		setupMocks   func(*mocks.MockState, *component.StateManager)
 		wantSchedule *PendingSchedule
 		wantErr      bool
 	}{
 		{
 			name: "successfully restore future schedule",
-			setupMocks: func(mockState *mocks.MockStateInterface, genericMgr *component.StateManager) {
+			setupMocks: func(mockState *mocks.MockState, genericMgr *component.StateManager) {
 				// Mock the generic RestoreScheduleState to return a valid schedule
 				mockState.EXPECT().Get(entities.InputBoolean.KitchenDishwasherIsScheduled).Return(ga.EntityState{State: "on"}, nil)
 				mockState.EXPECT().Get(entities.InputSelect.KitchenDishwasherScheduledMode).Return(ga.EntityState{State: "auto"}, nil)
@@ -86,7 +86,7 @@ func TestStateManager_RestoreSchedule(t *testing.T) {
 		},
 		{
 			name: "no pending schedule",
-			setupMocks: func(mockState *mocks.MockStateInterface, genericMgr *component.StateManager) {
+			setupMocks: func(mockState *mocks.MockState, genericMgr *component.StateManager) {
 				mockState.EXPECT().Get(entities.InputBoolean.KitchenDishwasherIsScheduled).Return(ga.EntityState{State: "off"}, nil)
 			},
 			wantSchedule: nil,
@@ -94,7 +94,7 @@ func TestStateManager_RestoreSchedule(t *testing.T) {
 		},
 		{
 			name: "error getting schedule state",
-			setupMocks: func(mockState *mocks.MockStateInterface, genericMgr *component.StateManager) {
+			setupMocks: func(mockState *mocks.MockState, genericMgr *component.StateManager) {
 				mockState.EXPECT().Get(entities.InputBoolean.KitchenDishwasherIsScheduled).Return(ga.EntityState{}, fmt.Errorf("entity error"))
 			},
 			wantErr: true,
@@ -107,7 +107,7 @@ func TestStateManager_RestoreSchedule(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockService := &ga.Service{}
-			mockState := mocks.NewMockStateInterface(ctrl)
+			mockState := mocks.NewMockState(ctrl)
 			mockController := &Controller{service: mockService}
 
 			sm := NewStateManager(mockService, mockState, mockController)
@@ -150,13 +150,13 @@ func TestStateManager_ClearSchedule(t *testing.T) {
 func TestStateManager_IsScheduleCancelled(t *testing.T) {
 	tests := []struct {
 		name          string
-		setupMock     func(*mocks.MockStateInterface)
+		setupMock     func(*mocks.MockState)
 		wantCancelled bool
 		wantErr       bool
 	}{
 		{
 			name: "schedule is active",
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get(entities.InputBoolean.KitchenDishwasherIsScheduled).Return(ga.EntityState{State: "on"}, nil)
 			},
 			wantCancelled: false,
@@ -164,7 +164,7 @@ func TestStateManager_IsScheduleCancelled(t *testing.T) {
 		},
 		{
 			name: "schedule is cancelled",
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get(entities.InputBoolean.KitchenDishwasherIsScheduled).Return(ga.EntityState{State: "off"}, nil)
 			},
 			wantCancelled: true,
@@ -172,7 +172,7 @@ func TestStateManager_IsScheduleCancelled(t *testing.T) {
 		},
 		{
 			name: "error checking schedule state",
-			setupMock: func(m *mocks.MockStateInterface) {
+			setupMock: func(m *mocks.MockState) {
 				m.EXPECT().Get(entities.InputBoolean.KitchenDishwasherIsScheduled).Return(ga.EntityState{}, fmt.Errorf("entity error"))
 			},
 			wantErr: true,
@@ -185,7 +185,7 @@ func TestStateManager_IsScheduleCancelled(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockService := &ga.Service{}
-			mockState := mocks.NewMockStateInterface(ctrl)
+			mockState := mocks.NewMockState(ctrl)
 			mockController := &Controller{service: mockService}
 
 			sm := NewStateManager(mockService, mockState, mockController)
