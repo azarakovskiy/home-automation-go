@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"home-go/component"
-	"home-go/debug"
-	"home-go/dryrun"
 	"home-go/entities"
+	"home-go/internal/tech/runtime/debug"
+	"home-go/internal/tech/runtime/dryrun"
 	"home-go/optimization/continuous"
 	"home-go/optimization/optimizer"
 	"home-go/pricing"

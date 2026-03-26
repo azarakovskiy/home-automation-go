@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"home-go/debug"
-	"home-go/dryrun"
 	"home-go/entities"
 	domainpricing "home-go/internal/domain/pricing"
+	"home-go/internal/tech/runtime/debug"
+	"home-go/internal/tech/runtime/dryrun"
 	"home-go/notifications"
 
 	ga "saml.dev/gome-assistant"

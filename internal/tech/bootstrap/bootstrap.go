@@ -6,9 +6,9 @@ import (
 	"os"
 
 	"home-go/component"
-	"home-go/debug"
-	"home-go/dryrun"
 	"home-go/internal/config"
+	"home-go/internal/tech/runtime/debug"
+	"home-go/internal/tech/runtime/dryrun"
 	"home-go/optimization/continuous/laptop"
 	"home-go/optimization/scheduled/dishwasher"
 	"home-go/pricing"

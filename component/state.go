@@ -5,8 +5,7 @@ import (
 	"log"
 	"time"
 
-	"home-go/dryrun"
-
+	"home-go/internal/tech/runtime/dryrun"
 	ga "saml.dev/gome-assistant"
 )
 

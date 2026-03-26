@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"home-go/component"
-	"home-go/dryrun"
 	"home-go/entities"
+	"home-go/internal/tech/runtime/dryrun"
 	"home-go/optimization/continuous"
 	"home-go/optimization/optimizer"
 	"home-go/pricing"
