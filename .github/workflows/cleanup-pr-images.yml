@@ -1,0 +1,48 @@
+name: cleanup-pr-images
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: home-go
+
+jobs:
+  cleanup:
+    name: delete-pr-image-versions
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Delete GHCR versions for closed PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          OWNER_TYPE: ${{ github.event.repository.owner.type }}
+          PACKAGE_NAME: ${{ env.IMAGE_NAME }}
+          PR_TAG: pr-${{ github.event.pull_request.number }}
+        run: |
+          if [ "$OWNER_TYPE" = "Organization" ]; then
+            api_root="/orgs/${OWNER}/packages/container/${PACKAGE_NAME}/versions"
+          else
+            api_root="/users/${OWNER}/packages/container/${PACKAGE_NAME}/versions"
+          fi
+
+          version_ids=$(gh api --paginate "$api_root" --jq \
+            ".[] | select(any(.metadata.container.tags[]?; . == \"${PR_TAG}\" or startswith(\"${PR_TAG}-\"))) | .id")
+
+          if [ -z "$version_ids" ]; then
+            echo "No GHCR versions found for ${PR_TAG}"
+            exit 0
+          fi
+
+          while IFS= read -r version_id; do
+            [ -n "$version_id" ] || continue
+            gh api --method DELETE "${api_root}/${version_id}"
+            echo "Deleted GHCR version ${version_id} for ${PR_TAG}"
+          done <<EOF
+          $version_ids
+          EOF
