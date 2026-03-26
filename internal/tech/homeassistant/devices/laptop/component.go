@@ -5,10 +5,10 @@ import (
 	"log"
 	"time"
 
-	"home-go/entities"
 	"home-go/internal/domain/charging"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/tech/homeassistant/component"
+	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/homeassistant/pricing"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"

@@ -3,8 +3,8 @@ package laptop
 import (
 	"time"
 
-	"home-go/entities"
 	"home-go/internal/domain/charging"
+	"home-go/internal/tech/homeassistant/entities"
 )
 
 // Profile optimized for workday uptime while avoiding expensive hours.

@@ -60,4 +60,4 @@ mocks: install-mockgen
 
 generate:
 	@echo "Generating entities from Home Assistant..."
-	@go generate
+	@go generate ./internal/tech/homeassistant

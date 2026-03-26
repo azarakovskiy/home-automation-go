@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"home-go/entities"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/mocks"
 	"home-go/internal/tech/homeassistant/component"
+	"home-go/internal/tech/homeassistant/entities"
 
 	"go.uber.org/mock/gomock"
 	ga "saml.dev/gome-assistant"

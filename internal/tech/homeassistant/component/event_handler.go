@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"home-go/entities"
+	"home-go/internal/tech/homeassistant/entities"
 
 	ga "saml.dev/gome-assistant"
 )

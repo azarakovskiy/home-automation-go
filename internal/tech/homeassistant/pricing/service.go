@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"home-go/entities"
 	domainpricing "home-go/internal/domain/pricing"
+	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/homeassistant/notifications"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"

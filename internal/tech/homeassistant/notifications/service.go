@@ -6,7 +6,7 @@ import (
 	"maps"
 	"time"
 
-	"home-go/entities"
+	"home-go/internal/tech/homeassistant/entities"
 
 	ga "saml.dev/gome-assistant"
 )

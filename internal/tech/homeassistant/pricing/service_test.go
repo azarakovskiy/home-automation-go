@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"home-go/entities"
+	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/mocks"
 	"home-go/internal/tech/homeassistant/notifications"
 

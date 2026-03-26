@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"home-go/entities"
 	"home-go/internal/domain/scheduler"
+	"home-go/internal/tech/homeassistant/entities"
 
 	ga "saml.dev/gome-assistant"
 )
