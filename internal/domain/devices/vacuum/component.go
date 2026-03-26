@@ -9,10 +9,14 @@ import (
 	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
-	"home-go/internal/tech/runtime/dryrun"
 
 	ga "saml.dev/gome-assistant"
 )
+
+type Controller interface {
+	TurnOn() error
+	TurnOff() error
+}
 
 // VacuumCharger manages vacuum charging optimization
 type VacuumCharger struct {
@@ -20,18 +24,20 @@ type VacuumCharger struct {
 
 	priceService *domainpricing.Service
 	optimizer    *optimizer.Optimizer
+	controller   Controller
 	profile      charging.ChargingProfile
 }
 
 // New creates a new vacuum charger component
-func New(base component.Base, state ga.State, priceService *domainpricing.Service) *VacuumCharger {
+func New(base component.Base, state ga.State, priceService *domainpricing.Service, controller Controller, profile charging.ChargingProfile) *VacuumCharger {
 	base.State = state
 
 	return &VacuumCharger{
 		Base:         base,
 		priceService: priceService,
 		optimizer:    optimizer.NewOptimizer(),
-		profile:      Profile,
+		controller:   controller,
+		profile:      profile,
 	}
 }
 
@@ -56,7 +62,7 @@ func (c *VacuumCharger) optimizeCharging(service *ga.Service, state ga.State) {
 	}
 	if awayTooLong {
 		log.Printf("House away >2h, turning off vacuum charger for safety")
-		if err := c.turnOff(); err != nil {
+		if err := c.controller.TurnOff(); err != nil {
 			log.Printf("ERROR: Failed to turn off: %v", err)
 		}
 		return
@@ -90,24 +96,12 @@ func (c *VacuumCharger) optimizeCharging(service *ga.Service, state ga.State) {
 
 	// Apply decision
 	if result.ChargeNow {
-		if err := c.turnOn(); err != nil {
+		if err := c.controller.TurnOn(); err != nil {
 			log.Printf("ERROR: Failed to turn on vacuum charger: %v", err)
 		}
 	} else {
-		if err := c.turnOff(); err != nil {
+		if err := c.controller.TurnOff(); err != nil {
 			log.Printf("ERROR: Failed to turn off vacuum charger: %v", err)
 		}
 	}
-}
-
-func (c *VacuumCharger) turnOn() error {
-	return dryrun.Call("Switch.TurnOn", entities.Switch.LivingRoomVacuumSocket, func() error {
-		return c.Service.Switch.TurnOn(entities.Switch.LivingRoomVacuumSocket)
-	})
-}
-
-func (c *VacuumCharger) turnOff() error {
-	return dryrun.Call("Switch.TurnOff", entities.Switch.LivingRoomVacuumSocket, func() error {
-		return c.Service.Switch.TurnOff(entities.Switch.LivingRoomVacuumSocket)
-	})
 }

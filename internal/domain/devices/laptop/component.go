@@ -11,10 +11,14 @@ import (
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/runtime/debug"
-	"home-go/internal/tech/runtime/dryrun"
 
 	ga "saml.dev/gome-assistant"
 )
+
+type Controller interface {
+	TurnOn() error
+	TurnOff() error
+}
 
 // LaptopCharger manages laptop charging optimization
 type LaptopCharger struct {
@@ -22,18 +26,20 @@ type LaptopCharger struct {
 
 	priceService *domainpricing.Service
 	optimizer    *optimizer.Optimizer
+	controller   Controller
 	profile      charging.ChargingProfile
 }
 
 // New creates a new laptop charger component
-func New(base component.Base, state ga.State, priceService *domainpricing.Service) *LaptopCharger {
+func New(base component.Base, state ga.State, priceService *domainpricing.Service, controller Controller, profile charging.ChargingProfile) *LaptopCharger {
 	base.State = state
 
 	return &LaptopCharger{
 		Base:         base,
 		priceService: priceService,
 		optimizer:    optimizer.NewOptimizer(),
-		profile:      Profile,
+		controller:   controller,
+		profile:      profile,
 	}
 }
 
@@ -58,7 +64,7 @@ func (c *LaptopCharger) optimizeCharging(service *ga.Service, state ga.State) {
 	}
 	if awayTooLong {
 		log.Printf("House away >2h, turning off laptop charger for safety")
-		if err := c.turnOff(); err != nil {
+		if err := c.controller.TurnOff(); err != nil {
 			log.Printf("ERROR: Failed to turn off: %v", err)
 		}
 		return
@@ -110,24 +116,12 @@ func (c *LaptopCharger) optimizeCharging(service *ga.Service, state ga.State) {
 
 	// Apply decision
 	if result.ChargeNow {
-		if err := c.turnOn(); err != nil {
+		if err := c.controller.TurnOn(); err != nil {
 			log.Printf("ERROR: Failed to turn on laptop charger: %v", err)
 		}
 	} else {
-		if err := c.turnOff(); err != nil {
+		if err := c.controller.TurnOff(); err != nil {
 			log.Printf("ERROR: Failed to turn off laptop charger: %v", err)
 		}
 	}
-}
-
-func (c *LaptopCharger) turnOn() error {
-	return dryrun.Call("Switch.TurnOn", entities.Switch.OfficeLaptopSocket, func() error {
-		return c.Service.Switch.TurnOn(entities.Switch.OfficeLaptopSocket)
-	})
-}
-
-func (c *LaptopCharger) turnOff() error {
-	return dryrun.Call("Switch.TurnOff", entities.Switch.OfficeLaptopSocket, func() error {
-		return c.Service.Switch.TurnOff(entities.Switch.OfficeLaptopSocket)
-	})
 }
