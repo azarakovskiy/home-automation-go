@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
-	"home-go/component"
 	"home-go/entities"
 	"home-go/internal/domain/optimizer"
+	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/runtime/dryrun"
 	"home-go/optimization/continuous"
 	"home-go/pricing"

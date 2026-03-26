@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
-	"home-go/component"
 	"home-go/entities"
 	"home-go/internal/domain/optimizer"
+	"home-go/internal/tech/homeassistant/component"
 
 	ga "saml.dev/gome-assistant"
 )

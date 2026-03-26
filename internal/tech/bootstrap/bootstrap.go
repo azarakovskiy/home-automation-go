@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"home-go/component"
 	"home-go/internal/config"
+	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
 	"home-go/optimization/continuous/laptop"
