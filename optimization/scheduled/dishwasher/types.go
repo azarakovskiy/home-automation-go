@@ -1,11 +1,11 @@
 package dishwasher
 
-// Mode represents dishwasher operating modes
-type Mode string
+import domaindishwasher "home-go/internal/domain/devices/dishwasher"
 
-// Dishwasher-specific modes
 const (
-	ModeAuto      Mode = "auto"
-	ModeAutoQuick Mode = "auto_quick" // Auto with VarioDry quick option
-	ModeCancel    Mode = "cancel"     // Virtual mode used to cancel pending schedules
+	ModeAuto      = domaindishwasher.ModeAuto
+	ModeAutoQuick = domaindishwasher.ModeAutoQuick
+	ModeCancel    = domaindishwasher.ModeCancel
 )
+
+type Mode = domaindishwasher.Mode
