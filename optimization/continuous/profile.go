@@ -4,57 +4,16 @@ import (
 	"time"
 
 	"home-go/entities"
-	"home-go/optimization/optimizer"
+	domaincharging "home-go/internal/domain/charging"
 )
 
-// ChargingStrategy defines how the device should be charged
-type ChargingStrategy string
+type ChargingStrategy = domaincharging.ChargingStrategy
+type ChargingProfile = domaincharging.ChargingProfile
 
 const (
-	// StrategyOpportunistic charges only during cheapest slots (vacuum, non-critical devices)
-	StrategyOpportunistic ChargingStrategy = "opportunistic"
-
-	// StrategyCriticalUptime ensures device is charged during critical hours (laptop, work devices)
-	// Pre-charges before critical periods if cheaper, allows drain during expensive critical hours
-	StrategyCriticalUptime ChargingStrategy = "critical_uptime"
+	StrategyOpportunistic  = domaincharging.StrategyOpportunistic
+	StrategyCriticalUptime = domaincharging.StrategyCriticalUptime
 )
-
-// ChargingProfile defines charging behavior for different device types
-type ChargingProfile struct {
-	Name          string
-	Strategy      ChargingStrategy
-	TotalDuration time.Duration // Total charging duration needed per cycle
-	WindowSize    time.Duration // Time window to optimize within
-
-	// For StrategyCriticalUptime only:
-	CriticalHoursStart int           // Hour when device must be available (e.g., 9 for 9 AM)
-	CriticalHoursEnd   int           // Hour when critical period ends (e.g., 19 for 7 PM)
-	DrainRate          time.Duration // How long device can run on full charge (e.g., 8h for full workday)
-	BatteryEntity      string        // Optional: HA entity for battery level (e.g., "sensor.laptop_battery_level")
-	MinBatteryPercent  int           // Minimum battery during critical hours (e.g., 10% - allows aggressive drain)
-
-	Description string
-}
-
-// ToOptimizerRequest converts profile to optimizer request
-func (p ChargingProfile) ToOptimizerRequest() optimizer.CheapestHoursRequest {
-	minBattery := p.MinBatteryPercent
-	if minBattery == 0 {
-		minBattery = 20 // Default to 20% minimum
-	}
-
-	return optimizer.CheapestHoursRequest{
-		DeviceName:         p.Name,
-		TotalDuration:      p.TotalDuration,
-		WindowSize:         p.WindowSize,
-		CriticalHoursStart: p.CriticalHoursStart,
-		CriticalHoursEnd:   p.CriticalHoursEnd,
-		DrainRate:          p.DrainRate,
-		BatteryEntity:      p.BatteryEntity,
-		MinBatteryPercent:  minBattery,
-		// Strategy is auto-detected by optimizer based on CriticalHoursStart/End
-	}
-}
 
 // Predefined charging profiles for active devices
 var (
