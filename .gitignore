@@ -9,6 +9,7 @@ home-go
 
 # Build
 /dist/
+.tools/
 
 # Go
 *.test
