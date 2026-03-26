@@ -3,8 +3,8 @@ package dishwasher
 import (
 	"sync"
 
+	"home-go/internal/domain/optimizer"
 	"home-go/notifications"
-	"home-go/optimization/optimizer"
 	"home-go/optimization/scheduled"
 
 	ga "saml.dev/gome-assistant"

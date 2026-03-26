@@ -3,7 +3,7 @@ package scheduler
 import (
 	"time"
 
-	"home-go/optimization/optimizer"
+	"home-go/internal/domain/optimizer"
 )
 
 const (

@@ -3,7 +3,7 @@ package charging
 import (
 	"time"
 
-	"home-go/optimization/optimizer"
+	"home-go/internal/domain/optimizer"
 )
 
 // ChargingStrategy defines how the device should be charged.

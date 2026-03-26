@@ -7,8 +7,8 @@ import (
 
 	"home-go/component"
 	"home-go/entities"
+	"home-go/internal/domain/optimizer"
 	"home-go/notifications"
-	"home-go/optimization/optimizer"
 	"home-go/optimization/scheduled"
 	"home-go/pricing"
 

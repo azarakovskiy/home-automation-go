@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"home-go/internal/domain/optimizer"
 	dishwasher_mocks "home-go/internal/mocks/optimization/scheduled/dishwasher"
-	"home-go/optimization/optimizer"
 	"home-go/optimization/scheduled"
 	dishwasher "home-go/optimization/scheduled/dishwasher"
 
