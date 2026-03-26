@@ -2,9 +2,9 @@ package dishwasher
 
 import (
 	domaindishwasher "home-go/internal/domain/devices/dishwasher"
-	"home-go/optimization/scheduled"
+	domainscheduler "home-go/internal/domain/scheduler"
 )
 
-func GetProfileForMode(mode Mode) (scheduled.Profile, error) {
+func GetProfileForMode(mode Mode) (domainscheduler.Profile, error) {
 	return domaindishwasher.GetProfileForMode(mode)
 }

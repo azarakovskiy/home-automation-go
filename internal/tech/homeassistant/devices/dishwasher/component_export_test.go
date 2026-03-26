@@ -4,8 +4,8 @@ import (
 	"sync"
 
 	"home-go/internal/domain/optimizer"
+	"home-go/internal/domain/scheduler"
 	"home-go/internal/tech/homeassistant/notifications"
-	"home-go/optimization/scheduled"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -40,7 +40,7 @@ func (d *Dishwasher) HandleScheduleFlagChangeForTest(data ga.EntityData) {
 }
 
 // HandleScheduleRequestForTest triggers the schedule request handler.
-func (d *Dishwasher) HandleScheduleRequestForTest(request scheduled.ScheduleRequest) {
+func (d *Dishwasher) HandleScheduleRequestForTest(request scheduler.ScheduleRequest) {
 	d.handleScheduleRequest(nil, nil, request)
 }
 

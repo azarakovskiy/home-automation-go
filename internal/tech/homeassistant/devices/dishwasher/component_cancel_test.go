@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"home-go/internal/domain/optimizer"
+	"home-go/internal/domain/scheduler"
 	dishwasher_mocks "home-go/internal/mocks/tech/homeassistant/devices/dishwasher"
-	"home-go/optimization/scheduled"
 	dishwasher "home-go/internal/tech/homeassistant/devices/dishwasher"
 
 	"go.uber.org/mock/gomock"
@@ -72,7 +72,7 @@ func TestHandleScheduleRequestCancel(t *testing.T) {
 
 	sm.EXPECT().ClearSchedule().Return(nil)
 
-	d.HandleScheduleRequestForTest(scheduled.ScheduleRequest{
+	d.HandleScheduleRequestForTest(scheduler.ScheduleRequest{
 		Device: "dishwasher",
 		Mode:   string(dishwasher.ModeCancel),
 	})
