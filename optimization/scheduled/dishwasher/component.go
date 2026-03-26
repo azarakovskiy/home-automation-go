@@ -9,8 +9,8 @@ import (
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/notifications"
+	"home-go/internal/tech/homeassistant/pricing"
 	"home-go/optimization/scheduled"
-	"home-go/pricing"
 
 	ga "saml.dev/gome-assistant"
 )
