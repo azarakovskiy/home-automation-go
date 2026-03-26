@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"home-go/internal/domain/optimizer"
-	dishwasher_mocks "home-go/internal/mocks/optimization/scheduled/dishwasher"
+	dishwasher_mocks "home-go/internal/mocks/tech/homeassistant/devices/dishwasher"
 	"home-go/optimization/scheduled"
-	dishwasher "home-go/optimization/scheduled/dishwasher"
+	dishwasher "home-go/internal/tech/homeassistant/devices/dishwasher"
 
 	"go.uber.org/mock/gomock"
 	ga "saml.dev/gome-assistant"

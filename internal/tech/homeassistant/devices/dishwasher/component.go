@@ -43,7 +43,7 @@ type PendingSchedule struct {
 // ScheduleStateStore captures the persistence surface used by the component.
 // It allows us to inject fakes in tests without touching Home Assistant services.
 //
-//go:generate mockgen -destination=../../../internal/mocks/optimization/scheduled/dishwasher/scheduled_state_store.go -package=dishwasher home-go/optimization/scheduled/dishwasher ScheduleStateStore
+//go:generate mockgen -destination=../../../../mocks/tech/homeassistant/devices/dishwasher/scheduled_state_store.go -package=dishwasher home-go/internal/tech/homeassistant/devices/dishwasher ScheduleStateStore
 type ScheduleStateStore interface {
 	SaveSchedule(*PendingSchedule) error
 	RestoreSchedule() (*PendingSchedule, error)
