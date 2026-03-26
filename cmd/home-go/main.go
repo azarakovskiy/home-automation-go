@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"home-go/internal/tech/bootstrap"
+	"home-go/internal/app"
 )
 
 func main() {
-	if err := bootstrap.RunFromEnv(); err != nil {
+	if err := app.RunFromEnv(); err != nil {
 		log.Fatalf("Failed to start app: %v", err)
 	}
 }
