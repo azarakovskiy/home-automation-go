@@ -32,7 +32,7 @@ This document contains coding standards, architectural patterns, and conventions
   - `EntityListeners()` - React to entity state changes  
   - `DailySchedules()` - Run at specific times daily
   - `Intervals()` - Run periodically
-- Each component is registered in `main.go`
+- Each component is registered in `cmd/home-go/main.go`
 
 ### State Persistence
 - Use Home Assistant entities for state that must survive restarts
@@ -199,15 +199,15 @@ This document contains coding standards, architectural patterns, and conventions
 ### Entity Naming
 - Follow HA conventions: `domain.name`, specifically `domain.area_device_variable`, e.g. `input_text.kitchen_dishwasher_cost` means "an input text to store cost for dishwasher in the kitchen"
 - Use underscores: `input_boolean.office_laptop_charge_optimization_auto`
-- Define in `entities/custom_entities.go`. `entities/entities.go` is generated with `go generate`
+- Define in `internal/tech/homeassistant/entities/custom_entities.go`. `internal/tech/homeassistant/entities/entities.go` is generated with `make generate`
 - **NEVER use hardcoded entity strings in code** - always reference entities from `entities` package:
   - Auto-generated entities: `entities.InputBoolean.OfficeLaptopChargeOptimizationAuto`
   - Custom entities (events): `entities.CustomEvents.Notify`
   - Custom entities (sensors from external sources): `entities.CustomSensors.OfficeLaptopWorkInternalBatteryLevel`
-- If you need a new entity, add it to `entities/custom_entities.go` first, then use the constant
-- **IMPORTANT**: `entities/entities.go` is auto-generated from Home Assistant and contains ALL existing entities in the system
+- If you need a new entity, add it to `internal/tech/homeassistant/entities/custom_entities.go` first, then use the constant
+- **IMPORTANT**: `internal/tech/homeassistant/entities/entities.go` is auto-generated from Home Assistant and contains ALL existing entities in the system
   - Only add to `custom_entities.go` if the entity is truly custom (events, helpers not in HA yet)
-  - If entity exists in HA (like companion app sensors), it's already in `entities/entities.go` - use it directly
+  - If entity exists in HA (like companion app sensors), it's already in `internal/tech/homeassistant/entities/entities.go` - use it directly
 
 ### Event-Driven Architecture
 - Components react to events
@@ -249,14 +249,14 @@ This document contains coding standards, architectural patterns, and conventions
 ### Mock Strategy
 - Use `mockgen` with real production interfaces
 - Don't create test-only interfaces
-- Keep mocks in `mocks/` directory
+- Keep mocks in `internal/mocks/`
 - Regenerate with `make mocks`
 
 ## Common Patterns
 
 ### Service Initialization
 ```go
-// In main.go
+// In cmd/home-go/main.go
 base := component.NewBase(component.BaseConfig{
     Service: service,
     State:   app.GetState(),
@@ -330,4 +330,3 @@ func (c *Component) EventListeners() []ga.EventListener {
 ---
 
 **Remember:** These are guidelines based on real development sessions. When in doubt, check existing code for patterns, and ask before implementing major changes.
-
