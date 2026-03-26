@@ -11,7 +11,6 @@ import (
 	"home-go/internal/domain/scheduler"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
-	"home-go/internal/tech/homeassistant/notifications"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -21,13 +20,18 @@ type NotificationSender interface {
 	Notify(domainnotifications.Event) error
 }
 
+type Controller interface {
+	InitializeModeForScheduled(mode string) error
+	StartDishwasher() error
+}
+
 // Dishwasher handles all dishwasher-related automation
 type Dishwasher struct {
 	component.Base // Embed Base to get default implementations and common services
 
 	priceService        *domainpricing.Service
 	notificationService NotificationSender
-	controller          *Controller
+	controller          Controller
 	optimizer           *optimizer.Optimizer
 	stateManager        ScheduleStateStore
 
@@ -44,7 +48,7 @@ type PendingSchedule struct {
 // ScheduleStateStore captures the persistence surface used by the component.
 // It allows us to inject fakes in tests without touching Home Assistant services.
 //
-//go:generate mockgen -destination=../../../../mocks/tech/homeassistant/devices/dishwasher/scheduled_state_store.go -package=dishwasher home-go/internal/tech/homeassistant/devices/dishwasher ScheduleStateStore
+//go:generate mockgen -destination=../../../../mocks/domain/devices/dishwasher/scheduled_state_store.go -package=dishwasher home-go/internal/domain/devices/dishwasher ScheduleStateStore
 type ScheduleStateStore interface {
 	SaveSchedule(*PendingSchedule) error
 	RestoreSchedule() (*PendingSchedule, error)
@@ -52,20 +56,24 @@ type ScheduleStateStore interface {
 	IsScheduleCancelled() (bool, error)
 }
 
-// New creates a new dishwasher component
-func New(base component.Base, state ga.State, priceService *domainpricing.Service) *Dishwasher {
-	// Set the State field in base for IsNightMode() to work
+// New creates a new dishwasher component.
+func New(
+	base component.Base,
+	state ga.State,
+	priceService *domainpricing.Service,
+	controller Controller,
+	stateManager ScheduleStateStore,
+	notificationService NotificationSender,
+) *Dishwasher {
 	base.State = state
-
-	controller := NewController(base.Service)
 
 	dishwasher := &Dishwasher{
 		Base:                base,
 		priceService:        priceService,
-		notificationService: notifications.NewNotificationService(base.Service),
+		notificationService: notificationService,
 		controller:          controller,
 		optimizer:           optimizer.NewOptimizer(),
-		stateManager:        NewStateManager(base.Service, state, controller),
+		stateManager:        stateManager,
 	}
 
 	// Attempt to restore schedule from HASS on startup

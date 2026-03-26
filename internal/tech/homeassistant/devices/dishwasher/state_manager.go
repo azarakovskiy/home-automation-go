@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	domaindishwasher "home-go/internal/domain/devices/dishwasher"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
@@ -41,7 +42,7 @@ func NewStateManager(service *ga.Service, state ga.State, controller *Controller
 }
 
 // SaveSchedule converts dishwasher schedule to generic state and saves it
-func (sm *StateManager) SaveSchedule(schedule *PendingSchedule) error {
+func (sm *StateManager) SaveSchedule(schedule *domaindishwasher.PendingSchedule) error {
 	scheduleState := component.ScheduleState{
 		IsScheduled:    true,
 		Mode:           string(schedule.Mode),
@@ -55,7 +56,7 @@ func (sm *StateManager) SaveSchedule(schedule *PendingSchedule) error {
 }
 
 // RestoreSchedule loads schedule state and converts back to dishwasher-specific format
-func (sm *StateManager) RestoreSchedule() (*PendingSchedule, error) {
+func (sm *StateManager) RestoreSchedule() (*domaindishwasher.PendingSchedule, error) {
 	scheduleState, err := sm.generic.RestoreScheduleState()
 	if err != nil {
 		return nil, err
@@ -97,8 +98,8 @@ func (sm *StateManager) RestoreSchedule() (*PendingSchedule, error) {
 		SavingsPercent: scheduleState.SavingsPercent,
 	}
 
-	return &PendingSchedule{
-		Mode:      Mode(scheduleState.Mode),
+	return &domaindishwasher.PendingSchedule{
+		Mode:      domaindishwasher.Mode(scheduleState.Mode),
 		StartTime: scheduleState.StartTime,
 		Result:    result,
 	}, nil

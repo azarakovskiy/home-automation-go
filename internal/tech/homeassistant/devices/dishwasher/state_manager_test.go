@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	domaindishwasher "home-go/internal/domain/devices/dishwasher"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/mocks"
 	"home-go/internal/tech/homeassistant/component"
@@ -57,7 +58,7 @@ func TestStateManager_RestoreSchedule(t *testing.T) {
 	tests := []struct {
 		name         string
 		setupMocks   func(*mocks.MockState, *component.StateManager)
-		wantSchedule *PendingSchedule
+		wantSchedule *domaindishwasher.PendingSchedule
 		wantErr      bool
 	}{
 		{
@@ -71,8 +72,8 @@ func TestStateManager_RestoreSchedule(t *testing.T) {
 				mockState.EXPECT().Get(entities.InputNumber.KitchenDishwasherCurrentCost).Return(ga.EntityState{State: "0.60"}, nil)
 				mockState.EXPECT().Get(entities.InputNumber.KitchenDishwasherSavingsPercent).Return(ga.EntityState{State: "16.67"}, nil)
 			},
-			wantSchedule: &PendingSchedule{
-				Mode:      ModeAuto,
+			wantSchedule: &domaindishwasher.PendingSchedule{
+				Mode:      domaindishwasher.ModeAuto,
 				StartTime: futureTime,
 				Result: &optimizer.OptimizationResult{
 					StartTime:      futureTime,
