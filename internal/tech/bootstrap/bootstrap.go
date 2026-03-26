@@ -7,10 +7,10 @@ import (
 
 	"home-go/internal/config"
 	"home-go/internal/tech/homeassistant/component"
+	"home-go/internal/tech/homeassistant/devices/laptop"
 	"home-go/internal/tech/homeassistant/pricing"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
-	"home-go/optimization/continuous/laptop"
 	"home-go/optimization/scheduled/dishwasher"
 
 	ga "saml.dev/gome-assistant"
