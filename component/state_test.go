@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"home-go/mocks"
+	"home-go/internal/mocks"
 
 	"go.uber.org/mock/gomock"
 	ga "saml.dev/gome-assistant"

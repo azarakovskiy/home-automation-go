@@ -7,7 +7,7 @@ import (
 
 	"home-go/component"
 	"home-go/entities"
-	"home-go/mocks"
+	"home-go/internal/mocks"
 	"home-go/optimization/optimizer"
 
 	"go.uber.org/mock/gomock"

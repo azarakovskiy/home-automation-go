@@ -54,8 +54,8 @@ lint: install-golangci-lint
 
 mocks: install-mockgen
 	@echo "Generating mocks..."
-	@mkdir -p mocks
-	go generate ./mocks/...
+	@mkdir -p internal/mocks
+	go generate ./internal/mocks/...
 	@echo "Mocks generated successfully!"
 
 generate:

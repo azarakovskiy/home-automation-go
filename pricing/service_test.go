@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"home-go/entities"
-	"home-go/mocks"
+	"home-go/internal/mocks"
 	"home-go/notifications"
 
 	"go.uber.org/mock/gomock"
