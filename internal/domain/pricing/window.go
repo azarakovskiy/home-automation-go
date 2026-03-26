@@ -1,10 +1,6 @@
 package pricing
 
-import (
-	"time"
-
-	domainpricing "home-go/internal/domain/pricing"
-)
+import "time"
 
 const (
 	minAnnouncementDuration   = 2 * time.Hour
@@ -12,19 +8,10 @@ const (
 )
 
 const (
-	priceBucketSize        = domainpricing.PriceBucketSize
-	cheapPercentile        = domainpricing.CheapPercentile
-	expensivePercentile    = domainpricing.ExpensivePercentile
-	minSamplesForHistogram = domainpricing.MinSamplesForHistogram
-)
-
-type PriceLevel = domainpricing.PriceLevel
-
-const (
-	PriceLevelUnknown = domainpricing.PriceLevelUnknown
-	PriceLevelCheap   = domainpricing.PriceLevelCheap
-	PriceLevelAverage = domainpricing.PriceLevelAverage
-	PriceLevelHigh    = domainpricing.PriceLevelHigh
+	priceBucketSize        = PriceBucketSize
+	cheapPercentile        = CheapPercentile
+	expensivePercentile    = ExpensivePercentile
+	minSamplesForHistogram = MinSamplesForHistogram
 )
 
 type priceWindow struct {

@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"home-go/internal/config"
+	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/devices/laptop"
 	"home-go/internal/tech/homeassistant/devices/dishwasher"
-	"home-go/internal/tech/homeassistant/pricing"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
 
@@ -51,7 +51,7 @@ func Run(cfg config.Config) error {
 
 func buildComponents(app *ga.App) []component.Component {
 	base := component.NewBase(app.GetService())
-	priceService := pricing.NewService(app.GetService(), app.GetState())
+	priceService := domainpricing.NewService(app.GetService(), app.GetState())
 
 	dishwasherComp := dishwasher.New(base, app.GetState(), priceService)
 	laptopChargerComp := laptop.New(base, app.GetState(), priceService)

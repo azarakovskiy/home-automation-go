@@ -6,9 +6,9 @@ import (
 
 	"home-go/internal/domain/charging"
 	"home-go/internal/domain/optimizer"
+	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
-	"home-go/internal/tech/homeassistant/pricing"
 	"home-go/internal/tech/runtime/dryrun"
 
 	ga "saml.dev/gome-assistant"
@@ -18,13 +18,13 @@ import (
 type VacuumCharger struct {
 	component.Base
 
-	priceService *pricing.Service
+	priceService *domainpricing.Service
 	optimizer    *optimizer.Optimizer
 	profile      charging.ChargingProfile
 }
 
 // New creates a new vacuum charger component
-func New(base component.Base, state ga.State, priceService *pricing.Service) *VacuumCharger {
+func New(base component.Base, state ga.State, priceService *domainpricing.Service) *VacuumCharger {
 	base.State = state
 
 	return &VacuumCharger{

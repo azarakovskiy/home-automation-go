@@ -7,11 +7,11 @@ import (
 
 	domainnotifications "home-go/internal/domain/notifications"
 	"home-go/internal/domain/optimizer"
+	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/domain/scheduler"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/homeassistant/notifications"
-	"home-go/internal/tech/homeassistant/pricing"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -25,7 +25,7 @@ type NotificationSender interface {
 type Dishwasher struct {
 	component.Base // Embed Base to get default implementations and common services
 
-	priceService        *pricing.Service
+	priceService        *domainpricing.Service
 	notificationService NotificationSender
 	controller          *Controller
 	optimizer           *optimizer.Optimizer
@@ -53,7 +53,7 @@ type ScheduleStateStore interface {
 }
 
 // New creates a new dishwasher component
-func New(base component.Base, state ga.State, priceService *pricing.Service) *Dishwasher {
+func New(base component.Base, state ga.State, priceService *domainpricing.Service) *Dishwasher {
 	// Set the State field in base for IsNightMode() to work
 	base.State = state
 
