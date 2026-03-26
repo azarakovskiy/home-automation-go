@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"home-go/entities"
+	"home-go/internal/domain/charging"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/pricing"
 	"home-go/internal/tech/runtime/dryrun"
-	"home-go/optimization/continuous"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -20,7 +20,7 @@ type VacuumCharger struct {
 
 	priceService *pricing.Service
 	optimizer    *optimizer.Optimizer
-	profile      continuous.ChargingProfile
+	profile      charging.ChargingProfile
 }
 
 // New creates a new vacuum charger component
@@ -31,7 +31,7 @@ func New(base component.Base, state ga.State, priceService *pricing.Service) *Va
 		Base:         base,
 		priceService: priceService,
 		optimizer:    optimizer.NewOptimizer(),
-		profile:      continuous.VacuumProfile,
+		profile:      Profile,
 	}
 }
 
