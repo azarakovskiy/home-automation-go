@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"home-go/pricing"
+	"home-go/internal/domain/pricing"
 )
 
 // MockProfile implements DeviceProfile for testing

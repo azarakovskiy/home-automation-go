@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"home-go/debug"
-	"home-go/pricing"
+	"home-go/internal/domain/pricing"
 )
 
 var nowFunc = time.Now

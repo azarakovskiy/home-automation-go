@@ -13,17 +13,14 @@ import (
 	"home-go/debug"
 	"home-go/dryrun"
 	"home-go/entities"
+	domainpricing "home-go/internal/domain/pricing"
 	"home-go/notifications"
 
 	ga "saml.dev/gome-assistant"
 )
 
-// PriceSlot represents a time slot with its electricity price
-type PriceSlot struct {
-	From  time.Time
-	Till  time.Time
-	Price float64 // Price in EUR/kWh
-}
+// PriceSlot is retained here as a compatibility alias for the domain type.
+type PriceSlot = domainpricing.PriceSlot
 
 const minAnnouncementInterval = 2 * time.Hour
 
@@ -359,7 +356,7 @@ func (s *Service) ingestHistogram(slots []PriceSlot) {
 	defer s.mu.Unlock()
 
 	for _, slot := range slots {
-		bucket := roundPriceToBucket(slot.Price)
+		bucket := domainpricing.RoundPriceToBucket(slot.Price)
 		durationWeight := slot.Till.Sub(slot.From).Hours()
 		if durationWeight <= 0 {
 			durationWeight = 1
@@ -462,20 +459,20 @@ func (s *Service) classifyPrice(price float64) PriceLevel {
 		for _, slot := range slots {
 			prices = append(prices, slot.Price)
 		}
-		cheap, expensive = computeThresholdsFromPrices(prices, cheapPercentile, expensivePercentile)
+		cheap, expensive = domainpricing.ComputeThresholdsFromPrices(prices, cheapPercentile, expensivePercentile)
 	}
 
-	return determinePriceLevel(price, cheap, expensive)
+	return domainpricing.DeterminePriceLevel(price, cheap, expensive)
 }
 
 func thresholdsFromHistogram(hist map[float64]float64) (float64, float64) {
-	buckets, total := buildBucketsFromHistogram(hist)
+	buckets, total := domainpricing.BuildBucketsFromHistogram(hist)
 	if total < minSamplesForHistogram {
 		return 0, 0
 	}
 
-	cheap := percentileFromBuckets(buckets, total, cheapPercentile)
-	expensive := percentileFromBuckets(buckets, total, expensivePercentile)
+	cheap := domainpricing.PercentileFromBuckets(buckets, total, cheapPercentile)
+	expensive := domainpricing.PercentileFromBuckets(buckets, total, expensivePercentile)
 	return cheap, expensive
 }
 
