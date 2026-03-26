@@ -8,7 +8,7 @@ import (
 	"home-go/entities"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/tech/homeassistant/component"
-	"home-go/notifications"
+	"home-go/internal/tech/homeassistant/notifications"
 	"home-go/optimization/scheduled"
 	"home-go/pricing"
 

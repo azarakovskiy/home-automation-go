@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"home-go/internal/domain/optimizer"
-	"home-go/notifications"
+	"home-go/internal/tech/homeassistant/notifications"
 	"home-go/optimization/scheduled"
 
 	ga "saml.dev/gome-assistant"

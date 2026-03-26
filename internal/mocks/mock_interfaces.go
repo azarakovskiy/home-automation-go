@@ -10,7 +10,7 @@
 package mocks
 
 import (
-	notifications "home-go/notifications"
+	notifications "home-go/internal/tech/homeassistant/notifications"
 	reflect "reflect"
 	time "time"
 

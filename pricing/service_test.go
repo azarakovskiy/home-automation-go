@@ -8,7 +8,7 @@ import (
 
 	"home-go/entities"
 	"home-go/internal/mocks"
-	"home-go/notifications"
+	"home-go/internal/tech/homeassistant/notifications"
 
 	"go.uber.org/mock/gomock"
 	ga "saml.dev/gome-assistant"

@@ -3,7 +3,7 @@ package mocks
 import (
 	"time"
 
-	"home-go/notifications"
+	"home-go/internal/tech/homeassistant/notifications"
 
 	ga "saml.dev/gome-assistant"
 )
