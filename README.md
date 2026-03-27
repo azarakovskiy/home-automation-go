@@ -41,14 +41,12 @@ Use [`gen.yaml.example`](/Users/alexey/dev/azarakovskiy/home-automation-go/gen.y
 
 ## Repository Layout
 
-- [`component/`](/Users/alexey/dev/azarakovskiy/home-automation-go/component) - shared component helpers and state persistence
-- [`pricing/`](/Users/alexey/dev/azarakovskiy/home-automation-go/pricing) - electricity price cache and classification
-- [`optimization/optimizer/`](/Users/alexey/dev/azarakovskiy/home-automation-go/optimization/optimizer) - shared optimization engine
-- [`optimization/scheduled/`](/Users/alexey/dev/azarakovskiy/home-automation-go/optimization/scheduled) - scheduled devices such as the dishwasher
-- [`optimization/continuous/`](/Users/alexey/dev/azarakovskiy/home-automation-go/optimization/continuous) - continuous charging devices such as laptop and vacuum chargers
-- [`notifications/`](/Users/alexey/dev/azarakovskiy/home-automation-go/notifications) - custom event notifications for Home Assistant
-- [`entities/`](/Users/alexey/dev/azarakovskiy/home-automation-go/entities) - generated and custom entity constants
-- [`dryrun/`](/Users/alexey/dev/azarakovskiy/home-automation-go/dryrun) - dry-run wrapper for device actions
+- [`cmd/home-go/`](/Users/alexey/dev/azarakovskiy/home-automation-go/cmd/home-go) - application entrypoint
+- [`internal/config/`](/Users/alexey/dev/azarakovskiy/home-automation-go/internal/config) - environment-backed runtime configuration
+- [`internal/domain/`](/Users/alexey/dev/azarakovskiy/home-automation-go/internal/domain) - pure scheduling, charging, pricing, and optimization logic
+- [`internal/tech/homeassistant/`](/Users/alexey/dev/azarakovskiy/home-automation-go/internal/tech/homeassistant) - Home Assistant adapters, entities, and device orchestration
+- [`internal/tech/runtime/`](/Users/alexey/dev/azarakovskiy/home-automation-go/internal/tech/runtime) - runtime wrappers such as debug and dry-run helpers
+- [`internal/mocks/`](/Users/alexey/dev/azarakovskiy/home-automation-go/internal/mocks) - generated mocks
 
 ## CI and Images
 

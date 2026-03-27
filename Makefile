@@ -2,6 +2,7 @@ SHELL := /bin/bash
 
 APP_NAME := home-go
 BIN_DIR := bin
+CMD_DIR := cmd
 TOOLS_DIR := .tools/bin
 TOOLS_BIN := $(abspath $(TOOLS_DIR))
 GOLANGCI_LINT_VERSION := v1.62.2
@@ -19,7 +20,7 @@ all: build
 
 build:
 	@mkdir -p $(BIN_DIR)
-	go build -o $(BIN_DIR)/$(APP_NAME) .
+	go build -o $(BIN_DIR)/$(APP_NAME) ./$(CMD_DIR)/$(APP_NAME)
 
 run: build
 	./$(BIN_DIR)/$(APP_NAME)
@@ -53,10 +54,10 @@ lint: install-golangci-lint
 
 mocks: install-mockgen
 	@echo "Generating mocks..."
-	@mkdir -p mocks
-	go generate ./mocks/...
+	@mkdir -p internal/mocks
+	go generate ./internal/mocks/...
 	@echo "Mocks generated successfully!"
 
 generate:
 	@echo "Generating entities from Home Assistant..."
-	@go generate
+	@go generate ./internal/tech/homeassistant

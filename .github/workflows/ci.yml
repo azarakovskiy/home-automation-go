@@ -40,7 +40,7 @@ jobs:
         run: make test
 
       - name: Check mock drift
-        run: git diff --exit-code -- mocks
+        run: git diff --exit-code -- internal/mocks
 
   docker-pr:
     name: build-and-push-pr-image
