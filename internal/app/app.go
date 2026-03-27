@@ -8,8 +8,8 @@ import (
 	"home-go/internal/config"
 	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/tech/homeassistant/component"
-	"home-go/internal/tech/homeassistant/devices/laptop"
 	"home-go/internal/tech/homeassistant/devices/dishwasher"
+	"home-go/internal/tech/homeassistant/devices/laptop"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
 

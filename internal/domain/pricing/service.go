@@ -456,7 +456,7 @@ func (s *Service) classifyPrice(price float64) PriceLevel {
 		for _, slot := range slots {
 			prices = append(prices, slot.Price)
 		}
-			cheap, expensive = ComputeThresholdsFromPrices(prices, cheapPercentile, expensivePercentile)
+		cheap, expensive = ComputeThresholdsFromPrices(prices, cheapPercentile, expensivePercentile)
 	}
 
 	return DeterminePriceLevel(price, cheap, expensive)

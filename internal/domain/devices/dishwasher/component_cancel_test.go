@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	dishwasher "home-go/internal/domain/devices/dishwasher"
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/domain/scheduler"
 	dishwasher_mocks "home-go/internal/mocks/domain/devices/dishwasher"
-	dishwasher "home-go/internal/domain/devices/dishwasher"
 
 	"go.uber.org/mock/gomock"
 	ga "saml.dev/gome-assistant"

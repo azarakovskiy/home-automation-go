@@ -1,8 +1,8 @@
 package laptop
 
 import (
-	domainpricing "home-go/internal/domain/pricing"
 	domainlaptop "home-go/internal/domain/devices/laptop"
+	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/runtime/dryrun"

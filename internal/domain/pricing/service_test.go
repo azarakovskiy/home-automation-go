@@ -7,8 +7,8 @@ import (
 	"time"
 
 	domainnotifications "home-go/internal/domain/notifications"
-	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/mocks"
+	"home-go/internal/tech/homeassistant/entities"
 
 	"go.uber.org/mock/gomock"
 	ga "saml.dev/gome-assistant"

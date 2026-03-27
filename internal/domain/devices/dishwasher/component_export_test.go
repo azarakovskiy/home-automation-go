@@ -13,7 +13,7 @@ import (
 type testController struct{}
 
 func (testController) InitializeModeForScheduled(string) error { return nil }
-func (testController) StartDishwasher() error                 { return nil }
+func (testController) StartDishwasher() error                  { return nil }
 
 // NewTestDishwasher constructs a minimal component for tests in the external package.
 func NewTestDishwasher(sm ScheduleStateStore) *Dishwasher {

@@ -1,8 +1,8 @@
 package vacuum
 
 import (
-	domainpricing "home-go/internal/domain/pricing"
 	domainvacuum "home-go/internal/domain/devices/vacuum"
+	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/runtime/dryrun"

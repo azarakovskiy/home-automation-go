@@ -5,6 +5,7 @@ import (
 	"time"
 
 	domainnotifications "home-go/internal/domain/notifications"
+
 	ga "saml.dev/gome-assistant"
 )
 
