@@ -1,19 +1,16 @@
-# Entity Generation Configuration
-# Copy this file to gen.yaml and update with your values
-
 # Required: insert the URL of your Home Assistant here
-url: "http://192.168.1.43:8123"
+url: "http://homeassistant.local:8123"
 
 # Insert your auth token here, or set the HA_AUTH_TOKEN env var
-# ha_auth_token: "your_token_here"
+ha_auth_token: ""
 
 # Optional: defaults to zone.home
-home_zone_entity_id: "zone.home"
+# home_zone_entity_id: "zone.home"
 
-# Optional: List of domains to include when generating constants
-# If provided, only these domains will be processed
-#include_domains: ["zone", "binary_sensor", "light"]
+# Optional: list of domains to include when generating constants
+# If provided, only these domains will be processed.
+# include_domains: ["zone", "binary_sensor", "light"]
 
-# Optional: List of domains to exclude when generating constants
-# Only used if include_domains is empty
-#exclude_domains: ["device_tracker", "person"]
+# Optional: list of domains to exclude when generating constants
+# Only used if include_domains is empty.
+# exclude_domains: ["device_tracker", "person"]
