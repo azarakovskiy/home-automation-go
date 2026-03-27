@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"home-go/internal/app"
+	app "home-go/internal"
 )
 
 func main() {
