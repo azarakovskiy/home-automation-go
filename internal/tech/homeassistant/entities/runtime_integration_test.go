@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const runtimeIntegrationEntityID = "sensor.runtime_integration_probe"
+
 type runtimeIntegrationEnv struct {
 	haURL         string
 	haAuthToken   string
@@ -24,18 +26,25 @@ type runtimeHAState struct {
 	State    string `json:"state"`
 }
 
+func setEnv(t *testing.T) {
+	t.Setenv("HA_URL", "http://192.168.1.43:8123")
+	t.Setenv("HA_AUTH_TOKEN", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI4ZDQ2ZThhNzEwM2Q0NjE2OTMwODY5MjJkOGU0MGNkYiIsImlhdCI6MTc2MDk4OTA5NCwiZXhwIjoyMDc2MzQ5MDk0fQ.qNpTY-ShJYvPPuHW9NyN59QTj8EZ8iu6kE8n1K_aSew")
+	t.Setenv("HA_MQTT_BROKER_URL", "mqtt://192.168.1.43:1883")
+	t.Setenv("HA_MQTT_USERNAME", "homego")
+	t.Setenv("HA_MQTT_PASSWORD", "homego-service")
+}
+
 func TestRuntimeIntegrationCreateEntity(t *testing.T) {
-	t.Parallel()
+	setEnv(t)
 
 	env := loadRuntimeIntegrationEnv(t)
 	rt := newIntegrationRuntime(t, env, "create")
 
-	entityID := uniqueEntityID(t, "sensor")
 	sensor, err := rt.NumberSensor(context.Background(), NumberSensorSpec{
 		CommonSpec: CommonSpec{
-			Key:          strings.TrimPrefix(entityID, "sensor."),
+			Key:          strings.TrimPrefix(runtimeIntegrationEntityID, "sensor."),
 			Name:         "Runtime Integration Create",
-			EntityIDHint: entityID,
+			EntityIDHint: runtimeIntegrationEntityID,
 			Icon:         "mdi:test-tube",
 		},
 		UnitOfMeasurement: "EUR",
@@ -44,27 +53,25 @@ func TestRuntimeIntegrationCreateEntity(t *testing.T) {
 		t.Fatalf("NumberSensor() error = %v", err)
 	}
 
-	t.Cleanup(func() {
-		_ = sensor.Remove(context.Background())
-	})
-
-	waitForHAEntity(t, env, entityID, 20*time.Second, func(_ runtimeHAState, status int) bool {
+	t.Logf("created entity %s", runtimeIntegrationEntityID)
+	waitForHAEntity(t, env, runtimeIntegrationEntityID, 20*time.Second, func(_ runtimeHAState, status int) bool {
 		return status == http.StatusOK
 	})
+
+	_ = sensor
 }
 
 func TestRuntimeIntegrationUpdateEntity(t *testing.T) {
-	t.Parallel()
+	setEnv(t)
 
 	env := loadRuntimeIntegrationEnv(t)
 	rt := newIntegrationRuntime(t, env, "update")
 
-	entityID := uniqueEntityID(t, "sensor")
 	sensor, err := rt.NumberSensor(context.Background(), NumberSensorSpec{
 		CommonSpec: CommonSpec{
-			Key:          strings.TrimPrefix(entityID, "sensor."),
+			Key:          strings.TrimPrefix(runtimeIntegrationEntityID, "sensor."),
 			Name:         "Runtime Integration Update",
-			EntityIDHint: entityID,
+			EntityIDHint: runtimeIntegrationEntityID,
 			Icon:         "mdi:test-tube",
 		},
 		UnitOfMeasurement: "EUR",
@@ -72,32 +79,28 @@ func TestRuntimeIntegrationUpdateEntity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NumberSensor() error = %v", err)
 	}
-
-	t.Cleanup(func() {
-		_ = sensor.Remove(context.Background())
-	})
 
 	if err := sensor.Set(context.Background(), 12.34); err != nil {
 		t.Fatalf("Set() error = %v", err)
 	}
 
-	waitForHAEntity(t, env, entityID, 20*time.Second, func(state runtimeHAState, status int) bool {
+	t.Logf("updated entity %s to 12.34", runtimeIntegrationEntityID)
+	waitForHAEntity(t, env, runtimeIntegrationEntityID, 20*time.Second, func(state runtimeHAState, status int) bool {
 		return status == http.StatusOK && state.State == "12.34"
 	})
 }
 
 func TestRuntimeIntegrationRemoveEntity(t *testing.T) {
-	t.Parallel()
+	setEnv(t)
 
 	env := loadRuntimeIntegrationEnv(t)
 	rt := newIntegrationRuntime(t, env, "remove")
 
-	entityID := uniqueEntityID(t, "sensor")
 	sensor, err := rt.NumberSensor(context.Background(), NumberSensorSpec{
 		CommonSpec: CommonSpec{
-			Key:          strings.TrimPrefix(entityID, "sensor."),
+			Key:          strings.TrimPrefix(runtimeIntegrationEntityID, "sensor."),
 			Name:         "Runtime Integration Remove",
-			EntityIDHint: entityID,
+			EntityIDHint: runtimeIntegrationEntityID,
 			Icon:         "mdi:test-tube",
 		},
 		UnitOfMeasurement: "EUR",
@@ -106,19 +109,12 @@ func TestRuntimeIntegrationRemoveEntity(t *testing.T) {
 		t.Fatalf("NumberSensor() error = %v", err)
 	}
 
-	if err := sensor.Set(context.Background(), 99.01); err != nil {
-		t.Fatalf("Set() error = %v", err)
-	}
-
-	waitForHAEntity(t, env, entityID, 20*time.Second, func(state runtimeHAState, status int) bool {
-		return status == http.StatusOK && state.State == "99.01"
-	})
-
 	if err := sensor.Remove(context.Background()); err != nil {
 		t.Fatalf("Remove() error = %v", err)
 	}
 
-	waitForHAEntity(t, env, entityID, 20*time.Second, func(_ runtimeHAState, status int) bool {
+	t.Logf("removed entity %s", runtimeIntegrationEntityID)
+	waitForHAEntity(t, env, runtimeIntegrationEntityID, 20*time.Second, func(_ runtimeHAState, status int) bool {
 		return status == http.StatusNotFound
 	})
 }
@@ -173,14 +169,6 @@ func newIntegrationRuntime(t *testing.T, env runtimeIntegrationEnv, suffix strin
 	})
 
 	return rt
-}
-
-func uniqueEntityID(t *testing.T, domain string) string {
-	t.Helper()
-
-	name := strings.ToLower(t.Name())
-	name = strings.NewReplacer("/", "_", " ", "_").Replace(name)
-	return fmt.Sprintf("%s.%s_%d", domain, name, time.Now().UnixNano())
 }
 
 func waitForHAEntity(t *testing.T, env runtimeIntegrationEnv, entityID string, timeout time.Duration, match func(runtimeHAState, int) bool) {

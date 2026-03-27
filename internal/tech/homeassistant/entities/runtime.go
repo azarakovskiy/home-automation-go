@@ -203,10 +203,10 @@ func (r *Runtime) Remove(ctx context.Context, key string) error {
 		entity = r.buildEntity(key, kind)
 	}
 
-	if err := r.publish(ctx, entity.discoveryTopic, true, nil); err != nil {
+	if err := r.publish(ctx, entity.discoveryTopic, true, []byte("")); err != nil {
 		return fmt.Errorf("remove discovery topic for %s: %w", key, err)
 	}
-	if err := r.publish(ctx, entity.stateTopic, true, nil); err != nil {
+	if err := r.publish(ctx, entity.stateTopic, true, []byte("")); err != nil {
 		return fmt.Errorf("remove state topic for %s: %w", key, err)
 	}
 	if err := r.registry.Remove(key); err != nil {
