@@ -5,19 +5,19 @@ import (
 	"log"
 	"time"
 
-	domainnotifications "home-go/internal/domain/notifications"
 	"home-go/internal/domain/optimizer"
 	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/domain/scheduler"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
+	hanotifications "home-go/internal/tech/homeassistant/notifications"
 
 	ga "saml.dev/gome-assistant"
 )
 
 // NotificationSender defines the minimal notification surface needed by the dishwasher.
 type NotificationSender interface {
-	Notify(domainnotifications.Event) error
+	Notify(event hanotifications.Event) error
 }
 
 type Controller interface {
@@ -290,7 +290,7 @@ func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent fl
 
 	// Format time in a natural way for speech
 	// e.g., "3 PM", "3:30 PM", "noon", "midnight"
-	timeStr := domainnotifications.FormatTimeForSpeech(startTime)
+	timeStr := formatTimeForSpeech(startTime)
 
 	message := fmt.Sprintf(
 		"Dishwasher starts at %s, saving %.0f percent on electricity!",
@@ -298,7 +298,7 @@ func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent fl
 		savingsPercent,
 	)
 
-	event := domainnotifications.Event{
+	event := hanotifications.Event{
 		Device:  "dishwasher",
 		Type:    "scheduled",
 		Message: message,
@@ -320,14 +320,14 @@ func (c *Dishwasher) announceImmediateStart(startTime time.Time, savingsPercent 
 		return
 	}
 
-	timeStr := domainnotifications.FormatTimeForSpeech(startTime)
+	timeStr := formatTimeForSpeech(startTime)
 
 	message := fmt.Sprintf(
 		"Dishwasher starts now, saving %.0f percent on electricity!",
 		savingsPercent,
 	)
 
-	event := domainnotifications.Event{
+	event := hanotifications.Event{
 		Device:  "dishwasher",
 		Type:    "started",
 		Message: message,
@@ -349,7 +349,7 @@ func (c *Dishwasher) announceCancellation(schedule *PendingSchedule, reason stri
 		return
 	}
 
-	timeStr := domainnotifications.FormatTimeForSpeech(schedule.StartTime)
+	timeStr := formatTimeForSpeech(schedule.StartTime)
 	message := fmt.Sprintf("Dishwasher schedule for %s was cancelled", timeStr)
 	if suffix := cancellationReasonToSpeech(reason); suffix != "" {
 		message = fmt.Sprintf("%s %s.", message, suffix)
@@ -357,7 +357,7 @@ func (c *Dishwasher) announceCancellation(schedule *PendingSchedule, reason stri
 		message += "."
 	}
 
-	event := domainnotifications.Event{
+	event := hanotifications.Event{
 		Device:  "dishwasher",
 		Type:    "cancelled",
 		Message: message,
@@ -393,6 +393,36 @@ func (c *Dishwasher) shouldDelayStart(
 
 	// Normal mode: use dynamic threshold
 	return c.optimizer.ShouldDelay(result, maxDelayHours)
+}
+
+func formatTimeForSpeech(t time.Time) string {
+	hour := t.Hour()
+	minute := t.Minute()
+
+	if hour == 0 && minute == 0 {
+		return "midnight"
+	}
+	if hour == 12 && minute == 0 {
+		return "noon"
+	}
+
+	period := "AM"
+	displayHour := hour
+	if hour >= 12 {
+		period = "PM"
+		if hour > 12 {
+			displayHour = hour - 12
+		}
+	}
+	if displayHour == 0 {
+		displayHour = 12
+	}
+
+	if minute == 0 {
+		return fmt.Sprintf("%d %s", displayHour, period)
+	}
+
+	return fmt.Sprintf("%d:%02d %s", displayHour, minute, period)
 }
 
 // handleScheduleFlagChange reacts to Home Assistant helper changes

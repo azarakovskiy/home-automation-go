@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"time"
 
-	domainnotifications "home-go/internal/domain/notifications"
 	"home-go/internal/tech/homeassistant/entities"
 
 	ga "saml.dev/gome-assistant"
 )
+
+// Event describes a user-facing notification delivered via Home Assistant.
+type Event struct {
+	Device  string         `json:"device"`
+	Type    string         `json:"type"`
+	Message string         `json:"message"`
+	Data    map[string]any `json:"data,omitempty"`
+}
 
 // NotificationService provides notifications via custom events
 // These events can be handled by Home Assistant automations
@@ -26,7 +34,7 @@ func NewNotificationService(service *ga.Service) *NotificationService {
 
 // Notify fires a custom event that can be handled by Home Assistant automations
 // Event type will be: custom_notify
-func (n *NotificationService) Notify(event domainnotifications.Event) error {
+func (n *NotificationService) Notify(event Event) error {
 	if event.Device == "" {
 		return fmt.Errorf("device cannot be empty")
 	}
@@ -58,4 +66,35 @@ func (n *NotificationService) Notify(event domainnotifications.Event) error {
 	}
 
 	return nil
+}
+
+// FormatTimeForSpeech converts a time to a natural spoken format.
+func FormatTimeForSpeech(t time.Time) string {
+	hour := t.Hour()
+	minute := t.Minute()
+
+	if hour == 0 && minute == 0 {
+		return "midnight"
+	}
+	if hour == 12 && minute == 0 {
+		return "noon"
+	}
+
+	period := "AM"
+	displayHour := hour
+	if hour >= 12 {
+		period = "PM"
+		if hour > 12 {
+			displayHour = hour - 12
+		}
+	}
+	if displayHour == 0 {
+		displayHour = 12
+	}
+
+	if minute == 0 {
+		return fmt.Sprintf("%d %s", displayHour, period)
+	}
+
+	return fmt.Sprintf("%d:%02d %s", displayHour, minute, period)
 }

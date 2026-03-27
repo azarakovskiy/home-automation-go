@@ -6,19 +6,19 @@ import (
 	"testing"
 	"time"
 
-	domainnotifications "home-go/internal/domain/notifications"
 	"home-go/internal/mocks"
 	"home-go/internal/tech/homeassistant/entities"
+	"home-go/internal/tech/homeassistant/notifications"
 
 	"go.uber.org/mock/gomock"
 	ga "saml.dev/gome-assistant"
 )
 
 type notificationRecorder struct {
-	events []domainnotifications.Event
+	events []notifications.Event
 }
 
-func (r *notificationRecorder) Notify(event domainnotifications.Event) error {
+func (r *notificationRecorder) Notify(event notifications.Event) error {
 	r.events = append(r.events, event)
 	return nil
 }
