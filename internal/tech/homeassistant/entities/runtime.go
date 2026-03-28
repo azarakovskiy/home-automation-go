@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +17,8 @@ const (
 
 	runtimeAvailabilityOnline  = "online"
 	runtimeAvailabilityOffline = "offline"
+	runtimePayloadOn           = "ON"
+	runtimePayloadOff          = "OFF"
 )
 
 type runtimeEntityKind string
@@ -149,10 +152,10 @@ func (r *Runtime) Close() error {
 }
 
 func (r *Runtime) Switch(ctx context.Context, spec SwitchSpec) (*SwitchHandle, error) {
-	if strings.TrimSpace(spec.Name) == "" {
-		return nil, fmt.Errorf("switch name is required")
+	if err := validateCommonSpec(spec.CommonSpec, "switch"); err != nil {
+		return nil, err
 	}
-	entity, err := r.declare(ctx, runtimeKindSwitch, spec.CommonSpec, switchDiscoveryPayload(spec))
+	entity, err := r.declare(ctx, runtimeKindSwitch, spec.CommonSpec, switchDiscoveryPayload())
 	if err != nil {
 		return nil, err
 	}
@@ -160,8 +163,8 @@ func (r *Runtime) Switch(ctx context.Context, spec SwitchSpec) (*SwitchHandle, e
 }
 
 func (r *Runtime) NumberSensor(ctx context.Context, spec NumberSensorSpec) (*NumberSensorHandle, error) {
-	if strings.TrimSpace(spec.Name) == "" {
-		return nil, fmt.Errorf("number sensor name is required")
+	if err := validateCommonSpec(spec.CommonSpec, "number sensor"); err != nil {
+		return nil, err
 	}
 	entity, err := r.declare(ctx, runtimeKindNumberSensor, spec.CommonSpec, numberSensorDiscoveryPayload(spec))
 	if err != nil {
@@ -171,10 +174,10 @@ func (r *Runtime) NumberSensor(ctx context.Context, spec NumberSensorSpec) (*Num
 }
 
 func (r *Runtime) BinarySensor(ctx context.Context, spec BinarySensorSpec) (*BinarySensorHandle, error) {
-	if strings.TrimSpace(spec.Name) == "" {
-		return nil, fmt.Errorf("binary sensor name is required")
+	if err := validateCommonSpec(spec.CommonSpec, "binary sensor"); err != nil {
+		return nil, err
 	}
-	entity, err := r.declare(ctx, runtimeKindBinarySensor, spec.CommonSpec, binarySensorDiscoveryPayload(spec))
+	entity, err := r.declare(ctx, runtimeKindBinarySensor, spec.CommonSpec, binarySensorDiscoveryPayload())
 	if err != nil {
 		return nil, err
 	}
@@ -187,14 +190,9 @@ func (r *Runtime) Remove(ctx context.Context, key string) error {
 		return fmt.Errorf("key is required")
 	}
 
-	r.mu.Lock()
+	r.mu.RLock()
 	entity, ok := r.entities[key]
-	if ok {
-		delete(r.entities, key)
-		delete(r.switchHandlers, key)
-	}
-	r.mu.Unlock()
-
+	r.mu.RUnlock()
 	if !ok {
 		kind, exists := r.registry.Kind(key)
 		if !exists {
@@ -212,6 +210,11 @@ func (r *Runtime) Remove(ctx context.Context, key string) error {
 	if err := r.registry.Remove(key); err != nil {
 		return fmt.Errorf("remove %s from registry: %w", key, err)
 	}
+
+	r.mu.Lock()
+	delete(r.entities, key)
+	delete(r.switchHandlers, key)
+	r.mu.Unlock()
 
 	return nil
 }
@@ -251,11 +254,7 @@ func (h *SwitchHandle) Off(ctx context.Context) error {
 }
 
 func (h *SwitchHandle) Set(ctx context.Context, on bool) error {
-	payload := []byte("OFF")
-	if on {
-		payload = []byte("ON")
-	}
-	return h.runtime.setState(ctx, h.key, payload)
+	return h.runtime.setState(ctx, h.key, boolPayload(on))
 }
 
 func (h *SwitchHandle) OnCommand(fn func(context.Context, bool) error) error {
@@ -299,11 +298,7 @@ func (h *BinarySensorHandle) Off(ctx context.Context) error {
 }
 
 func (h *BinarySensorHandle) Set(ctx context.Context, on bool) error {
-	payload := []byte("OFF")
-	if on {
-		payload = []byte("ON")
-	}
-	return h.runtime.setState(ctx, h.key, payload)
+	return h.runtime.setState(ctx, h.key, boolPayload(on))
 }
 
 func (h *BinarySensorHandle) Remove(ctx context.Context) error {
@@ -399,7 +394,7 @@ func (r *Runtime) handleReconnect(ctx context.Context) error {
 }
 
 func (r *Runtime) handleHomeAssistantStatus(ctx context.Context, _ string, payload []byte) {
-	if string(payload) != runtimeAvailabilityOnline {
+	if strings.TrimSpace(string(payload)) != runtimeAvailabilityOnline {
 		return
 	}
 
@@ -480,12 +475,12 @@ func (c RuntimeConfig) withDefaults() RuntimeConfig {
 	return c
 }
 
-func switchDiscoveryPayload(spec SwitchSpec) map[string]any {
+func switchDiscoveryPayload() map[string]any {
 	return map[string]any{
-		"payload_on":  "ON",
-		"payload_off": "OFF",
-		"state_on":    "ON",
-		"state_off":   "OFF",
+		"payload_on":  runtimePayloadOn,
+		"payload_off": runtimePayloadOff,
+		"state_on":    runtimePayloadOn,
+		"state_off":   runtimePayloadOff,
 	}
 }
 
@@ -497,19 +492,34 @@ func numberSensorDiscoveryPayload(spec NumberSensorSpec) map[string]any {
 	return payload
 }
 
-func binarySensorDiscoveryPayload(spec BinarySensorSpec) map[string]any {
+func binarySensorDiscoveryPayload() map[string]any {
 	return map[string]any{
-		"payload_on":  "ON",
-		"payload_off": "OFF",
+		"payload_on":  runtimePayloadOn,
+		"payload_off": runtimePayloadOff,
 	}
+}
+
+func validateCommonSpec(spec CommonSpec, kindLabel string) error {
+	if strings.TrimSpace(spec.Name) == "" {
+		return fmt.Errorf("%s name is required", kindLabel)
+	}
+	if _, err := validateRuntimeKey(spec.Key); err != nil {
+		return err
+	}
+	return nil
+}
+
+func boolPayload(on bool) []byte {
+	if on {
+		return []byte(runtimePayloadOn)
+	}
+	return []byte(runtimePayloadOff)
 }
 
 func mergeDiscoveryPayload(parts ...map[string]any) map[string]any {
 	merged := make(map[string]any)
 	for _, part := range parts {
-		for key, value := range part {
-			merged[key] = value
-		}
+		maps.Copy(merged, part)
 	}
 	return merged
 }
@@ -541,9 +551,9 @@ func parseRuntimeCommandTopic(appPrefix, topic string) (string, error) {
 
 func parseRuntimeBoolPayload(payload []byte) (bool, error) {
 	switch strings.TrimSpace(strings.ToUpper(string(payload))) {
-	case "ON":
+	case runtimePayloadOn:
 		return true, nil
-	case "OFF":
+	case runtimePayloadOff:
 		return false, nil
 	default:
 		return false, fmt.Errorf("expected ON or OFF, got %q", string(payload))

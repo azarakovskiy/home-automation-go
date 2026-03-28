@@ -30,27 +30,8 @@ DRY_RUN=true make run
 
 - `HA_URL` - Home Assistant URL
 - `HA_AUTH_TOKEN` - Long-lived access token
-- `HA_MQTT_BROKER_URL` - MQTT broker URL used by Home Assistant discovery tests
-- `HA_MQTT_USERNAME` - MQTT username for discovery tests
-- `HA_MQTT_PASSWORD` - MQTT password for discovery tests
 - `DRY_RUN` - Enable dry-run mode
 - `DEBUG` - Enable verbose debug logging
-
-## Runtime MQTT Entity Tests
-
-The `internal/tech/homeassistant/entities` package contains env-gated integration tests
-for runtime MQTT discovery against a real Home Assistant setup.
-
-To run the manual verification tests:
-
-```bash
-go test ./internal/tech/homeassistant/entities -run TestRuntimeIntegrationCreateEntity
-go test ./internal/tech/homeassistant/entities -run TestRuntimeIntegrationUpdateEntity
-go test ./internal/tech/homeassistant/entities -run TestRuntimeIntegrationRemoveEntity
-```
-
-These tests require `HA_URL`, `HA_AUTH_TOKEN`, and `HA_MQTT_BROKER_URL` to be set.
-`HA_MQTT_USERNAME` and `HA_MQTT_PASSWORD` are optional if your broker allows anonymous access.
 
 ## Entity Generation
 

@@ -82,11 +82,11 @@ func TestRuntimeRemoveClearsDiscoveryAndState(t *testing.T) {
 		t.Fatalf("Remove() error = %v", err)
 	}
 
-	if payload := transport.lastPublish("homeassistant/sensor/dishwasher_savings/config").payload; payload != nil {
-		t.Fatalf("discovery payload = %v, want nil", payload)
+	if payload := transport.lastPublish("homeassistant/sensor/dishwasher_savings/config").payload; string(payload) != "" {
+		t.Fatalf("discovery payload = %q, want empty payload", string(payload))
 	}
-	if payload := transport.lastPublish("home-go/entities/dishwasher_savings/state").payload; payload != nil {
-		t.Fatalf("state payload = %v, want nil", payload)
+	if payload := transport.lastPublish("home-go/entities/dishwasher_savings/state").payload; string(payload) != "" {
+		t.Fatalf("state payload = %q, want empty payload", string(payload))
 	}
 }
 
@@ -156,8 +156,8 @@ func TestRuntimeReconcileRemovesStaleEntries(t *testing.T) {
 		t.Fatalf("Reconcile() error = %v", err)
 	}
 
-	if payload := transport.lastPublish("homeassistant/sensor/remove/config").payload; payload != nil {
-		t.Fatalf("removed discovery payload = %v, want nil", payload)
+	if payload := transport.lastPublish("homeassistant/sensor/remove/config").payload; string(payload) != "" {
+		t.Fatalf("removed discovery payload = %q, want empty payload", string(payload))
 	}
 	if _, exists := rt.registry.Kind("remove"); exists {
 		t.Fatalf("registry still contains removed key")
@@ -180,6 +180,111 @@ func TestRuntimeDeclareWithDifferentKindsFails(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("NumberSensor() error = nil, want error")
+	}
+}
+
+func TestRuntimeSwitchRequiresName(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	_, err := rt.Switch(context.Background(), SwitchSpec{
+		CommonSpec: CommonSpec{Key: "feature_x"},
+	})
+	if err == nil {
+		t.Fatal("Switch() error = nil, want error")
+	}
+}
+
+func TestRuntimeNumberSensorRejectsInvalidKey(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	_, err := rt.NumberSensor(context.Background(), NumberSensorSpec{
+		CommonSpec: CommonSpec{Key: "bad/key", Name: "Bad Key"},
+	})
+	if err == nil {
+		t.Fatal("NumberSensor() error = nil, want error")
+	}
+}
+
+func TestRuntimeOnCommandRequiresDeclaredSwitch(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	sw := &SwitchHandle{runtime: rt, key: "feature_x"}
+	if err := sw.OnCommand(func(context.Context, bool) error { return nil }); err == nil {
+		t.Fatal("OnCommand() error = nil, want error")
+	}
+}
+
+func TestRuntimeOnCommandRejectsNilHandler(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	sw, err := rt.Switch(context.Background(), SwitchSpec{
+		CommonSpec: CommonSpec{Key: "feature_x", Name: "Feature X"},
+	})
+	if err != nil {
+		t.Fatalf("Switch() error = %v", err)
+	}
+
+	if err := sw.OnCommand(nil); err == nil {
+		t.Fatal("OnCommand() error = nil, want error")
+	}
+}
+
+func TestRuntimeRemoveUndeclaredWithoutRegistryIsNoop(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	if err := rt.Remove(context.Background(), "missing"); err != nil {
+		t.Fatalf("Remove() error = %v", err)
+	}
+	if got := len(transport.publishes); got != 0 {
+		t.Fatalf("publish topics = %d, want 0", got)
+	}
+}
+
+func TestRuntimeRemoveRegistryBackedEntityWithoutDeclaration(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	registryPath := filepath.Join(t.TempDir(), "registry.json")
+	rt := newTestRuntime(t, transport, registryPath)
+
+	if err := rt.registry.Upsert("orphan", runtimeKindNumberSensor); err != nil {
+		t.Fatalf("Upsert() error = %v", err)
+	}
+
+	if err := rt.Remove(context.Background(), "orphan"); err != nil {
+		t.Fatalf("Remove() error = %v", err)
+	}
+
+	if got := transport.publishCount("homeassistant/sensor/orphan/config"); got != 1 {
+		t.Fatalf("discovery publish count = %d, want 1", got)
+	}
+	if got := transport.publishCount("home-go/entities/orphan/state"); got != 1 {
+		t.Fatalf("state publish count = %d, want 1", got)
+	}
+}
+
+func TestRuntimeRemoveKeepsDeclaredEntityOnPublishFailure(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	sensor, err := rt.NumberSensor(context.Background(), NumberSensorSpec{
+		CommonSpec: CommonSpec{Key: "dishwasher_savings", Name: "Dishwasher Savings"},
+	})
+	if err != nil {
+		t.Fatalf("NumberSensor() error = %v", err)
+	}
+
+	transport.publishErrs["homeassistant/sensor/dishwasher_savings/config"] = context.DeadlineExceeded
+	err = sensor.Remove(context.Background())
+	if err == nil {
+		t.Fatal("Remove() error = nil, want error")
+	}
+
+	if _, ok := rt.entities["dishwasher_savings"]; !ok {
+		t.Fatal("runtime forgot declared entity after failed remove")
 	}
 }
 
@@ -206,6 +311,57 @@ func TestRuntimeReconnectRepublishesKnownState(t *testing.T) {
 	}
 	if got := transport.publishCount("home-go/entities/dishwasher_savings/state"); got < 2 {
 		t.Fatalf("state publish count = %d, want at least 2", got)
+	}
+}
+
+func TestRuntimeReconnectWithoutStateOnlyRepublishesDiscovery(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	_, err := rt.BinarySensor(context.Background(), BinarySensorSpec{
+		CommonSpec: CommonSpec{Key: "dishwasher_scheduled", Name: "Dishwasher Scheduled"},
+	})
+	if err != nil {
+		t.Fatalf("BinarySensor() error = %v", err)
+	}
+
+	if err := rt.handleReconnect(context.Background()); err != nil {
+		t.Fatalf("handleReconnect() error = %v", err)
+	}
+
+	if got := transport.publishCount("homeassistant/binary_sensor/dishwasher_scheduled/config"); got < 2 {
+		t.Fatalf("discovery publish count = %d, want at least 2", got)
+	}
+	if got := transport.publishCount("home-go/entities/dishwasher_scheduled/state"); got != 0 {
+		t.Fatalf("state publish count = %d, want 0", got)
+	}
+}
+
+func TestRuntimeRedeclarePreservesLastStateForReconnect(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	sensor, err := rt.NumberSensor(context.Background(), NumberSensorSpec{
+		CommonSpec: CommonSpec{Key: "dishwasher_savings", Name: "Dishwasher Savings"},
+	})
+	if err != nil {
+		t.Fatalf("NumberSensor() error = %v", err)
+	}
+	if err := sensor.Set(context.Background(), 2.5); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if _, err := rt.NumberSensor(context.Background(), NumberSensorSpec{
+		CommonSpec: CommonSpec{Key: "dishwasher_savings", Name: "Dishwasher Savings"},
+	}); err != nil {
+		t.Fatalf("NumberSensor(redeclare) error = %v", err)
+	}
+
+	if err := rt.handleReconnect(context.Background()); err != nil {
+		t.Fatalf("handleReconnect() error = %v", err)
+	}
+
+	if payload := string(transport.lastPublish("home-go/entities/dishwasher_savings/state").payload); payload != "2.5" {
+		t.Fatalf("last state payload = %q, want 2.5", payload)
 	}
 }
 
@@ -249,6 +405,61 @@ func TestParseRuntimeCommandTopic(t *testing.T) {
 	}
 }
 
+func TestParseRuntimeCommandTopicRejectsInvalidTopic(t *testing.T) {
+	_, err := parseRuntimeCommandTopic("home-go", "home-go/entities/feature_x/state")
+	if err == nil {
+		t.Fatal("parseRuntimeCommandTopic() error = nil, want error")
+	}
+}
+
+func TestHandleCommandIgnoresInvalidPayload(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	sw, err := rt.Switch(context.Background(), SwitchSpec{
+		CommonSpec: CommonSpec{Key: "feature_x", Name: "Feature X"},
+	})
+	if err != nil {
+		t.Fatalf("Switch() error = %v", err)
+	}
+
+	called := make(chan struct{}, 1)
+	if err := sw.OnCommand(func(context.Context, bool) error {
+		called <- struct{}{}
+		return nil
+	}); err != nil {
+		t.Fatalf("OnCommand() error = %v", err)
+	}
+
+	transport.emit("home-go/entities/feature_x/set", []byte("not-valid"))
+
+	select {
+	case <-called:
+		t.Fatal("handler was called for invalid payload")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestHandleHomeAssistantStatusIgnoresOffline(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	_, err := rt.NumberSensor(context.Background(), NumberSensorSpec{
+		CommonSpec: CommonSpec{Key: "dishwasher_savings", Name: "Dishwasher Savings"},
+	})
+	if err != nil {
+		t.Fatalf("NumberSensor() error = %v", err)
+	}
+	before := transport.publishCount("homeassistant/sensor/dishwasher_savings/config")
+
+	rt.handleHomeAssistantStatus(context.Background(), "homeassistant/status", []byte("offline"))
+
+	after := transport.publishCount("homeassistant/sensor/dishwasher_savings/config")
+	if after != before {
+		t.Fatalf("discovery publish count = %d, want %d", after, before)
+	}
+}
+
 func newTestRuntime(t *testing.T, transport runtimeTransport, registryPath string) *Runtime {
 	t.Helper()
 
@@ -284,6 +495,7 @@ type fakeRuntimeTransport struct {
 	onConnect     func(context.Context) error
 	subscriptions map[string]runtimeMessageHandler
 	publishes     map[string][]fakePublish
+	publishErrs   map[string]error
 }
 
 type fakePublish struct {
@@ -295,6 +507,7 @@ func newFakeRuntimeTransport() *fakeRuntimeTransport {
 	return &fakeRuntimeTransport{
 		subscriptions: make(map[string]runtimeMessageHandler),
 		publishes:     make(map[string][]fakePublish),
+		publishErrs:   make(map[string]error),
 	}
 }
 
@@ -312,6 +525,10 @@ func (f *fakeRuntimeTransport) Connect(context.Context) error {
 func (f *fakeRuntimeTransport) Publish(_ context.Context, topic string, retained bool, payload []byte) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	if err := f.publishErrs[topic]; err != nil {
+		return err
+	}
 
 	cloned := append([]byte(nil), payload...)
 	f.publishes[topic] = append(f.publishes[topic], fakePublish{
@@ -394,6 +611,7 @@ func TestParseRuntimeBoolPayload(t *testing.T) {
 	}{
 		{name: "on", payload: []byte("ON"), want: true},
 		{name: "off", payload: []byte("OFF"), want: false},
+		{name: "lowercase on", payload: []byte(" on "), want: true},
 		{name: "invalid", payload: []byte("maybe"), wantErr: true},
 	}
 

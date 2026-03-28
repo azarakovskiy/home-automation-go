@@ -3,6 +3,7 @@ package entities
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -74,9 +75,7 @@ func (r *runtimeRegistry) Snapshot() map[string]runtimeEntityKind {
 	defer r.mu.Unlock()
 
 	out := make(map[string]runtimeEntityKind, len(r.kinds))
-	for key, kind := range r.kinds {
-		out[key] = kind
-	}
+	maps.Copy(out, r.kinds)
 	return out
 }
 

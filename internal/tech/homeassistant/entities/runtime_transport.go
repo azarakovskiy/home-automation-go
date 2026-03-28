@@ -3,6 +3,7 @@ package entities
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +48,7 @@ func newPahoRuntimeTransport(cfg RuntimeConfig, availabilityTopic string) (*paho
 
 	opts.OnConnect = func(client mqtt.Client) {
 		if err := transport.restoreSubscriptions(context.Background()); err != nil {
+			log.Printf("WARNING: failed to restore runtime MQTT subscriptions: %v", err)
 			return
 		}
 
@@ -54,7 +56,9 @@ func newPahoRuntimeTransport(cfg RuntimeConfig, availabilityTopic string) (*paho
 		onConnect := transport.onConnect
 		transport.mu.RUnlock()
 		if onConnect != nil {
-			_ = onConnect(context.Background())
+			if err := onConnect(context.Background()); err != nil {
+				log.Printf("WARNING: runtime MQTT on-connect callback failed: %v", err)
+			}
 		}
 	}
 
@@ -103,9 +107,13 @@ func (t *pahoRuntimeTransport) Close() error {
 
 func (t *pahoRuntimeTransport) restoreSubscriptions(ctx context.Context) error {
 	t.mu.RLock()
-	defer t.mu.RUnlock()
-
+	subscriptions := make(map[string]runtimeMessageHandler, len(t.subscriptions))
 	for topic, handler := range t.subscriptions {
+		subscriptions[topic] = handler
+	}
+	t.mu.RUnlock()
+
+	for topic, handler := range subscriptions {
 		if err := t.subscribe(ctx, topic, handler); err != nil {
 			return err
 		}
