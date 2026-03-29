@@ -1,6 +1,6 @@
-package scheduler
+package dishwasher
 
-// ScheduleRequest is the generic event data for scheduling any device.
+// ScheduleRequest is the dishwasher-specific event payload for delayed start requests.
 type ScheduleRequest struct {
 	Device        string `json:"device"`
 	Mode          string `json:"mode"`
