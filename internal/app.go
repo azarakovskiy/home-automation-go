@@ -10,6 +10,7 @@ import (
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/devices/dishwasher"
 	"home-go/internal/tech/homeassistant/devices/laptop"
+	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
 
@@ -41,7 +42,20 @@ func Run(cfg config.Config) error {
 	}
 	defer app.Cleanup()
 
-	components := buildComponents(app)
+	runtimeEntities, err := entities.NewRuntime(entities.RuntimeConfig{
+		BrokerURL: cfg.MQTT.BrokerURL,
+		Username:  cfg.MQTT.Username,
+		Password:  cfg.MQTT.Password,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create runtime entities: %w", err)
+	}
+	defer runtimeEntities.Close()
+
+	components, err := buildComponents(app, runtimeEntities)
+	if err != nil {
+		return err
+	}
 	registerComponents(app, components)
 	logStartupInfo(components)
 
@@ -49,11 +63,14 @@ func Run(cfg config.Config) error {
 	return nil
 }
 
-func buildComponents(app *ga.App) []component.Component {
+func buildComponents(app *ga.App, runtimeEntities *entities.Runtime) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
 	priceService := pricing.NewService(app.GetService(), app.GetState())
 
-	dishwasherComp := dishwasher.New(base, app.GetState(), priceService)
+	dishwasherComp, err := dishwasher.New(base, app.GetState(), priceService, runtimeEntities)
+	if err != nil {
+		return nil, fmt.Errorf("build dishwasher component: %w", err)
+	}
 	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
 	// vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
 
@@ -62,7 +79,7 @@ func buildComponents(app *ga.App) []component.Component {
 		dishwasherComp,
 		laptopChargerComp,
 		// vacuumChargerComp,
-	}
+	}, nil
 }
 
 func registerComponents(app *ga.App, components []component.Component) {

@@ -61,6 +61,32 @@ func TestRuntimeSetPublishesRetainedState(t *testing.T) {
 	}
 }
 
+func TestRuntimeTextSensorPublishesStringStateAndEntityID(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	sensor, err := rt.TextSensor(context.Background(), TextSensorSpec{
+		CommonSpec: CommonSpec{
+			Key:  "dishwasher_scheduled_mode",
+			Name: "Dishwasher Scheduled Mode",
+		},
+	})
+	if err != nil {
+		t.Fatalf("TextSensor() error = %v", err)
+	}
+	if got := sensor.EntityID(); got != "sensor.dishwasher_scheduled_mode" {
+		t.Fatalf("EntityID() = %q, want %q", got, "sensor.dishwasher_scheduled_mode")
+	}
+	if err := sensor.Set(context.Background(), "auto"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	pub := transport.lastPublish("home-go/entities/dishwasher_scheduled_mode/state")
+	if string(pub.payload) != "auto" {
+		t.Fatalf("state payload = %q, want %q", string(pub.payload), "auto")
+	}
+}
+
 func TestRuntimeRemoveClearsDiscoveryAndState(t *testing.T) {
 	transport := newFakeRuntimeTransport()
 	registryPath := filepath.Join(t.TempDir(), "registry.json")
@@ -250,7 +276,7 @@ func TestRuntimeRemoveRegistryBackedEntityWithoutDeclaration(t *testing.T) {
 	registryPath := filepath.Join(t.TempDir(), "registry.json")
 	rt := newTestRuntime(t, transport, registryPath)
 
-	if err := rt.registry.Upsert("orphan", runtimeKindNumberSensor); err != nil {
+	if err := rt.registry.Upsert("orphan", runtimeKindSensor); err != nil {
 		t.Fatalf("Upsert() error = %v", err)
 	}
 
