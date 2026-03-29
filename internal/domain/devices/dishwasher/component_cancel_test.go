@@ -6,34 +6,25 @@ import (
 	"time"
 
 	dishwasher "home-go/internal/domain/devices/dishwasher"
-	"home-go/internal/domain/optimizer"
-	"home-go/internal/domain/scheduler"
-	dishwasher_mocks "home-go/internal/mocks/domain/devices/dishwasher"
-
-	"go.uber.org/mock/gomock"
 )
 
 func TestCancelPendingScheduleFromDashboardCancelsPendingSchedule(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	sm := dishwasher_mocks.NewMockScheduleStateStore(ctrl)
-	d := dishwasher.NewTestDishwasher(sm)
+	store := &dishwasher.TestScheduleStore{}
+	d := dishwasher.NewTestDishwasher(store)
 	notifier := dishwasher.NewTestNotificationService()
 	d.SetNotificationSenderForTest(notifier)
 	startTime := time.Date(2025, time.October, 10, 21, 0, 0, 0, time.UTC)
 	d.SetPendingScheduleForTest(&dishwasher.PendingSchedule{
-		Mode:      dishwasher.ModeAuto,
 		StartTime: startTime,
-		Result:    &optimizer.OptimizationResult{},
 	})
-
-	sm.EXPECT().ClearSchedule().Return(nil)
 
 	d.CancelPendingScheduleFromDashboardForTest()
 
 	if d.PendingScheduleForTest() != nil {
 		t.Fatal("expected pending schedule to be cleared")
+	}
+	if store.ClearCalls != 1 {
+		t.Fatalf("ClearCalls = %d, want 1", store.ClearCalls)
 	}
 
 	event, ok := notifier.LastEvent()
@@ -55,29 +46,25 @@ func TestCancelPendingScheduleFromDashboardCancelsPendingSchedule(t *testing.T) 
 }
 
 func TestHandleScheduleRequestCancel(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	sm := dishwasher_mocks.NewMockScheduleStateStore(ctrl)
-	d := dishwasher.NewTestDishwasher(sm)
+	store := &dishwasher.TestScheduleStore{}
+	d := dishwasher.NewTestDishwasher(store)
 	notifier := dishwasher.NewTestNotificationService()
 	d.SetNotificationSenderForTest(notifier)
 	startTime := time.Date(2025, time.October, 11, 15, 0, 0, 0, time.UTC)
 	d.SetPendingScheduleForTest(&dishwasher.PendingSchedule{
-		Mode:      dishwasher.ModeAuto,
 		StartTime: startTime,
-		Result:    &optimizer.OptimizationResult{},
 	})
 
-	sm.EXPECT().ClearSchedule().Return(nil)
-
-	d.HandleScheduleRequestForTest(scheduler.ScheduleRequest{
+	d.HandleScheduleRequestForTest(dishwasher.ScheduleRequest{
 		Device: "dishwasher",
 		Mode:   string(dishwasher.ModeCancel),
 	})
 
 	if d.PendingScheduleForTest() != nil {
 		t.Fatal("expected pending schedule to be cleared by cancel request")
+	}
+	if store.ClearCalls != 1 {
+		t.Fatalf("ClearCalls = %d, want 1", store.ClearCalls)
 	}
 
 	event, ok := notifier.LastEvent()
