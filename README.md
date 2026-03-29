@@ -39,6 +39,19 @@ DRY_RUN=true make run
 
 Use [`gen.yaml.example`](/Users/alexey/dev/azarakovskiy/home-automation-go/gen.yaml.example) as the starting point for generator configuration.
 
+## Runtime MQTT Entities
+
+This repo also supports runtime-created Home Assistant entities through the MQTT-based runtime in [`internal/tech/homeassistant/entities/`](/Users/alexey/dev/azarakovskiy/home-automation-go/internal/tech/homeassistant/entities).
+
+Principles:
+
+- Use generated `entities.*` constants for stable Home Assistant entities that already exist in the installation.
+- Use Home Assistant helpers for persisted user-managed state such as schedules, toggles, and settings.
+- Use the runtime MQTT entity component when the Go service is the owner of short-lived or service-defined entities that should appear in Home Assistant dynamically.
+- Runtime entity declaration is init-safe: it publishes discovery metadata, but does not overwrite an existing retained state value.
+- Runtime state changes are explicit via typed setters such as switch on/off or sensor value updates.
+- Cleanup is explicit through runtime removal/reconcile, with a small local registry file used only to remember which runtime entities this service owns across restarts.
+
 ## Repository Layout
 
 - [`cmd/home-go/`](/Users/alexey/dev/azarakovskiy/home-automation-go/cmd/home-go) - application entrypoint

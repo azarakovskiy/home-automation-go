@@ -209,6 +209,16 @@ This document contains coding standards, architectural patterns, and conventions
   - Only add to `custom_entities.go` if the entity is truly custom (events, helpers not in HA yet)
   - If entity exists in HA (like companion app sensors), it's already in `internal/tech/homeassistant/entities/entities.go` - use it directly
 
+### Runtime MQTT Entities
+- The `internal/tech/homeassistant/entities` package also contains a runtime MQTT entity component for service-owned dynamic entities.
+- Prefer generated constants and HA helpers first. Reach for runtime MQTT entities only when the Go service must create and retire HA-visible entities dynamically.
+- Runtime MQTT entities are owned by the Go service, not by Home Assistant configuration.
+- Declaration should be init-safe: publish discovery metadata without overwriting an already retained state.
+- State changes should happen only through explicit typed setters on runtime handles.
+- Removal and restart-safe cleanup go through the runtime registry/reconcile flow; do not reimplement ad hoc retained-topic cleanup in components.
+- Keep the public usage high-level and HA-centric. MQTT topic naming, retained-message handling, and reconnect behavior should stay hidden inside the `entities` package.
+- Never commit secrets or live Home Assistant credentials into runtime entity tests or examples.
+
 ### Event-Driven Architecture
 - Components react to events
 - Use appropriate listener types
