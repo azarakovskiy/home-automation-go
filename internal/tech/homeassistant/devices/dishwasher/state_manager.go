@@ -176,96 +176,119 @@ func (sm *StateManager) SaveSchedule(schedule *domaindishwasher.PendingSchedule)
 
 // RestoreSchedule loads schedule state from runtime entities.
 func (sm *StateManager) RestoreSchedule() (*domaindishwasher.PendingSchedule, error) {
-	isScheduledState, err := sm.getState(sm.scheduled.EntityID())
+	isScheduled, err := sm.loadScheduledFlag()
 	if err != nil {
-		if isMissingEntityError(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("get scheduled flag: %w", err)
+		return nil, err
 	}
-	if isScheduledState.State != "on" {
+	if !isScheduled {
 		return nil, nil
 	}
 
-	modeState, err := sm.getState(sm.mode.EntityID())
+	restored, err := sm.loadRestoredSchedule()
 	if err != nil {
-		return nil, fmt.Errorf("get mode: %w", err)
+		return nil, err
+	}
+	if restored.startTime.Before(time.Now()) {
+		return sm.handleExpiredSchedule()
 	}
 
-	startState, err := sm.getState(sm.startTime.EntityID())
+	return restored.pendingSchedule(), nil
+}
+
+func (sm *StateManager) loadScheduledFlag() (bool, error) {
+	isScheduledState, err := sm.getState(sm.scheduled.EntityID())
 	if err != nil {
-		return nil, fmt.Errorf("get start time: %w", err)
+		if isMissingEntityError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("get scheduled flag: %w", err)
+	}
+
+	return isScheduledState.State == "on", nil
+}
+
+func (sm *StateManager) loadRestoredSchedule() (restoredSchedule, error) {
+	modeState, err := sm.getRequiredState(sm.mode.EntityID(), "mode")
+	if err != nil {
+		return restoredSchedule{}, err
+	}
+
+	startState, err := sm.getRequiredState(sm.startTime.EntityID(), "start time")
+	if err != nil {
+		return restoredSchedule{}, err
 	}
 
 	startTime, err := parseScheduleTime(startState.State)
 	if err != nil {
-		return nil, fmt.Errorf("parse start time: %w", err)
+		return restoredSchedule{}, fmt.Errorf("parse start time: %w", err)
 	}
 
-	estimatedCostState, err := sm.getState(sm.estimatedCost.EntityID())
+	estimatedCost, err := sm.getRequiredFloat(sm.estimatedCost.EntityID(), "estimated cost")
 	if err != nil {
-		return nil, fmt.Errorf("get estimated cost: %w", err)
+		return restoredSchedule{}, err
 	}
 
-	currentCostState, err := sm.getState(sm.currentCost.EntityID())
+	currentCost, err := sm.getRequiredFloat(sm.currentCost.EntityID(), "current cost")
 	if err != nil {
-		return nil, fmt.Errorf("get current cost: %w", err)
+		return restoredSchedule{}, err
 	}
 
-	savingsPercentState, err := sm.getState(sm.savingsPercent.EntityID())
+	savingsPercent, err := sm.getRequiredFloat(sm.savingsPercent.EntityID(), "savings percent")
 	if err != nil {
-		return nil, fmt.Errorf("get savings percent: %w", err)
+		return restoredSchedule{}, err
 	}
 
-	estimatedCost, err := parseFloat(estimatedCostState.State)
-	if err != nil {
-		return nil, fmt.Errorf("parse estimated cost: %w", err)
-	}
-
-	currentCost, err := parseFloat(currentCostState.State)
-	if err != nil {
-		return nil, fmt.Errorf("parse current cost: %w", err)
-	}
-
-	savingsPercent, err := parseFloat(savingsPercentState.State)
-	if err != nil {
-		return nil, fmt.Errorf("parse savings percent: %w", err)
-	}
-
-	if startTime.Before(time.Now()) {
-		log.Printf("Restored schedule has passed its start time, ensuring dishwasher is running")
-
-		socketState, err := sm.state.Get(entities.Switch.KitchenDishwasherSocket)
-		if err != nil {
-			log.Printf("WARNING: Failed to check socket state: %v", err)
-		} else if socketState.State != "on" {
-			log.Printf("Socket is OFF for expired schedule, starting dishwasher now")
-			if err := sm.controller.StartDishwasher(); err != nil {
-				log.Printf("ERROR: Failed to start dishwasher for expired schedule: %v", err)
-			}
-		} else {
-			log.Printf("Socket is already ON, dishwasher likely running")
-		}
-
-		if err := sm.ClearSchedule(); err != nil {
-			return nil, fmt.Errorf("clear expired schedule: %w", err)
-		}
-		return nil, nil
-	}
-
-	result := &optimizer.OptimizationResult{
-		StartTime:      startTime,
-		EstimatedCost:  estimatedCost,
-		CurrentCost:    currentCost,
-		Savings:        currentCost - estimatedCost,
-		SavingsPercent: savingsPercent,
-	}
-
-	return &domaindishwasher.PendingSchedule{
-		Mode:      domaindishwasher.Mode(modeState.State),
-		StartTime: startTime,
-		Result:    result,
+	return restoredSchedule{
+		mode:           domaindishwasher.Mode(modeState.State),
+		startTime:      startTime,
+		estimatedCost:  estimatedCost,
+		currentCost:    currentCost,
+		savingsPercent: savingsPercent,
 	}, nil
+}
+
+func (sm *StateManager) handleExpiredSchedule() (*domaindishwasher.PendingSchedule, error) {
+	log.Printf("Restored schedule has passed its start time, ensuring dishwasher is running")
+
+	socketState, err := sm.state.Get(entities.Switch.KitchenDishwasherSocket)
+	if err != nil {
+		log.Printf("WARNING: Failed to check socket state: %v", err)
+	} else if socketState.State != "on" {
+		log.Printf("Socket is OFF for expired schedule, starting dishwasher now")
+		if err := sm.controller.StartDishwasher(); err != nil {
+			log.Printf("ERROR: Failed to start dishwasher for expired schedule: %v", err)
+		}
+	} else {
+		log.Printf("Socket is already ON, dishwasher likely running")
+	}
+
+	if err := sm.ClearSchedule(); err != nil {
+		return nil, fmt.Errorf("clear expired schedule: %w", err)
+	}
+
+	return nil, nil
+}
+
+func (sm *StateManager) getRequiredState(entityID string, label string) (ga.EntityState, error) {
+	state, err := sm.getState(entityID)
+	if err != nil {
+		return ga.EntityState{}, fmt.Errorf("get %s: %w", label, err)
+	}
+	return state, nil
+}
+
+func (sm *StateManager) getRequiredFloat(entityID string, label string) (float64, error) {
+	state, err := sm.getRequiredState(entityID, label)
+	if err != nil {
+		return 0, err
+	}
+
+	value, err := parseFloat(state.State)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", label, err)
+	}
+
+	return value, nil
 }
 
 // ClearSchedule clears persisted dishwasher schedule state.
@@ -340,6 +363,30 @@ func parseFloat(s string) (float64, error) {
 	var f float64
 	_, err := fmt.Sscanf(s, "%f", &f)
 	return f, err
+}
+
+type restoredSchedule struct {
+	mode           domaindishwasher.Mode
+	startTime      time.Time
+	estimatedCost  float64
+	currentCost    float64
+	savingsPercent float64
+}
+
+func (r restoredSchedule) pendingSchedule() *domaindishwasher.PendingSchedule {
+	result := &optimizer.OptimizationResult{
+		StartTime:      r.startTime,
+		EstimatedCost:  r.estimatedCost,
+		CurrentCost:    r.currentCost,
+		Savings:        r.currentCost - r.estimatedCost,
+		SavingsPercent: r.savingsPercent,
+	}
+
+	return &domaindishwasher.PendingSchedule{
+		Mode:      r.mode,
+		StartTime: r.startTime,
+		Result:    result,
+	}
 }
 
 func isMissingEntityError(err error) bool {
