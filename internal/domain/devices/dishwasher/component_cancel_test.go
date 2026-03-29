@@ -11,10 +11,9 @@ import (
 	dishwasher_mocks "home-go/internal/mocks/domain/devices/dishwasher"
 
 	"go.uber.org/mock/gomock"
-	ga "saml.dev/gome-assistant"
 )
 
-func TestHandleScheduleFlagChangeCancelsPendingSchedule(t *testing.T) {
+func TestCancelPendingScheduleFromDashboardCancelsPendingSchedule(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -31,7 +30,7 @@ func TestHandleScheduleFlagChangeCancelsPendingSchedule(t *testing.T) {
 
 	sm.EXPECT().ClearSchedule().Return(nil)
 
-	d.HandleScheduleFlagChangeForTest(ga.EntityData{FromState: "on", ToState: "off"})
+	d.CancelPendingScheduleFromDashboardForTest()
 
 	if d.PendingScheduleForTest() != nil {
 		t.Fatal("expected pending schedule to be cleared")
@@ -47,7 +46,7 @@ func TestHandleScheduleFlagChangeCancelsPendingSchedule(t *testing.T) {
 	if !strings.Contains(event.Message, "Dishwasher schedule for") {
 		t.Fatalf("unexpected message: %s", event.Message)
 	}
-	if got := event.Data["reason"]; got != "input_boolean turned off" {
+	if got := event.Data["reason"]; got != "dashboard switch turned off" {
 		t.Fatalf("expected reason metadata, got %v", got)
 	}
 	if got := event.Data["start_time_text"]; got != "9 PM" {

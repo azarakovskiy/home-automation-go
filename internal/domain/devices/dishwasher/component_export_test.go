@@ -6,8 +6,6 @@ import (
 	"home-go/internal/domain/optimizer"
 	"home-go/internal/domain/scheduler"
 	hanotifications "home-go/internal/tech/homeassistant/notifications"
-
-	ga "saml.dev/gome-assistant"
 )
 
 type testController struct{}
@@ -39,9 +37,9 @@ func (d *Dishwasher) PendingScheduleForTest() *PendingSchedule {
 	return d.pendingSchedule
 }
 
-// HandleScheduleFlagChangeForTest triggers the flag change handler.
-func (d *Dishwasher) HandleScheduleFlagChangeForTest(data ga.EntityData) {
-	d.handleScheduleFlagChange(nil, nil, data)
+// CancelPendingScheduleFromDashboardForTest triggers the dashboard cancellation path.
+func (d *Dishwasher) CancelPendingScheduleFromDashboardForTest() {
+	d.CancelPendingScheduleFromDashboard()
 }
 
 // HandleScheduleRequestForTest triggers the schedule request handler.

@@ -25,7 +25,7 @@ type runtimeEntityKind string
 
 const (
 	runtimeKindSwitch       runtimeEntityKind = "switch"
-	runtimeKindNumberSensor runtimeEntityKind = "sensor"
+	runtimeKindSensor       runtimeEntityKind = "sensor"
 	runtimeKindBinarySensor runtimeEntityKind = "binary_sensor"
 )
 
@@ -54,6 +54,10 @@ type SwitchSpec struct {
 type NumberSensorSpec struct {
 	CommonSpec
 	UnitOfMeasurement string
+}
+
+type TextSensorSpec struct {
+	CommonSpec
 }
 
 type BinarySensorSpec struct {
@@ -94,6 +98,11 @@ type SwitchHandle struct {
 }
 
 type NumberSensorHandle struct {
+	runtime *Runtime
+	key     string
+}
+
+type TextSensorHandle struct {
 	runtime *Runtime
 	key     string
 }
@@ -166,11 +175,22 @@ func (r *Runtime) NumberSensor(ctx context.Context, spec NumberSensorSpec) (*Num
 	if err := validateCommonSpec(spec.CommonSpec, "number sensor"); err != nil {
 		return nil, err
 	}
-	entity, err := r.declare(ctx, runtimeKindNumberSensor, spec.CommonSpec, numberSensorDiscoveryPayload(spec))
+	entity, err := r.declare(ctx, runtimeKindSensor, spec.CommonSpec, numberSensorDiscoveryPayload(spec))
 	if err != nil {
 		return nil, err
 	}
 	return &NumberSensorHandle{runtime: r, key: entity.key}, nil
+}
+
+func (r *Runtime) TextSensor(ctx context.Context, spec TextSensorSpec) (*TextSensorHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "text sensor"); err != nil {
+		return nil, err
+	}
+	entity, err := r.declare(ctx, runtimeKindSensor, spec.CommonSpec, textSensorDiscoveryPayload())
+	if err != nil {
+		return nil, err
+	}
+	return &TextSensorHandle{runtime: r, key: entity.key}, nil
 }
 
 func (r *Runtime) BinarySensor(ctx context.Context, spec BinarySensorSpec) (*BinarySensorHandle, error) {
@@ -257,6 +277,10 @@ func (h *SwitchHandle) Set(ctx context.Context, on bool) error {
 	return h.runtime.setState(ctx, h.key, boolPayload(on))
 }
 
+func (h *SwitchHandle) EntityID() string {
+	return h.runtime.entityID(h.key)
+}
+
 func (h *SwitchHandle) OnCommand(fn func(context.Context, bool) error) error {
 	if fn == nil {
 		return fmt.Errorf("command handler is required")
@@ -285,7 +309,23 @@ func (h *NumberSensorHandle) Set(ctx context.Context, value float64) error {
 	return h.runtime.setState(ctx, h.key, []byte(payload))
 }
 
+func (h *NumberSensorHandle) EntityID() string {
+	return h.runtime.entityID(h.key)
+}
+
 func (h *NumberSensorHandle) Remove(ctx context.Context) error {
+	return h.runtime.Remove(ctx, h.key)
+}
+
+func (h *TextSensorHandle) Set(ctx context.Context, value string) error {
+	return h.runtime.setState(ctx, h.key, []byte(value))
+}
+
+func (h *TextSensorHandle) EntityID() string {
+	return h.runtime.entityID(h.key)
+}
+
+func (h *TextSensorHandle) Remove(ctx context.Context) error {
 	return h.runtime.Remove(ctx, h.key)
 }
 
@@ -299,6 +339,10 @@ func (h *BinarySensorHandle) Off(ctx context.Context) error {
 
 func (h *BinarySensorHandle) Set(ctx context.Context, on bool) error {
 	return h.runtime.setState(ctx, h.key, boolPayload(on))
+}
+
+func (h *BinarySensorHandle) EntityID() string {
+	return h.runtime.entityID(h.key)
 }
 
 func (h *BinarySensorHandle) Remove(ctx context.Context) error {
@@ -499,6 +543,10 @@ func binarySensorDiscoveryPayload() map[string]any {
 	}
 }
 
+func textSensorDiscoveryPayload() map[string]any {
+	return map[string]any{}
+}
+
 func validateCommonSpec(spec CommonSpec, kindLabel string) error {
 	if strings.TrimSpace(spec.Name) == "" {
 		return fmt.Errorf("%s name is required", kindLabel)
@@ -514,6 +562,21 @@ func boolPayload(on bool) []byte {
 		return []byte(runtimePayloadOn)
 	}
 	return []byte(runtimePayloadOff)
+}
+
+func (r *Runtime) entityID(key string) string {
+	r.mu.RLock()
+	entity, ok := r.entities[key]
+	r.mu.RUnlock()
+	if ok {
+		return fmt.Sprintf("%s.%s", entity.kind, entity.key)
+	}
+
+	kind, ok := r.registry.Kind(key)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s.%s", kind, key)
 }
 
 func mergeDiscoveryPayload(parts ...map[string]any) map[string]any {

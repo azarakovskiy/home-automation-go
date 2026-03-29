@@ -99,14 +99,10 @@ func (c *Dishwasher) EventListeners() []ga.EventListener {
 	return []ga.EventListener{handler.Build()}
 }
 
-// EntityListeners listens for manual cancellations via the scheduled flag helper
+// EntityListeners returns no direct entity listeners for dishwasher.
+// Manual dashboard toggle requests are handled by the HA runtime switch adapter.
 func (c *Dishwasher) EntityListeners() []ga.EntityListener {
-	listener := ga.NewEntityListener().
-		EntityIds(entities.InputBoolean.KitchenDishwasherIsScheduled).
-		Call(c.handleScheduleFlagChange).
-		Build()
-
-	return []ga.EntityListener{listener}
+	return nil
 }
 
 // Intervals returns intervals for this component
@@ -425,19 +421,6 @@ func formatTimeForSpeech(t time.Time) string {
 	return fmt.Sprintf("%d:%02d %s", displayHour, minute, period)
 }
 
-// handleScheduleFlagChange reacts to Home Assistant helper changes
-func (c *Dishwasher) handleScheduleFlagChange(service *ga.Service, state ga.State, data ga.EntityData) {
-	if data.ToState != "off" {
-		return
-	}
-
-	if c.pendingSchedule == nil {
-		return
-	}
-
-	c.cancelPendingSchedule("input_boolean turned off")
-}
-
 // cancelPendingSchedule clears local + HA state for a pending run
 func (c *Dishwasher) cancelPendingSchedule(reason string) {
 	if c.pendingSchedule == nil {
@@ -454,13 +437,23 @@ func (c *Dishwasher) cancelPendingSchedule(reason string) {
 	}
 }
 
+// HasPendingSchedule reports whether a delayed dishwasher start is currently pending.
+func (c *Dishwasher) HasPendingSchedule() bool {
+	return c.pendingSchedule != nil
+}
+
+// CancelPendingScheduleFromDashboard handles a dashboard-triggered schedule cancellation.
+func (c *Dishwasher) CancelPendingScheduleFromDashboard() {
+	c.cancelPendingSchedule("dashboard switch turned off")
+}
+
 func cancellationReasonToSpeech(reason string) string {
 	switch reason {
 	case "cancel event":
 		return "after a cancel request"
 	case "scheduled flag turned off":
 		return "because the schedule toggle was turned off"
-	case "input_boolean turned off":
+	case "dashboard switch turned off":
 		return "manually from Home Assistant"
 	default:
 		if reason == "" {
