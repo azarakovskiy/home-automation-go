@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"home-go/internal/config"
 	"home-go/internal/domain/reminders"
 	"home-go/internal/tech/sqlite"
 )
@@ -15,7 +16,7 @@ var baseTime = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 func openDB(t *testing.T) *reminders.Repository {
 	t.Helper()
-	db, err := sqlite.Open(":memory:", "migrations")
+	db, err := sqlite.Open(config.DatabaseConfig{Path: ":memory:", MigrationsDir: "migrations"})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

@@ -10,19 +10,20 @@ import (
 	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"home-go/internal/config"
 	_ "modernc.org/sqlite"
 )
 
-// Open opens (or creates) a SQLite database at dbPath and applies all pending
-// migrations from migrationsDir before returning.
-func Open(dbPath, migrationsDir string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", dbPath)
+// Open opens (or creates) a SQLite database using the given DatabaseConfig and
+// applies all pending migrations before returning.
+func Open(cfg config.DatabaseConfig) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", cfg.Path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite db: %w", err)
 	}
 	db.SetMaxOpenConns(1) // SQLite is single-writer
 
-	if err := runMigrations(db, migrationsDir); err != nil {
+	if err := runMigrations(db, cfg.MigrationsDir); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
