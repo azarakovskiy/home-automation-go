@@ -24,8 +24,7 @@ type MQTTConfig struct {
 }
 
 type DatabaseConfig struct {
-	Path          string
-	MigrationsDir string
+	Path string
 }
 
 func Load() (Config, error) {
@@ -40,8 +39,7 @@ func Load() (Config, error) {
 			AppPrefix:       "home-go",
 		},
 		Database: DatabaseConfig{
-			Path:          envOrDefault("SQLITE_PATH", "./reminders.db"),
-			MigrationsDir: envOrDefault("SQLITE_MIGRATIONS_DIR", "./internal/tech/sqlite/migrations"),
+			Path: envOrDefault("SQLITE_PATH", "./reminders.db"),
 		},
 		Debug:  isEnabled("DEBUG"),
 		DryRun: isEnabled("DRY_RUN"),
