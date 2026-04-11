@@ -5,7 +5,7 @@ BIN_DIR := bin
 CMD_DIR := cmd
 TOOLS_DIR := .tools/bin
 TOOLS_BIN := $(abspath $(TOOLS_DIR))
-GOLANGCI_LINT_VERSION := v1.62.2
+GOLANGCI_LINT_VERSION := v1.60.1
 MOCKGEN_VERSION := v0.6.0
 PKG := ./...
 
