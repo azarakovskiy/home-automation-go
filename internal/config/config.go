@@ -10,6 +10,7 @@ type Config struct {
 	HAURL       string
 	HAAuthToken string
 	MQTT        MQTTConfig
+	Database    DatabaseConfig
 	Debug       bool
 	DryRun      bool
 }
@@ -20,6 +21,11 @@ type MQTTConfig struct {
 	Password  string
 }
 
+type DatabaseConfig struct {
+	Path          string
+	MigrationsDir string
+}
+
 func Load() (Config, error) {
 	cfg := Config{
 		HAURL:       os.Getenv("HA_URL"),
@@ -28,6 +34,10 @@ func Load() (Config, error) {
 			BrokerURL: os.Getenv("HA_MQTT_BROKER_URL"),
 			Username:  os.Getenv("HA_MQTT_USERNAME"),
 			Password:  os.Getenv("HA_MQTT_PASSWORD"),
+		},
+		Database: DatabaseConfig{
+			Path:          envOrDefault("SQLITE_PATH", "./reminders.db"),
+			MigrationsDir: envOrDefault("SQLITE_MIGRATIONS_DIR", "./internal/tech/sqlite/migrations"),
 		},
 		Debug:  isEnabled("DEBUG"),
 		DryRun: isEnabled("DRY_RUN"),
@@ -48,4 +58,11 @@ func Load() (Config, error) {
 
 func isEnabled(name string) bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv(name)), "true")
+}
+
+func envOrDefault(name, defaultValue string) string {
+	if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+		return v
+	}
+	return defaultValue
 }
