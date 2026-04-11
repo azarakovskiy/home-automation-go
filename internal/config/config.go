@@ -39,7 +39,7 @@ func Load() (Config, error) {
 			AppPrefix:       "home-go",
 		},
 		Database: DatabaseConfig{
-			Path: envOrDefault("SQLITE_PATH", "./reminders.db"),
+			Path: envOrDefault("SQLITE_PATH", "./home_go.db"),
 		},
 		Debug:  isEnabled("DEBUG"),
 		DryRun: isEnabled("DRY_RUN"),
