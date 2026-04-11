@@ -16,7 +16,7 @@ var baseTime = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 func openDB(t *testing.T) *reminders.Repository {
 	t.Helper()
-	db, err := sqlite.Open(config.DatabaseConfig{Path: ":memory:", MigrationsDir: "migrations"})
+	db, err := sqlite.Open(config.DatabaseConfig{Path: ":memory:"})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
