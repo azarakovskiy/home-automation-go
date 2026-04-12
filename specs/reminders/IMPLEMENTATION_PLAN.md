@@ -13,7 +13,7 @@ This file is the execution tracker for the reminders feature. Keep steps atomic,
 
 ## Current Step
 
-`IN PROGRESS`: V1-30 Add `internal/tech/homeassistant/devices/reminders/`.
+`DONE`: V1 Core complete. Slice 8 (V1.1 Quiet Hours) is next.
 
 ## Delivery Slices
 
@@ -112,52 +112,51 @@ The specification describes the final feature. Versioning and incremental delive
 
 ## Slice 4: Home Assistant Adapter
 
-- `PENDING` V1-30 Add `internal/tech/homeassistant/devices/reminders/`.
-- `PENDING` V1-31 Define event DTOs for create, ack, and delete requests.
-- `PENDING` V1-32 Add reminder custom event constants in `internal/tech/homeassistant/entities/custom_entities.go`.
-- `PENDING` V1-33 Implement a reminders component constructor with required dependencies:
+- `DONE` V1-30 Add `internal/tech/homeassistant/devices/reminders/`.
+- `DONE` V1-31 Define event DTOs for create, ack, and delete requests (`events.go`).
+- `DONE` V1-32 Add reminder custom event constants in `internal/tech/homeassistant/entities/custom_entities.go`.
+- `DONE` V1-33 Implement a reminders component constructor with required dependencies:
   - base component
   - runtime MQTT entity service
   - reminder manager
-  - state access if needed
-- `PENDING` V1-34 Register custom event listeners using the existing typed event handler pattern.
-- `PENDING` V1-35 Register one periodic tick interval.
-- `PENDING` V1-36 Map create event payloads into the domain create command.
-- `PENDING` V1-37 Map ack event payloads into per-user acknowledgement commands.
-- `PENDING` V1-38 Map delete event payloads into delete commands.
+- `DONE` V1-34 Register custom event listeners using the existing typed event handler pattern.
+- `DONE` V1-35 Register one periodic tick interval (1-minute).
+- `DONE` V1-36 Map create event payloads into the domain create command.
+- `DONE` V1-37 Map ack event payloads into per-user acknowledgement commands.
+- `DONE` V1-38 Map delete event payloads into delete commands.
 
 ## Slice 5: MQTT Runtime Projection
 
-- `PENDING` V1-39 Define stable runtime MQTT key conventions:
-  - include reminder ID
-  - include user ID where projection is user-specific
-- `PENDING` V1-40 Implement projection creation for actionable reminders.
-- `PENDING` V1-41 Implement projection refresh when reminder state changes.
-- `PENDING` V1-42 Implement runtime MQTT acknowledgement controls.
-- `PENDING` V1-43 Wire MQTT command handlers to per-user acknowledgement.
-- `PENDING` V1-44 Implement projection removal for:
+- `DONE` V1-39 Define stable runtime MQTT key conventions:
+  - key format: `reminder_{reminderID}_{userID}` (both parts slash-sanitized)
+  - per-user Switch entity for each target
+- `DONE` V1-40 Implement projection creation for actionable reminders (`showProjection`).
+- `DONE` V1-41 Implement projection refresh when reminder state changes (re-calling `showProjection` is idempotent; `runtime.declare` is upsert and `OnCommand` overwrites the handler).
+- `DONE` V1-42 Implement runtime MQTT acknowledgement controls (per-user Switch entity set ON when active).
+- `DONE` V1-43 Wire MQTT command handlers to per-user acknowledgement (Switch OFF command → `Manager.Ack`).
+- `DONE` V1-44 Implement projection removal for:
   - fully acknowledged reminders (all_targets_ack: all acked; any_target_ack: first ack)
   - deleted reminders
   - expired reminders
-- `PENDING` V1-45 Implement startup restore of active projections.
-- `PENDING` V1-46 Call runtime reconcile so stale retained reminder entities are removed.
-- `PENDING` V1-47 Add adapter tests for MQTT entity creation, ack command handling, cleanup, and restore.
+- `DONE` V1-45 Implement startup restore of active projections (`Component.Restore`).
+- `DONE` V1-46 Call runtime reconcile so stale retained reminder entities are removed (called inside `Restore`).
+- `DONE` V1-47 Add adapter tests for MQTT entity creation, ack command handling, cleanup, and restore.
 
 ## Slice 6: App Wiring
 
 - `DONE` V1-48 Add `DatabaseConfig` to `internal/config/config.go` with `Path` field (`SQLITE_PATH` env var, default `./reminders.db`). Runtime registry path not needed.
-- `PENDING` V1-49 Initialize SQLite reminders repository during app startup.
-- `PENDING` V1-50 Initialize the reminders manager.
-- `PENDING` V1-51 Initialize and register the Home Assistant reminders component in `internal/app.go`.
-- `PENDING` V1-52 Verify runtime entity restore path is invoked on startup.
+- `DONE` V1-49 Initialize SQLite reminders repository during app startup.
+- `DONE` V1-50 Initialize the reminders manager.
+- `DONE` V1-51 Initialize and register the Home Assistant reminders component in `internal/app.go`.
+- `DONE` V1-52 Verify runtime entity restore path is invoked on startup.
 
 ## Slice 7: V1 Hardening
 
-- `PENDING` V1-53 Run and fix unit tests.
-- `PENDING` V1-54 Run `make test`.
-- `PENDING` V1-55 Review for leaked Home Assistant-specific concerns inside the domain.
-- `PENDING` V1-56 Review for missing error wrapping and contextual logs.
-- `PENDING` V1-57 Review that no reminder state is persisted in Home Assistant helpers.
+- `DONE` V1-53 Run and fix unit tests.
+- `DONE` V1-54 Run `make test`.
+- `DONE` V1-55 Review for leaked Home Assistant-specific concerns inside the domain.
+- `DONE` V1-56 Review for missing error wrapping and contextual logs. Fixed: `hydrateList` now wraps `loadAggregate` errors with reminder ID context.
+- `DONE` V1-57 Review that no reminder state is persisted in Home Assistant helpers.
 
 ## Slice 8: V1.1 Quiet Hours
 

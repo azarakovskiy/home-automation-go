@@ -172,7 +172,7 @@ func (r *RemindersRepo) hydrateList(ctx context.Context, rows []sqlc.Reminder) (
 	for _, row := range rows {
 		rem, err := r.loadAggregate(ctx, row)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("hydrate reminder %s: %w", row.ID, err)
 		}
 		out = append(out, rem)
 	}
