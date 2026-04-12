@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	managerNow  = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
-	managerCtx  = context.Background()
+	managerNow = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	managerCtx = context.Background()
 )
 
 func fixedNow(t time.Time) func() time.Time {
@@ -111,12 +111,12 @@ func TestManager_Delete_ReturnsRemoveAction(t *testing.T) {
 	mgr, repo := newTestManager(t)
 
 	existing := reminders.Reminder{
-		ID:      "rem-2",
-		Targets: []string{"alice"},
-		Acks:    []reminders.UserAck{},
+		ID:       "rem-2",
+		Targets:  []string{"alice"},
+		Acks:     []reminders.UserAck{},
 		Schedule: onceSched(managerNow),
-		Policy:  defaultPolicy(),
-		State:   reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+		Policy:   defaultPolicy(),
+		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
 	}
 
 	repo.EXPECT().GetByID(managerCtx, "rem-2").Return(existing, nil)
@@ -154,12 +154,12 @@ func TestManager_Ack_SingleUser_CompletesAndRemoves(t *testing.T) {
 	mgr, repo := newTestManager(t)
 
 	existing := reminders.Reminder{
-		ID:      "rem-3",
-		Targets: []string{"alice"},
-		Acks:    []reminders.UserAck{},
+		ID:       "rem-3",
+		Targets:  []string{"alice"},
+		Acks:     []reminders.UserAck{},
 		Schedule: onceSched(managerNow.Add(-time.Hour)),
-		Policy:  ackPolicy(),
-		State:   reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+		Policy:   ackPolicy(),
+		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
 	}
 
 	repo.EXPECT().GetByID(managerCtx, "rem-3").Return(existing, nil)
@@ -184,12 +184,12 @@ func TestManager_Ack_MultiUser_PartialAck_AllTargetsPolicy(t *testing.T) {
 	mgr, repo := newTestManager(t)
 
 	existing := reminders.Reminder{
-		ID:      "rem-4",
-		Targets: []string{"alice", "bob"},
-		Acks:    []reminders.UserAck{},
+		ID:       "rem-4",
+		Targets:  []string{"alice", "bob"},
+		Acks:     []reminders.UserAck{},
 		Schedule: onceSched(managerNow.Add(-time.Hour)),
-		Policy:  ackPolicy(), // all_targets_ack
-		State:   reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+		Policy:   ackPolicy(), // all_targets_ack
+		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
 	}
 
 	repo.EXPECT().GetByID(managerCtx, "rem-4").Return(existing, nil)
@@ -215,12 +215,12 @@ func TestManager_Ack_MultiUser_AllAck_AllTargetsPolicy(t *testing.T) {
 
 	aliceAckedAt := managerNow.Add(-5 * time.Minute)
 	existing := reminders.Reminder{
-		ID:      "rem-5",
-		Targets: []string{"alice", "bob"},
-		Acks:    []reminders.UserAck{{UserID: "alice", AckedAt: aliceAckedAt}},
+		ID:       "rem-5",
+		Targets:  []string{"alice", "bob"},
+		Acks:     []reminders.UserAck{{UserID: "alice", AckedAt: aliceAckedAt}},
 		Schedule: onceSched(managerNow.Add(-time.Hour)),
-		Policy:  ackPolicy(), // all_targets_ack
-		State:   reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+		Policy:   ackPolicy(), // all_targets_ack
+		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
 	}
 
 	repo.EXPECT().GetByID(managerCtx, "rem-5").Return(existing, nil)
@@ -245,12 +245,12 @@ func TestManager_Ack_AnyTargetPolicy_CompletesOnFirstAck(t *testing.T) {
 	mgr, repo := newTestManager(t)
 
 	existing := reminders.Reminder{
-		ID:      "rem-6",
-		Targets: []string{"alice", "bob"},
-		Acks:    []reminders.UserAck{},
+		ID:       "rem-6",
+		Targets:  []string{"alice", "bob"},
+		Acks:     []reminders.UserAck{},
 		Schedule: onceSched(managerNow.Add(-time.Hour)),
-		Policy:  anyAckPolicy(), // any_target_ack
-		State:   reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+		Policy:   anyAckPolicy(), // any_target_ack
+		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
 	}
 
 	repo.EXPECT().GetByID(managerCtx, "rem-6").Return(existing, nil)
@@ -298,12 +298,12 @@ func TestManager_Tick_OnceDueNoAck_CompletesAndRemoves(t *testing.T) {
 	mgr, repo := newTestManager(t)
 
 	due := reminders.Reminder{
-		ID:      "rem-7",
-		Targets: []string{"alice"},
-		Acks:    []reminders.UserAck{},
+		ID:       "rem-7",
+		Targets:  []string{"alice"},
+		Acks:     []reminders.UserAck{},
 		Schedule: onceSched(managerNow.Add(-time.Minute)),
-		Policy:  defaultPolicy(), // no ack required
-		State:   reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+		Policy:   defaultPolicy(), // no ack required
+		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
 	}
 
 	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{due}, nil)
@@ -328,12 +328,12 @@ func TestManager_Tick_OnceWithAck_ShowsProjection(t *testing.T) {
 	mgr, repo := newTestManager(t)
 
 	due := reminders.Reminder{
-		ID:      "rem-8",
-		Targets: []string{"alice"},
-		Acks:    []reminders.UserAck{},
+		ID:       "rem-8",
+		Targets:  []string{"alice"},
+		Acks:     []reminders.UserAck{},
 		Schedule: onceSched(managerNow.Add(-time.Minute)),
-		Policy:  ackPolicy(), // requires ack
-		State:   reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+		Policy:   ackPolicy(), // requires ack
+		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
 	}
 
 	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{due}, nil)
@@ -353,12 +353,12 @@ func TestManager_Tick_Recurring_ShowsProjection(t *testing.T) {
 
 	every := time.Hour
 	due := reminders.Reminder{
-		ID:      "rem-9",
-		Targets: []string{"alice"},
-		Acks:    []reminders.UserAck{},
+		ID:       "rem-9",
+		Targets:  []string{"alice"},
+		Acks:     []reminders.UserAck{},
 		Schedule: recurSched(managerNow.Add(-time.Hour), every),
-		Policy:  defaultPolicy(),
-		State:   reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+		Policy:   defaultPolicy(),
+		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
 	}
 
 	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{due}, nil)

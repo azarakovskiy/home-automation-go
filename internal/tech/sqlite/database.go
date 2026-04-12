@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 
+	"home-go/internal/config"
+
 	"github.com/golang-migrate/migrate/v4"
 	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"home-go/internal/config"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // register the sqlite driver for database/sql
 )
 
 //go:embed migrations/*.sql

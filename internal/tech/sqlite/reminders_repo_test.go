@@ -14,6 +14,8 @@ import (
 // the DB stores Unix seconds and we compare with == after round-trip).
 var baseTime = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
+const testUserAlice = "alice"
+
 func openDB(t *testing.T) *reminders.Repository {
 	t.Helper()
 	db, err := sqlite.Open(config.DatabaseConfig{Path: ":memory:"})
@@ -53,6 +55,64 @@ func newOnceReminder(id string, triggerAt time.Time) reminders.Reminder {
 	}
 }
 
+func assertReminderSchedule(t *testing.T, got, want reminders.Schedule) {
+	t.Helper()
+	if got.Kind != want.Kind {
+		t.Errorf("Kind: got %q, want %q", got.Kind, want.Kind)
+	}
+	if !got.TriggerAt.Equal(want.TriggerAt) {
+		t.Errorf("TriggerAt: got %v, want %v", got.TriggerAt, want.TriggerAt)
+	}
+	if got.NextRunAt == nil || !got.NextRunAt.Equal(*want.NextRunAt) {
+		t.Errorf("NextRunAt: got %v, want %v", got.NextRunAt, want.NextRunAt)
+	}
+	if got.RecurEvery == nil || *got.RecurEvery != *want.RecurEvery {
+		t.Errorf("RecurEvery: got %v, want %v", got.RecurEvery, want.RecurEvery)
+	}
+	if got.ValidUntil == nil || !got.ValidUntil.Equal(*want.ValidUntil) {
+		t.Errorf("ValidUntil: got %v, want %v", got.ValidUntil, want.ValidUntil)
+	}
+}
+
+func assertReminderPolicy(t *testing.T, got, want reminders.DeliveryPolicy) {
+	t.Helper()
+	if got.RequiresAck != want.RequiresAck {
+		t.Errorf("RequiresAck: got %v, want %v", got.RequiresAck, want.RequiresAck)
+	}
+	if got.CompletionPolicy != want.CompletionPolicy {
+		t.Errorf("CompletionPolicy: got %q, want %q", got.CompletionPolicy, want.CompletionPolicy)
+	}
+	if got.Profile != want.Profile {
+		t.Errorf("Profile: got %q, want %q", got.Profile, want.Profile)
+	}
+}
+
+func assertReminderState(t *testing.T, got, want reminders.State) {
+	t.Helper()
+	if got.Status != want.Status {
+		t.Errorf("Status: got %q, want %q", got.Status, want.Status)
+	}
+	if got.LastFiredAt == nil || !got.LastFiredAt.Equal(*want.LastFiredAt) {
+		t.Errorf("LastFiredAt: got %v, want %v", got.LastFiredAt, want.LastFiredAt)
+	}
+	if !got.CreatedAt.Equal(want.CreatedAt) {
+		t.Errorf("CreatedAt: got %v, want %v", got.CreatedAt, want.CreatedAt)
+	}
+}
+
+func assertReminderMeta(t *testing.T, got, want reminders.Metadata) {
+	t.Helper()
+	if got.Source != want.Source {
+		t.Errorf("Source: got %q, want %q", got.Source, want.Source)
+	}
+	if got.Owner != want.Owner {
+		t.Errorf("Owner: got %q, want %q", got.Owner, want.Owner)
+	}
+	if got.Message != want.Message {
+		t.Errorf("Message: got %q, want %q", got.Message, want.Message)
+	}
+}
+
 func TestSaveAndGetByID_RoundTrip(t *testing.T) {
 	repoPtr := openDB(t)
 	repo := *repoPtr
@@ -65,9 +125,9 @@ func TestSaveAndGetByID_RoundTrip(t *testing.T) {
 
 	rem := reminders.Reminder{
 		ID:      "rem-1",
-		Targets: []string{"alice", "bob"},
+		Targets: []string{testUserAlice, "bob"},
 		Acks: []reminders.UserAck{
-			{UserID: "alice", AckedAt: baseTime},
+			{UserID: testUserAlice, AckedAt: baseTime},
 		},
 		Schedule: reminders.Schedule{
 			Kind:       reminders.ScheduleKindRecurring,
@@ -106,56 +166,18 @@ func TestSaveAndGetByID_RoundTrip(t *testing.T) {
 	if got.ID != rem.ID {
 		t.Errorf("ID: got %q, want %q", got.ID, rem.ID)
 	}
-	if got.Schedule.Kind != rem.Schedule.Kind {
-		t.Errorf("Kind: got %q, want %q", got.Schedule.Kind, rem.Schedule.Kind)
-	}
-	if !got.Schedule.TriggerAt.Equal(rem.Schedule.TriggerAt) {
-		t.Errorf("TriggerAt: got %v, want %v", got.Schedule.TriggerAt, rem.Schedule.TriggerAt)
-	}
-	if got.Schedule.NextRunAt == nil || !got.Schedule.NextRunAt.Equal(*rem.Schedule.NextRunAt) {
-		t.Errorf("NextRunAt: got %v, want %v", got.Schedule.NextRunAt, rem.Schedule.NextRunAt)
-	}
-	if got.Schedule.RecurEvery == nil || *got.Schedule.RecurEvery != *rem.Schedule.RecurEvery {
-		t.Errorf("RecurEvery: got %v, want %v", got.Schedule.RecurEvery, rem.Schedule.RecurEvery)
-	}
-	if got.Schedule.ValidUntil == nil || !got.Schedule.ValidUntil.Equal(*rem.Schedule.ValidUntil) {
-		t.Errorf("ValidUntil: got %v, want %v", got.Schedule.ValidUntil, rem.Schedule.ValidUntil)
-	}
-	if got.Policy.RequiresAck != rem.Policy.RequiresAck {
-		t.Errorf("RequiresAck: got %v, want %v", got.Policy.RequiresAck, rem.Policy.RequiresAck)
-	}
-	if got.Policy.CompletionPolicy != rem.Policy.CompletionPolicy {
-		t.Errorf("CompletionPolicy: got %q, want %q", got.Policy.CompletionPolicy, rem.Policy.CompletionPolicy)
-	}
-	if got.Policy.Profile != rem.Policy.Profile {
-		t.Errorf("Profile: got %q, want %q", got.Policy.Profile, rem.Policy.Profile)
-	}
-	if got.State.Status != rem.State.Status {
-		t.Errorf("Status: got %q, want %q", got.State.Status, rem.State.Status)
-	}
-	if got.State.LastFiredAt == nil || !got.State.LastFiredAt.Equal(*rem.State.LastFiredAt) {
-		t.Errorf("LastFiredAt: got %v, want %v", got.State.LastFiredAt, rem.State.LastFiredAt)
-	}
-	if !got.State.CreatedAt.Equal(rem.State.CreatedAt) {
-		t.Errorf("CreatedAt: got %v, want %v", got.State.CreatedAt, rem.State.CreatedAt)
-	}
-	if got.Meta.Source != rem.Meta.Source {
-		t.Errorf("Source: got %q, want %q", got.Meta.Source, rem.Meta.Source)
-	}
-	if got.Meta.Owner != rem.Meta.Owner {
-		t.Errorf("Owner: got %q, want %q", got.Meta.Owner, rem.Meta.Owner)
-	}
-	if got.Meta.Message != rem.Meta.Message {
-		t.Errorf("Message: got %q, want %q", got.Meta.Message, rem.Meta.Message)
-	}
+	assertReminderSchedule(t, got.Schedule, rem.Schedule)
+	assertReminderPolicy(t, got.Policy, rem.Policy)
+	assertReminderState(t, got.State, rem.State)
+	assertReminderMeta(t, got.Meta, rem.Meta)
 
 	// Targets (sorted)
-	if len(got.Targets) != 2 || got.Targets[0] != "alice" || got.Targets[1] != "bob" {
+	if len(got.Targets) != 2 || got.Targets[0] != testUserAlice || got.Targets[1] != "bob" {
 		t.Errorf("Targets: got %v, want [alice bob]", got.Targets)
 	}
 
 	// Acks
-	if len(got.Acks) != 1 || got.Acks[0].UserID != "alice" || !got.Acks[0].AckedAt.Equal(baseTime) {
+	if len(got.Acks) != 1 || got.Acks[0].UserID != testUserAlice || !got.Acks[0].AckedAt.Equal(baseTime) {
 		t.Errorf("Acks: got %v", got.Acks)
 	}
 }
@@ -285,7 +307,7 @@ func TestAcks_SaveLoadUpdateIdempotent(t *testing.T) {
 	ctx := context.Background()
 
 	rem := newOnceReminder("ack-test", baseTime)
-	rem.Targets = []string{"alice", "bob"}
+	rem.Targets = []string{testUserAlice, "bob"}
 	rem.Policy.RequiresAck = true
 
 	// Save with no acks
@@ -303,7 +325,7 @@ func TestAcks_SaveLoadUpdateIdempotent(t *testing.T) {
 
 	// Save with one ack
 	ackTime := baseTime.Add(5 * time.Minute)
-	rem.Acks = []reminders.UserAck{{UserID: "alice", AckedAt: ackTime}}
+	rem.Acks = []reminders.UserAck{{UserID: testUserAlice, AckedAt: ackTime}}
 	if err := repo.Save(ctx, rem); err != nil {
 		t.Fatalf("Save (one ack): %v", err)
 	}
@@ -312,7 +334,7 @@ func TestAcks_SaveLoadUpdateIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
-	if len(got.Acks) != 1 || got.Acks[0].UserID != "alice" || !got.Acks[0].AckedAt.Equal(ackTime) {
+	if len(got.Acks) != 1 || got.Acks[0].UserID != testUserAlice || !got.Acks[0].AckedAt.Equal(ackTime) {
 		t.Errorf("Acks after first save: %v", got.Acks)
 	}
 

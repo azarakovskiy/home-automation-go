@@ -513,9 +513,8 @@ func TestAckCommandHandler_OnCommandIgnored(t *testing.T) {
 		t.Fatalf("command handler error = %v", err)
 	}
 
-	if sw.onCalled {
-		// Expected: ON command triggers sw.On() to re-affirm the state
-		// This is the intended behavior
+	if !sw.onCalled {
+		t.Error("expected ON command to call sw.On() to re-affirm the state")
 	}
 
 	// Manager.Ack should NOT have been called

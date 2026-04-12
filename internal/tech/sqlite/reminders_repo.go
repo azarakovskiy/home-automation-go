@@ -178,4 +178,3 @@ func (r *RemindersRepo) hydrateList(ctx context.Context, rows []sqlc.Reminder) (
 	}
 	return out, nil
 }
-
