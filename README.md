@@ -4,7 +4,7 @@ Event-driven home automation in Go for pricing-aware scheduling and charging.
 
 ## Requirements
 
-- Go 1.23+
+- Go 1.25+
 - Home Assistant instance
 - Long-lived Home Assistant access token
 
