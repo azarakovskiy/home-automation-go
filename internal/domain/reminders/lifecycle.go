@@ -59,21 +59,33 @@ func (r Reminder) IsDue(now time.Time) bool {
 
 // Trigger fires the reminder, advancing its state.
 // For once-type reminders without ack requirement, it transitions to completed.
-// For recurring reminders, it computes the next run time.
+// For recurring reminders, it computes the next run time from RecurEvery.
+// For once+requires_ack reminders, the next run time is derived from the
+// escalation policy: InitialDelay on the first fire, RepeatInterval on repeats.
 func (r *Reminder) Trigger(now time.Time) error {
 	if r.State.Status != StatusActive {
 		return ErrNotActive
 	}
 
+	isFirstFire := r.State.LastFiredAt == nil
 	r.State.LastFiredAt = &now
 	r.State.UpdatedAt = now
 
-	if r.Schedule.Kind == ScheduleKindRecurring && r.Schedule.RecurEvery != nil {
+	switch {
+	case r.Schedule.Kind == ScheduleKindRecurring && r.Schedule.RecurEvery != nil:
 		next := now.Add(*r.Schedule.RecurEvery)
 		r.Schedule.NextRunAt = &next
-	}
 
-	if r.Schedule.Kind == ScheduleKindOnce && !r.Policy.RequiresAck {
+	case r.Schedule.Kind == ScheduleKindOnce && r.Policy.RequiresAck:
+		ep := PolicyForProfile(r.Policy.Profile)
+		delay := ep.RepeatInterval
+		if isFirstFire {
+			delay = ep.InitialDelay
+		}
+		next := now.Add(delay)
+		r.Schedule.NextRunAt = &next
+
+	case r.Schedule.Kind == ScheduleKindOnce && !r.Policy.RequiresAck:
 		r.State.Status = StatusCompleted
 	}
 

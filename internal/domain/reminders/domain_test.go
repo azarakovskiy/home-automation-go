@@ -1,6 +1,7 @@
 package reminders
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -201,6 +202,55 @@ func TestTrigger_OnceWithAck(t *testing.T) {
 	err := r.Trigger(now)
 	assertNoError(t, err)
 	assertEqual(t, r.State.Status, StatusActive)
+}
+
+func TestTrigger_OnceWithAck_SetsNextRunAtFromEscalationPolicy(t *testing.T) {
+	profiles := []struct {
+		profile     Profile
+		wantInitial time.Duration
+		wantRepeat  time.Duration
+	}{
+		{ProfileQuiet, EscalationQuiet.InitialDelay, EscalationQuiet.RepeatInterval},
+		{ProfileNormal, EscalationNormal.InitialDelay, EscalationNormal.RepeatInterval},
+		{ProfileAnnoying, EscalationAnnoying.InitialDelay, EscalationAnnoying.RepeatInterval},
+	}
+
+	for _, tc := range profiles {
+		t.Run(string(tc.profile), func(t *testing.T) {
+			policy := DeliveryPolicy{RequiresAck: true, CompletionPolicy: CompletionPolicyAllTargetsAck, Profile: tc.profile}
+			r, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), policy, makeMeta(), baseTime)
+
+			// First fire: NextRunAt uses InitialDelay.
+			fire1 := baseTime.Add(1 * time.Minute)
+			assertNoError(t, r.Trigger(fire1))
+			assertEqual(t, r.State.Status, StatusActive)
+			if r.Schedule.NextRunAt == nil {
+				t.Fatal("expected NextRunAt to be set after first trigger")
+			}
+			assertEqual(t, *r.Schedule.NextRunAt, fire1.Add(tc.wantInitial))
+
+			// Second fire: NextRunAt uses RepeatInterval.
+			fire2 := fire1.Add(tc.wantInitial)
+			assertNoError(t, r.Trigger(fire2))
+			assertEqual(t, r.State.Status, StatusActive)
+			assertEqual(t, *r.Schedule.NextRunAt, fire2.Add(tc.wantRepeat))
+		})
+	}
+}
+
+func TestTrigger_OnceWithAck_DoesNotReFireEveryTick(t *testing.T) {
+	// After first trigger, the reminder must not be due again until NextRunAt.
+	policy := DeliveryPolicy{RequiresAck: true, CompletionPolicy: CompletionPolicyAllTargetsAck, Profile: ProfileNormal}
+	r, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), policy, makeMeta(), baseTime)
+
+	fire := baseTime.Add(1 * time.Minute)
+	assertNoError(t, r.Trigger(fire))
+
+	// One second later: not due yet (InitialDelay is 5 min for normal).
+	assertEqual(t, r.IsDue(fire.Add(1*time.Second)), false)
+
+	// At InitialDelay boundary: due again.
+	assertEqual(t, r.IsDue(fire.Add(EscalationNormal.InitialDelay)), true)
 }
 
 func TestTrigger_Recurring(t *testing.T) {
@@ -445,22 +495,7 @@ func assertErrorIs(t *testing.T, err, target error) {
 		t.Fatalf("expected error %v, got nil", target)
 		return
 	}
-	if !errorIs(err, target) {
+	if !errors.Is(err, target) {
 		t.Errorf("expected error %v, got %v", target, err)
 	}
-}
-
-func errorIs(err, target error) bool {
-	for err != nil {
-		if err == target {
-			return true
-		}
-		// Check if it implements Unwrap
-		u, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = u.Unwrap()
-	}
-	return false
 }
