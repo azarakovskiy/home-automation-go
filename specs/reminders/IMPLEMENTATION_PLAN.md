@@ -13,7 +13,7 @@ This file is the execution tracker for the reminders feature. Keep steps atomic,
 
 ## Current Step
 
-`DONE`: V1 Core complete. Slice 8 (V1.1 Quiet Hours) is next.
+`DONE`: V1 Core complete + hardened. Slice 8 (V1.1 Quiet Hours) is next.
 
 ## Delivery Slices
 
@@ -157,6 +157,10 @@ The specification describes the final feature. Versioning and incremental delive
 - `DONE` V1-55 Review for leaked Home Assistant-specific concerns inside the domain.
 - `DONE` V1-56 Review for missing error wrapping and contextual logs. Fixed: `hydrateList` now wraps `loadAggregate` errors with reminder ID context.
 - `DONE` V1-57 Review that no reminder state is persisted in Home Assistant helpers.
+- `DONE` V1-58 Fix: `Trigger()` now sets `NextRunAt` for once+requires_ack reminders using the profile's escalation policy (InitialDelay on first fire, RepeatInterval on repeats). Without this, reminders re-triggered on every tick.
+- `DONE` V1-59 Simplify: replaced manual `errorIs` test helper with stdlib `errors.Is`.
+- `DONE` V1-60 Docs: added `specs/reminders/HASS_INTEGRATION.md` with event reference and YAML examples.
+- `DONE` V1-61 Config: documented `SQLITE_PATH` in `env.example`.
 
 ## Slice 8: V1.1 Quiet Hours
 
