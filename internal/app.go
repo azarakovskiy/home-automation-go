@@ -1,18 +1,23 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"home-go/internal/config"
 	"home-go/internal/domain/pricing"
+	domainreminders "home-go/internal/domain/reminders"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/devices/dishwasher"
 	"home-go/internal/tech/homeassistant/devices/laptop"
+	hareminders "home-go/internal/tech/homeassistant/devices/reminders"
 	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
+	"home-go/internal/tech/sqlite"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -54,7 +59,18 @@ func Run(cfg config.Config) error {
 	}
 	defer runtimeEntities.Close()
 
-	components, err := buildComponents(app, runtimeEntities)
+	// V1-49: open SQLite and build the reminders repository.
+	db, err := sqlite.Open(cfg.Database)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+	remindersRepo := sqlite.NewRemindersRepo(db)
+
+	// V1-50: build the reminders domain manager.
+	remindersManager := domainreminders.NewManager(remindersRepo, time.Now)
+
+	components, err := buildComponents(app, runtimeEntities, remindersManager)
 	if err != nil {
 		return err
 	}
@@ -65,7 +81,7 @@ func Run(cfg config.Config) error {
 	return nil
 }
 
-func buildComponents(app *ga.App, runtimeEntities *entities.Runtime) ([]component.Component, error) {
+func buildComponents(app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
 	priceService := pricing.NewService(app.GetService(), app.GetState())
 
@@ -76,11 +92,19 @@ func buildComponents(app *ga.App, runtimeEntities *entities.Runtime) ([]componen
 	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
 	// vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
 
+	// V1-51: build and restore the reminders HA component.
+	remindersComp := hareminders.New(base, runtimeEntities, remindersManager)
+	// V1-52: restore active projections; stale MQTT entities are reconciled inside Restore.
+	if err := remindersComp.Restore(context.Background()); err != nil {
+		return nil, fmt.Errorf("restore reminders component: %w", err)
+	}
+
 	return []component.Component{
 		priceService,
 		dishwasherComp,
 		laptopChargerComp,
 		// vacuumChargerComp,
+		remindersComp,
 	}, nil
 }
 

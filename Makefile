@@ -14,7 +14,7 @@ export
 PATH := $(TOOLS_BIN):$(PATH)
 export PATH
 
-.PHONY: all build run test clean fmt tidy lint deps tools mocks generate install-golangci-lint install-mockgen
+.PHONY: all build run test clean fmt tidy lint deps tools mocks generate generate-hass sqlc install-golangci-lint install-mockgen
 
 all: build
 
@@ -58,6 +58,12 @@ mocks: install-mockgen
 	go generate ./internal/mocks/...
 	@echo "Mocks generated successfully!"
 
-generate:
+generate: generate-hass sqlc
+
+generate-hass:
 	@echo "Generating entities from Home Assistant..."
 	@go generate ./internal/tech/homeassistant
+
+sqlc:
+	@echo "Generating sqlc queries..."
+	sqlc generate
