@@ -139,5 +139,5 @@ func runtimeClientID(cfg RuntimeConfig) string {
 	if strings.TrimSpace(cfg.ClientID) != "" {
 		return cfg.ClientID
 	}
-	return fmt.Sprintf("%s-runtime-entities", cfg.AppPrefix)
+	return cfg.AppPrefix
 }

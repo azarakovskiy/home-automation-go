@@ -15,9 +15,11 @@ type Config struct {
 }
 
 type MQTTConfig struct {
-	BrokerURL string
-	Username  string
-	Password  string
+	BrokerURL       string
+	Username        string
+	Password        string
+	DiscoveryPrefix string
+	AppPrefix       string
 }
 
 func Load() (Config, error) {
@@ -25,9 +27,11 @@ func Load() (Config, error) {
 		HAURL:       os.Getenv("HA_URL"),
 		HAAuthToken: os.Getenv("HA_AUTH_TOKEN"),
 		MQTT: MQTTConfig{
-			BrokerURL: os.Getenv("HA_MQTT_BROKER_URL"),
-			Username:  os.Getenv("HA_MQTT_USERNAME"),
-			Password:  os.Getenv("HA_MQTT_PASSWORD"),
+			BrokerURL:       os.Getenv("HA_MQTT_BROKER_URL"),
+			Username:        os.Getenv("HA_MQTT_USERNAME"),
+			Password:        os.Getenv("HA_MQTT_PASSWORD"),
+			DiscoveryPrefix: "homeassistant",
+			AppPrefix:       "home-go",
 		},
 		Debug:  isEnabled("DEBUG"),
 		DryRun: isEnabled("DRY_RUN"),

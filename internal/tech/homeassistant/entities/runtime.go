@@ -12,9 +12,6 @@ import (
 )
 
 const (
-	defaultDiscoveryPrefix = "homeassistant"
-	defaultAppPrefix       = "home-go"
-
 	runtimeAvailabilityOnline  = "online"
 	runtimeAvailabilityOffline = "offline"
 	runtimePayloadOn           = "ON"
@@ -113,9 +110,14 @@ type BinarySensorHandle struct {
 }
 
 func NewRuntime(cfg RuntimeConfig) (*Runtime, error) {
-	cfg = cfg.withDefaults()
 	if strings.TrimSpace(cfg.BrokerURL) == "" {
 		return nil, fmt.Errorf("broker URL is required")
+	}
+	if strings.TrimSpace(cfg.DiscoveryPrefix) == "" {
+		return nil, fmt.Errorf("discovery prefix is required")
+	}
+	if strings.TrimSpace(cfg.AppPrefix) == "" {
+		return nil, fmt.Errorf("app prefix is required")
 	}
 
 	registry, err := newRuntimeRegistry(cfg.RegistryPath)
@@ -507,16 +509,6 @@ func (r *Runtime) baseDiscoveryPayload(spec CommonSpec, entity *runtimeEntity) m
 		payload["device_class"] = spec.DeviceClass
 	}
 	return payload
-}
-
-func (c RuntimeConfig) withDefaults() RuntimeConfig {
-	if c.DiscoveryPrefix == "" {
-		c.DiscoveryPrefix = defaultDiscoveryPrefix
-	}
-	if c.AppPrefix == "" {
-		c.AppPrefix = defaultAppPrefix
-	}
-	return c
 }
 
 func switchDiscoveryPayload() map[string]any {

@@ -43,9 +43,11 @@ func Run(cfg config.Config) error {
 	defer app.Cleanup()
 
 	runtimeEntities, err := entities.NewRuntime(entities.RuntimeConfig{
-		BrokerURL: cfg.MQTT.BrokerURL,
-		Username:  cfg.MQTT.Username,
-		Password:  cfg.MQTT.Password,
+		BrokerURL:       cfg.MQTT.BrokerURL,
+		Username:        cfg.MQTT.Username,
+		Password:        cfg.MQTT.Password,
+		DiscoveryPrefix: cfg.MQTT.DiscoveryPrefix,
+		AppPrefix:       cfg.MQTT.AppPrefix,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create runtime entities: %w", err)
