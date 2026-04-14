@@ -47,10 +47,7 @@ func newPahoRuntimeTransport(cfg RuntimeConfig, availabilityTopic string) (*paho
 	}
 
 	opts.OnConnect = func(client mqtt.Client) {
-		if err := transport.restoreSubscriptions(context.Background()); err != nil {
-			log.Printf("WARNING: failed to restore runtime MQTT subscriptions: %v", err)
-			return
-		}
+		transport.restoreSubscriptions(context.Background())
 
 		transport.mu.RLock()
 		onConnect := transport.onConnect
@@ -95,7 +92,16 @@ func (t *pahoRuntimeTransport) Subscribe(_ context.Context, topic string, handle
 	t.subscriptions[topic] = handler
 	t.mu.Unlock()
 
-	return t.subscribe(context.Background(), topic, handler)
+	if err := t.subscribe(context.Background(), topic, handler); err != nil {
+		// If the connection was lost the subscription is already registered in t.subscriptions.
+		// OnConnect will restore it once the client reconnects, so this is not fatal.
+		if isTransientConnectionError(err) {
+			log.Printf("DEBUG: subscribe to %s deferred until reconnect: %v", topic, err)
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (t *pahoRuntimeTransport) Close() error {
@@ -105,7 +111,7 @@ func (t *pahoRuntimeTransport) Close() error {
 	return nil
 }
 
-func (t *pahoRuntimeTransport) restoreSubscriptions(ctx context.Context) error {
+func (t *pahoRuntimeTransport) restoreSubscriptions(ctx context.Context) {
 	t.mu.RLock()
 	subscriptions := make(map[string]runtimeMessageHandler, len(t.subscriptions))
 	for topic, handler := range t.subscriptions {
@@ -115,10 +121,11 @@ func (t *pahoRuntimeTransport) restoreSubscriptions(ctx context.Context) error {
 
 	for topic, handler := range subscriptions {
 		if err := t.subscribe(ctx, topic, handler); err != nil {
-			return err
+			// Log and continue: a failed restore for one topic must not block
+			// the rest or prevent the onConnect callback from running.
+			log.Printf("WARNING: failed to restore subscription for %s: %v", topic, err)
 		}
 	}
-	return nil
 }
 
 func (t *pahoRuntimeTransport) subscribe(_ context.Context, topic string, handler runtimeMessageHandler) error {
@@ -133,6 +140,17 @@ func (t *pahoRuntimeTransport) subscribe(_ context.Context, topic string, handle
 		return fmt.Errorf("subscribe %s: %w", topic, err)
 	}
 	return nil
+}
+
+func isTransientConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "connection lost") ||
+		strings.Contains(msg, "not connected") ||
+		strings.Contains(msg, "not currently connected") ||
+		strings.Contains(msg, "EOF")
 }
 
 func runtimeClientID(cfg RuntimeConfig) string {

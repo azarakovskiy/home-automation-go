@@ -57,3 +57,6 @@ go.work.sum
 
 # Entity generation config (contains sensitive tokens)
 gen.yaml
+
+# DB
+home_go.db
