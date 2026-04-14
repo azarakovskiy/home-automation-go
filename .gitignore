@@ -1,5 +1,6 @@
 # Binaries
 /bin/
+home-go
 *.exe
 *.exe~
 *.dll
@@ -29,6 +30,7 @@ coverage.txt
 *.dll
 *.so
 *.dylib
+.claude/
 
 # Test binary, built with `go test -c`
 *.test
