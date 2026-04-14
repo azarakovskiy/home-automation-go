@@ -511,7 +511,6 @@ func (r *Runtime) baseDiscoveryPayload(spec CommonSpec, entity *runtimeEntity) m
 	return payload
 }
 
-
 func switchDiscoveryPayload() map[string]any {
 	return map[string]any{
 		"payload_on":  runtimePayloadOn,
