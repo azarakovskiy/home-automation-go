@@ -7,7 +7,7 @@ import (
 
 	"home-go/internal/domain/optimizer"
 	domainpricing "home-go/internal/domain/pricing"
-	"home-go/internal/domain/scheduler"
+	domainscheduler "home-go/internal/domain/scheduler"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
 	hanotifications "home-go/internal/tech/homeassistant/notifications"
@@ -33,28 +33,10 @@ type Dishwasher struct {
 	notificationService NotificationSender
 	controller          Controller
 	optimizer           *optimizer.Optimizer
-	stateManager        ScheduleStateStore
-
-	pendingSchedule *PendingSchedule
+	scheduler           *domainscheduler.Scheduler
 }
 
-// PendingSchedule tracks a scheduled dishwasher cycle
-type PendingSchedule struct {
-	Mode      Mode
-	StartTime time.Time
-	Result    *optimizer.OptimizationResult
-}
-
-// ScheduleStateStore captures the persistence surface used by the component.
-// It allows us to inject fakes in tests without touching Home Assistant services.
-//
-//go:generate mockgen -destination=../../../../mocks/domain/devices/dishwasher/scheduled_state_store.go -package=dishwasher home-go/internal/domain/devices/dishwasher ScheduleStateStore
-type ScheduleStateStore interface {
-	SaveSchedule(*PendingSchedule) error
-	RestoreSchedule() (*PendingSchedule, error)
-	ClearSchedule() error
-	IsScheduleCancelled() (bool, error)
-}
+type PendingSchedule = domainscheduler.Plan
 
 // New creates a new dishwasher component.
 func New(
@@ -62,7 +44,7 @@ func New(
 	state ga.State,
 	priceService *domainpricing.Service,
 	controller Controller,
-	stateManager ScheduleStateStore,
+	scheduler *domainscheduler.Scheduler,
 	notificationService NotificationSender,
 ) *Dishwasher {
 	base.State = state
@@ -73,16 +55,14 @@ func New(
 		notificationService: notificationService,
 		controller:          controller,
 		optimizer:           optimizer.NewOptimizer(),
-		stateManager:        stateManager,
+		scheduler:           scheduler,
 	}
 
-	// Attempt to restore schedule from HASS on startup
-	if schedule, err := dishwasher.stateManager.RestoreSchedule(); err != nil {
+	if err := dishwasher.scheduler.Restore(time.Now()); err != nil {
 		log.Printf("ERROR: Failed to restore schedule: %v", err)
-	} else if schedule != nil {
-		dishwasher.pendingSchedule = schedule
-		log.Printf("Restored pending schedule: mode=%s, starts at %s",
-			schedule.Mode, schedule.StartTime.Format("15:04"))
+	} else if schedule := dishwasher.scheduler.Pending(); schedule != nil {
+		log.Printf("Restored pending schedule: starts at %s",
+			schedule.StartTime.Format("15:04"))
 	}
 
 	return dishwasher
@@ -118,7 +98,7 @@ func (c *Dishwasher) Intervals() []ga.Interval {
 
 // handleScheduleRequest processes strongly-typed dishwasher schedule events
 // The TypedEventHandler automatically parses the event, so we receive typed data directly
-func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, request scheduler.ScheduleRequest) {
+func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, request ScheduleRequest) {
 	log.Printf("Received schedule request event")
 
 	// Type-safe access to fields - no parsing needed!
@@ -225,17 +205,9 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 		return
 	}
 
-	// Store pending schedule in memory
-	c.pendingSchedule = &PendingSchedule{
-		Mode:      mode,
-		StartTime: result.StartTime,
-		Result:    result,
-	}
-
-	// Persist schedule to HASS entities (this also sets the display fields)
-	if err := c.stateManager.SaveSchedule(c.pendingSchedule); err != nil {
+	if err := c.scheduler.Schedule(domainscheduler.Plan{StartTime: result.StartTime}); err != nil {
 		log.Printf("ERROR: Failed to save schedule state: %v", err)
-		// Continue anyway - schedule is still in memory
+		return
 	}
 
 	log.Printf("Dishwasher scheduled successfully!")
@@ -246,35 +218,12 @@ func (c *Dishwasher) handleScheduleRequest(service *ga.Service, state ga.State, 
 
 // checkPendingStart runs periodically via interval to check if it's time to start
 func (c *Dishwasher) checkPendingStart(service *ga.Service, state ga.State) {
-	if c.pendingSchedule == nil {
+	if !c.scheduler.HasPending() {
 		return
 	}
 
-	// Check if user manually cancelled the schedule
-	cancelled, err := c.stateManager.IsScheduleCancelled()
-	if err != nil {
-		log.Printf("ERROR: Failed to check if schedule was cancelled: %v", err)
-	} else if cancelled {
-		c.cancelPendingSchedule("scheduled flag turned off")
-		return
-	}
-
-	now := time.Now()
-	if now.After(c.pendingSchedule.StartTime) || now.Equal(c.pendingSchedule.StartTime) {
-		log.Printf("Time to start dishwasher!")
-
-		if err := c.controller.StartDishwasher(); err != nil {
-			log.Printf("ERROR: Failed to start: %v", err)
-			return
-		}
-
-		// Clear schedule from HASS entities
-		if err := c.stateManager.ClearSchedule(); err != nil {
-			log.Printf("ERROR: Failed to clear schedule state: %v", err)
-		}
-
-		// Clear pending schedule from memory
-		c.pendingSchedule = nil
+	if err := c.scheduler.Tick(time.Now()); err != nil {
+		log.Printf("ERROR: Failed to start pending dishwasher schedule: %v", err)
 	}
 }
 
@@ -423,23 +372,24 @@ func formatTimeForSpeech(t time.Time) string {
 
 // cancelPendingSchedule clears local + HA state for a pending run
 func (c *Dishwasher) cancelPendingSchedule(reason string) {
-	if c.pendingSchedule == nil {
+	schedule := c.scheduler.Pending()
+	if schedule == nil {
 		log.Printf("Cancellation requested (%s) but no pending dishwasher schedule", reason)
-	} else {
-		log.Printf("Cancelling pending dishwasher schedule (%s)", reason)
-		schedule := c.pendingSchedule
-		c.pendingSchedule = nil
-		c.announceCancellation(schedule, reason)
+		return
 	}
 
-	if err := c.stateManager.ClearSchedule(); err != nil {
+	log.Printf("Cancelling pending dishwasher schedule (%s)", reason)
+	if err := c.scheduler.Cancel(); err != nil {
 		log.Printf("ERROR: Failed to clear schedule state: %v", err)
+		return
 	}
+
+	c.announceCancellation(schedule, reason)
 }
 
 // HasPendingSchedule reports whether a delayed dishwasher start is currently pending.
 func (c *Dishwasher) HasPendingSchedule() bool {
-	return c.pendingSchedule != nil
+	return c.scheduler.HasPending()
 }
 
 // CancelPendingScheduleFromDashboard handles a dashboard-triggered schedule cancellation.
@@ -451,8 +401,6 @@ func cancellationReasonToSpeech(reason string) string {
 	switch reason {
 	case "cancel event":
 		return "after a cancel request"
-	case "scheduled flag turned off":
-		return "because the schedule toggle was turned off"
 	case "dashboard switch turned off":
 		return "manually from Home Assistant"
 	default:

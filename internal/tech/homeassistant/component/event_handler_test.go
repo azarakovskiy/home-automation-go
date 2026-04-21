@@ -4,11 +4,16 @@ import (
 	"encoding/json"
 	"testing"
 
-	"home-go/internal/domain/scheduler"
 	"home-go/internal/tech/homeassistant/entities"
 
 	ga "saml.dev/gome-assistant"
 )
+
+type testScheduleRequest struct {
+	Device        string `json:"device"`
+	Mode          string `json:"mode"`
+	MaxDelayHours int    `json:"max_delay_hours"`
+}
 
 // TestTypedEventHandler_ParsesAndCallsHandler verifies that TypedEventHandler
 // correctly unmarshals the event and calls the handler with typed data
@@ -17,11 +22,11 @@ func TestTypedEventHandler_ParsesAndCallsHandler(t *testing.T) {
 	eventType := "event.test_schedule"
 
 	// Create test event JSON
-	testEvent := entities.HASS[scheduler.ScheduleRequest]{
+	testEvent := entities.HASS[testScheduleRequest]{
 		Type: "result",
-		Event: entities.HAInnerEvent[scheduler.ScheduleRequest]{
+		Event: entities.HAInnerEvent[testScheduleRequest]{
 			EventType: eventType,
-			Data: scheduler.ScheduleRequest{
+			Data: testScheduleRequest{
 				Device:        "test_device",
 				Mode:          "test_mode",
 				MaxDelayHours: 8,
@@ -38,10 +43,10 @@ func TestTypedEventHandler_ParsesAndCallsHandler(t *testing.T) {
 	}
 
 	// Track if handler was called with correct data
-	var receivedRequest *scheduler.ScheduleRequest
+	var receivedRequest *testScheduleRequest
 	handlerCalled := false
 
-	handler := func(service *ga.Service, state ga.State, request scheduler.ScheduleRequest) {
+	handler := func(service *ga.Service, state ga.State, request testScheduleRequest) {
 		handlerCalled = true
 		receivedRequest = &request
 	}
@@ -86,7 +91,7 @@ func TestTypedEventHandler_HandlesInvalidJSON(t *testing.T) {
 	invalidJSON := []byte(`{this is not valid json}`)
 
 	handlerCalled := false
-	handler := func(service *ga.Service, state ga.State, request scheduler.ScheduleRequest) {
+	handler := func(service *ga.Service, state ga.State, request testScheduleRequest) {
 		handlerCalled = true
 	}
 

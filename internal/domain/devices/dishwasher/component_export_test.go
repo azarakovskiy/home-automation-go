@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"home-go/internal/domain/optimizer"
-	"home-go/internal/domain/scheduler"
+	domainscheduler "home-go/internal/domain/scheduler"
 	hanotifications "home-go/internal/tech/homeassistant/notifications"
 )
 
@@ -14,11 +14,15 @@ func (testController) InitializeModeForScheduled(string) error { return nil }
 func (testController) StartDishwasher() error                  { return nil }
 
 // NewTestDishwasher constructs a minimal component for tests in the external package.
-func NewTestDishwasher(sm ScheduleStateStore) *Dishwasher {
+func NewTestDishwasher(store domainscheduler.Store) *Dishwasher {
+	if store == nil {
+		store = &TestScheduleStore{}
+	}
+
 	return &Dishwasher{
-		controller:   testController{},
-		optimizer:    optimizer.NewOptimizer(),
-		stateManager: sm,
+		controller: testController{},
+		optimizer:  optimizer.NewOptimizer(),
+		scheduler:  domainscheduler.New(store, &testSchedulerRunner{}),
 	}
 }
 
@@ -29,12 +33,17 @@ func (d *Dishwasher) SetNotificationSenderForTest(sender NotificationSender) {
 
 // SetPendingScheduleForTest seeds a pending schedule for test assertions.
 func (d *Dishwasher) SetPendingScheduleForTest(schedule *PendingSchedule) {
-	d.pendingSchedule = schedule
+	if schedule == nil {
+		d.scheduler = domainscheduler.New(&TestScheduleStore{}, &testSchedulerRunner{})
+		return
+	}
+
+	_ = d.scheduler.Schedule(*schedule)
 }
 
 // PendingScheduleForTest exposes the current pending schedule.
 func (d *Dishwasher) PendingScheduleForTest() *PendingSchedule {
-	return d.pendingSchedule
+	return d.scheduler.Pending()
 }
 
 // CancelPendingScheduleFromDashboardForTest triggers the dashboard cancellation path.
@@ -43,8 +52,51 @@ func (d *Dishwasher) CancelPendingScheduleFromDashboardForTest() {
 }
 
 // HandleScheduleRequestForTest triggers the schedule request handler.
-func (d *Dishwasher) HandleScheduleRequestForTest(request scheduler.ScheduleRequest) {
+func (d *Dishwasher) HandleScheduleRequestForTest(request ScheduleRequest) {
 	d.handleScheduleRequest(nil, nil, request)
+}
+
+type TestScheduleStore struct {
+	Saved       *domainscheduler.Plan
+	RestorePlan *domainscheduler.Plan
+	SaveErr     error
+	ClearErr    error
+	ClearCalls  int
+}
+
+func (t *TestScheduleStore) Save(plan domainscheduler.Plan) error {
+	if t.SaveErr != nil {
+		return t.SaveErr
+	}
+	t.Saved = &plan
+	return nil
+}
+
+func (t *TestScheduleStore) Restore() (*domainscheduler.Plan, error) {
+	if t.RestorePlan == nil {
+		return nil, nil
+	}
+
+	plan := *t.RestorePlan
+	return &plan, nil
+}
+
+func (t *TestScheduleStore) Clear() error {
+	t.ClearCalls++
+	return t.ClearErr
+}
+
+type testSchedulerRunner struct {
+	startErr   error
+	expiredErr error
+}
+
+func (t *testSchedulerRunner) StartNow() error {
+	return t.startErr
+}
+
+func (t *testSchedulerRunner) HandleExpiredSchedule() error {
+	return t.expiredErr
 }
 
 // TestNotificationService captures notifications for assertions.
