@@ -2,17 +2,15 @@ package dryrun
 
 import (
 	"log"
-	"os"
-	"strings"
 )
 
 // enabled is a global flag for dry-run mode
 var enabled bool
 
-// Init initializes dry-run mode based on the DRY_RUN environment variable
-// Must be called at application startup before any services are used
-func Init() {
-	enabled = strings.ToLower(os.Getenv("DRY_RUN")) == "true"
+// Init initializes dry-run mode.
+// Must be called at application startup before any services are used.
+func Init(dryRun bool) {
+	enabled = dryRun
 	if enabled {
 		log.Printf("🔧 DRY-RUN MODE ENABLED - No actual device changes will be made")
 	}

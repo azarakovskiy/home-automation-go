@@ -3,7 +3,6 @@ package debug
 import (
 	"log"
 	"os"
-	"strings"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -11,10 +10,10 @@ import (
 // enabled is a global flag for debug logging
 var enabled bool
 
-// Init initializes debug mode based on the DEBUG environment variable
-// Must be called at application startup
-func Init() {
-	enabled = strings.ToLower(os.Getenv("DEBUG")) == "true"
+// Init initializes debug mode.
+// Must be called at application startup.
+func Init(dbg bool) {
+	enabled = dbg
 	if enabled {
 		log.Printf("🐛 DEBUG MODE ENABLED - Verbose logging active")
 		mqtt.ERROR = log.New(os.Stdout, "[ERROR] ", 0)

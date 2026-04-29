@@ -1,48 +1,23 @@
 package debug
 
 import (
-	"os"
 	"testing"
 )
 
 func TestInit(t *testing.T) {
 	tests := []struct {
-		name     string
-		envValue string
-		want     bool
+		name  string
+		input bool
+		want  bool
 	}{
-		{
-			name:     "enabled with true",
-			envValue: "true",
-			want:     true,
-		},
-		{
-			name:     "enabled with TRUE",
-			envValue: "TRUE",
-			want:     true,
-		},
-		{
-			name:     "disabled with false",
-			envValue: "false",
-			want:     false,
-		},
-		{
-			name:     "disabled with empty",
-			envValue: "",
-			want:     false,
-		},
+		{name: "enabled", input: true, want: true},
+		{name: "disabled", input: false, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set env var
-			os.Setenv("DEBUG", tt.envValue)
-			defer os.Unsetenv("DEBUG")
-
-			// Initialize
-			Init()
-
-			// Check result
+			enabled = false
+			Init(tt.input)
 			if IsEnabled() != tt.want {
 				t.Errorf("IsEnabled() = %v, want %v", IsEnabled(), tt.want)
 			}

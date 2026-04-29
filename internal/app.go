@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"home-go/internal/config"
@@ -34,9 +33,8 @@ func RunFromEnv() error {
 
 // Run starts the application with an already loaded config.
 func Run(cfg config.Config) error {
-	syncRuntimeEnv(cfg)
-	dryrun.Init()
-	debug.Init()
+	dryrun.Init(cfg.DryRun)
+	debug.Init(cfg.Debug)
 
 	app, err := ga.NewApp(ga.NewAppRequest{
 		URL:         cfg.HAURL,
@@ -53,6 +51,7 @@ func Run(cfg config.Config) error {
 		Password:        cfg.MQTT.Password,
 		DiscoveryPrefix: cfg.MQTT.DiscoveryPrefix,
 		AppPrefix:       cfg.MQTT.AppPrefix,
+		DeviceName:      "home-go",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create runtime entities: %w", err)
@@ -150,16 +149,3 @@ func logStartupInfo(components []component.Component) {
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 }
 
-func syncRuntimeEnv(cfg config.Config) {
-	setBoolEnv("DEBUG", cfg.Debug)
-	setBoolEnv("DRY_RUN", cfg.DryRun)
-}
-
-func setBoolEnv(key string, enabled bool) {
-	if enabled {
-		_ = os.Setenv(key, "true")
-		return
-	}
-
-	_ = os.Unsetenv(key)
-}

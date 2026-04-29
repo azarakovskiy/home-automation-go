@@ -2,49 +2,23 @@ package dryrun
 
 import (
 	"fmt"
-	"os"
 	"testing"
 )
 
 func TestInit(t *testing.T) {
 	tests := []struct {
-		name   string
-		envVal string
-		want   bool
+		name  string
+		input bool
+		want  bool
 	}{
-		{
-			name:   "enabled with true",
-			envVal: "true",
-			want:   true,
-		},
-		{
-			name:   "enabled with TRUE",
-			envVal: "TRUE",
-			want:   true,
-		},
-		{
-			name:   "disabled with false",
-			envVal: "false",
-			want:   false,
-		},
-		{
-			name:   "disabled with empty",
-			envVal: "",
-			want:   false,
-		},
+		{name: "enabled", input: true, want: true},
+		{name: "disabled", input: false, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset state
 			enabled = false
-
-			// Set env var
-			os.Setenv("DRY_RUN", tt.envVal)
-			defer os.Unsetenv("DRY_RUN")
-
-			Init()
-
+			Init(tt.input)
 			if IsEnabled() != tt.want {
 				t.Errorf("IsEnabled() = %v, want %v", IsEnabled(), tt.want)
 			}
