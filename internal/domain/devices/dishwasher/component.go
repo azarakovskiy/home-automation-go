@@ -8,6 +8,7 @@ import (
 	"home-go/internal/domain/optimizer"
 	domainpricing "home-go/internal/domain/pricing"
 	"home-go/internal/domain/scheduler"
+	"home-go/internal/domain/timeformat"
 	"home-go/internal/tech/homeassistant/component"
 	"home-go/internal/tech/homeassistant/entities"
 	hanotifications "home-go/internal/tech/homeassistant/notifications"
@@ -284,9 +285,7 @@ func (c *Dishwasher) announceDelayedStart(startTime time.Time, savingsPercent fl
 		return
 	}
 
-	// Format time in a natural way for speech
-	// e.g., "3 PM", "3:30 PM", "noon", "midnight"
-	timeStr := formatTimeForSpeech(startTime)
+	timeStr := timeformat.ForSpeech(startTime)
 
 	message := fmt.Sprintf(
 		"Dishwasher starts at %s, saving %.0f percent on electricity!",
@@ -316,7 +315,7 @@ func (c *Dishwasher) announceImmediateStart(startTime time.Time, savingsPercent 
 		return
 	}
 
-	timeStr := formatTimeForSpeech(startTime)
+	timeStr := timeformat.ForSpeech(startTime)
 
 	message := fmt.Sprintf(
 		"Dishwasher starts now, saving %.0f percent on electricity!",
@@ -345,7 +344,7 @@ func (c *Dishwasher) announceCancellation(schedule *PendingSchedule, reason stri
 		return
 	}
 
-	timeStr := formatTimeForSpeech(schedule.StartTime)
+	timeStr := timeformat.ForSpeech(schedule.StartTime)
 	message := fmt.Sprintf("Dishwasher schedule for %s was cancelled", timeStr)
 	if suffix := cancellationReasonToSpeech(reason); suffix != "" {
 		message = fmt.Sprintf("%s %s.", message, suffix)
@@ -389,36 +388,6 @@ func (c *Dishwasher) shouldDelayStart(
 
 	// Normal mode: use dynamic threshold
 	return c.optimizer.ShouldDelay(result, maxDelayHours)
-}
-
-func formatTimeForSpeech(t time.Time) string {
-	hour := t.Hour()
-	minute := t.Minute()
-
-	if hour == 0 && minute == 0 {
-		return "midnight"
-	}
-	if hour == 12 && minute == 0 {
-		return "noon"
-	}
-
-	period := "AM"
-	displayHour := hour
-	if hour >= 12 {
-		period = "PM"
-		if hour > 12 {
-			displayHour = hour - 12
-		}
-	}
-	if displayHour == 0 {
-		displayHour = 12
-	}
-
-	if minute == 0 {
-		return fmt.Sprintf("%d %s", displayHour, period)
-	}
-
-	return fmt.Sprintf("%d:%02d %s", displayHour, minute, period)
 }
 
 // cancelPendingSchedule clears local + HA state for a pending run

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"home-go/internal/domain/timeformat"
 	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/homeassistant/notifications"
 	"home-go/internal/tech/runtime/debug"
@@ -522,7 +523,7 @@ func (s *Service) maybeAnnounce(slots []PriceSlot) {
 	if hours <= 0 {
 		hours = 1
 	}
-	untilSpeech := formatTimeForSpeech(window.End)
+	untilSpeech := timeformat.ForSpeech(window.End)
 
 	message := fmt.Sprintf("For the next %d hours, electricity prices are %s until %s.",
 		hours, window.Level.HumanString(), untilSpeech)
@@ -593,36 +594,6 @@ func (s *Service) wasAnnounced(window priceWindow) bool {
 	}
 
 	return true
-}
-
-func formatTimeForSpeech(t time.Time) string {
-	hour := t.Hour()
-	minute := t.Minute()
-
-	if hour == 0 && minute == 0 {
-		return "midnight"
-	}
-	if hour == 12 && minute == 0 {
-		return "noon"
-	}
-
-	period := "AM"
-	displayHour := hour
-	if hour >= 12 {
-		period = "PM"
-		if hour > 12 {
-			displayHour = hour - 12
-		}
-	}
-	if displayHour == 0 {
-		displayHour = 12
-	}
-
-	if minute == 0 {
-		return fmt.Sprintf("%d %s", displayHour, period)
-	}
-
-	return fmt.Sprintf("%d:%02d %s", displayHour, minute, period)
 }
 
 func (s *Service) recordAnnouncement(window priceWindow) {
