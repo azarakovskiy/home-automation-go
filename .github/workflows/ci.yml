@@ -64,6 +64,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ops/build/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.pull_request.number }}
@@ -92,6 +93,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ops/build/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:master
@@ -124,6 +126,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ops/build/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
