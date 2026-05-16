@@ -1,0 +1,47 @@
+# ─── Home Assistant Runtime & State ────────────────────────────────
+home-assistant_v2.db*
+home-assistant.log*
+.ha_run.lock
+.storage/
+.cloud/
+deps/
+*.yaml.save
+onboarding*
+auth*
+*.uuid
+
+# ─── Zigbee2MQTT ──────────────────────────────────────────────────
+zigbee2mqtt/
+
+# ─── Transient / Cache Folders ────────────────────────────────────
+tts/
+image/
+www/
+tmp/
+.backups/
+
+# ─── Secrets & Credentials ─────────────────────────────────────────
+secrets.yaml
+*.token
+*.conf
+
+# ─── Python Cache & Virtualenv ─────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+
+# ─── Editor / IDE Metadata ─────────────────────────────────────────
+.idea/
+.vscode/
+*.code-workspace
+
+# ─── Custom Components (optional ignore if developing) ─────────────
+custom_components/
+
+# ─── Misc / OS Artefacts ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.ssh/
+.cache/

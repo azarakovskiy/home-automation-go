@@ -1,0 +1,1059 @@
+- id: '1753711382977'
+  alias: '[Office] -> [Doorbell] Blink for detection'
+  description: Blink for motion or person detection
+  triggers:
+  - type: motion
+    device_id: bed464b80c82a989022619b1198390be
+    entity_id: f33fd80504a03d08946a8fc7e34bb047
+    domain: binary_sensor
+    trigger: device
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+    id: TRIGGER_DOORBELL_MOTION
+  - type: turned_on
+    device_id: bed464b80c82a989022619b1198390be
+    entity_id: 566e5e17a47f599f0df8739f0c663b5f
+    domain: binary_sensor
+    trigger: device
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 2
+    id: TRIGGER_DOORBELL_PERSON
+  conditions:
+  - condition: or
+    conditions:
+    - condition: zone
+      entity_id: person.alexey
+      zone: zone.home
+    - condition: zone
+      entity_id: person.pok
+      zone: zone.home
+  - condition: time
+    after: '10:00:00'
+    before: '22:00:00'
+  actions:
+  - variables:
+      previous_state: '{{ states(''light.office_lamp_moonlight'') }}'
+      previous_brightness: '{{ state_attr(''light.office_lamp_moonlight'', ''brightness'')
+        }}'
+  - type: turn_on
+    device_id: f455ed0aa9d378a80c5701a26f0a439e
+    entity_id: cfa4a599541a0f25287f12f37e6696ba
+    domain: light
+    brightness_pct: 100
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_DOORBELL_MOTION
+      sequence:
+      - repeat:
+          sequence:
+          - type: toggle
+            device_id: f455ed0aa9d378a80c5701a26f0a439e
+            entity_id: cfa4a599541a0f25287f12f37e6696ba
+            domain: light
+          - delay:
+              hours: 0
+              minutes: 0
+              seconds: 3
+              milliseconds: 0
+          until:
+          - type: is_no_motion
+            condition: device
+            device_id: bed464b80c82a989022619b1198390be
+            entity_id: f33fd80504a03d08946a8fc7e34bb047
+            domain: binary_sensor
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 5
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_DOORBELL_PERSON
+      sequence:
+      - repeat:
+          sequence:
+          - type: toggle
+            device_id: f455ed0aa9d378a80c5701a26f0a439e
+            entity_id: cfa4a599541a0f25287f12f37e6696ba
+            domain: light
+          - delay:
+              hours: 0
+              minutes: 0
+              seconds: 0
+              milliseconds: 500
+          until:
+          - type: is_off
+            condition: device
+            device_id: bed464b80c82a989022619b1198390be
+            entity_id: 566e5e17a47f599f0df8739f0c663b5f
+            domain: binary_sensor
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 5
+  - type: turn_off
+    device_id: f455ed0aa9d378a80c5701a26f0a439e
+    entity_id: cfa4a599541a0f25287f12f37e6696ba
+    domain: light
+  mode: restart
+- id: '1754568814521'
+  alias: '[Bedroom] -> [Speaker] Increase the volume for the trains'
+  description: Increase white noise volume for the trains incoming
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.train_departure_alert
+    from: 'false'
+    to: 'true'
+  conditions:
+  - condition: device
+    device_id: 4a8ad54a3f8858ebf794613a05d2db29
+    domain: media_player
+    entity_id: 0224a26b3b466cc0eae4a556781fd8fe
+    type: is_playing
+    enabled: false
+  actions:
+  - variables:
+      current_volume: '{{ state_attr(media_player.bedroom_speaker, ''volume_level'')
+        | float(default=0.3) }}'
+      target_volume: '{{ [current_volume + 0.2, 1.0] | min }}'
+      volume_steps: 5
+  - repeat:
+      count: 5
+      sequence:
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 1
+          milliseconds: 0
+      - action: media_player.volume_set
+        metadata: {}
+        data:
+          volume_level: "{{\n  current_volume +\n  (target_volume - current_volume)
+            * (repeat.index / volume_steps)\n}}\n"
+        target:
+          device_id: 4a8ad54a3f8858ebf794613a05d2db29
+    enabled: false
+  - device_id: c629bd1d66d9e09815dee4d29522312f
+    domain: mobile_app
+    type: notify
+    message: Train departing
+    title: Train departing
+  - delay:
+      hours: 0
+      minutes: 2
+      seconds: 0
+      milliseconds: 0
+  - device_id: c629bd1d66d9e09815dee4d29522312f
+    domain: mobile_app
+    type: notify
+    message: Train left
+    title: Train left
+  - repeat:
+      count: 5
+      sequence:
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 1
+          milliseconds: 0
+      - action: media_player.volume_set
+        metadata: {}
+        data:
+          volume_level: "{{\n  target_volume -\n  (target_volume - current_volume)
+            * (repeat.index / volume_steps)\n}}\n"
+        target:
+          device_id: 4a8ad54a3f8858ebf794613a05d2db29
+    enabled: false
+  mode: restart
+- id: '1754649316132'
+  alias: '[helper] Cache when trains will be nearby the house'
+  description: 'Saves times when there are trains nearby.
+
+    '
+  triggers:
+  - entity_id:
+    - sensor.train_nearby_sprinter_kersenboogerd_hoofddorp_4100
+    id: TRIGGER_TRAIN_KERSENBOOGERD_HOOFDDORP
+    attribute: departure_time_actual
+    trigger: state
+  - entity_id:
+    - sensor.train_nearby_sprinter_hoofddorp_kersenboogerd_4100
+    id: TRIGGER_TRAIN_HOOFDDORP_KERSENBOOGERD
+    attribute: departure_time_actual
+    trigger: state
+  - entity_id:
+    - sensor.train_nearby_intercity_enkhuizen_amsterdam_via_purmerend_3700
+    id: TRIGGER_TRAIN_ENKHUIZEN_AMSTERDAM
+    attribute: departure_time_actual
+    trigger: state
+  - entity_id:
+    - sensor.train_nearby_intercity_amsterdam_enkhuizen_via_purmerend_3700
+    id: TRIGGER_TRAIN_AMSTERDAM_ENKHUIZEN
+    attribute: departure_time_actual
+    trigger: state
+  - entity_id:
+    - sensor.train_nearby_intercity_enkhuizen_maastricht_2900
+    id: TRIGGER_TRAIN_ENKHUIZEN_MAASTRICHT
+    attribute: departure_time_actual
+    trigger: state
+  - entity_id:
+    - sensor.train_nearby_intercity_maastricht_enkhuizen_2900
+    id: TRIGGER_TRAIN_MAASTRICHT_ENKHUIZEN
+    attribute: departure_time_actual
+    trigger: state
+  - entity_id:
+    - sensor.train_nearby_intercity_enkhuizen_veerlen_3900
+    id: TRIGGER_TRAIN_ENKHUIZEN_VEERLEN
+    attribute: departure_time_actual
+    trigger: state
+  - entity_id:
+    - sensor.train_nearby_intercity_veerlen_enkhuizen_3900
+    id: TRIGGER_TRAIN_VEERLEN_ENKHUIZEN
+    attribute: departure_time_actual
+    trigger: state
+  conditions:
+  - condition: template
+    value_template: '{{ trigger.from_state is not none and trigger.from_state.attributes.going
+      == true }}
+
+      '
+  actions:
+  - variables:
+      delay_from_purmerend: 2
+      delay_from_weidevenne: 1
+      delay_from_hoorn: 17
+      delay_from_sloterdijk: 14
+      time_output_fmt: '%Y-%m-%d %H:%M'
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_TRAIN_KERSENBOOGERD_HOOFDDORP
+      sequence:
+      - data:
+          value: '{% set departure_time = trigger.from_state.attributes.departure_time_actual
+            %} {% set delay = delay_from_purmerend %} {% set current_date = now().strftime(''%Y-%m-%d'')
+            %} {% set departure_datetime = as_datetime(current_date + '' '' + departure_time)
+            %} {{ (departure_datetime + timedelta(minutes=delay)).strftime(time_output_fmt)
+            }}
+
+            '
+        target:
+          entity_id: input_text.cached_train_nearby_time_kersenboogerd_hoofddorp_4100
+        action: input_text.set_value
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_TRAIN_HOOFDDORP_KERSENBOOGERD
+      sequence:
+      - data:
+          value: '{% set departure_time = trigger.from_state.attributes.departure_time_actual
+            %} {% set delay = delay_from_weidevenne %} {% set current_date = now().strftime(''%Y-%m-%d'')
+            %} {% set departure_datetime = as_datetime(current_date + '' '' + departure_time)
+            %} {{ (departure_datetime + timedelta(minutes=delay)).strftime(time_output_fmt)
+            }}
+
+            '
+        target:
+          entity_id: input_text.cached_train_nearby_time_hoofddorp_kersenboogerd_4100
+        action: input_text.set_value
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_TRAIN_ENKHUIZEN_AMSTERDAM
+      - condition: template
+        value_template: '{{ trigger.from_state is not none and trigger.from_state.attributes.transfers
+          == 0 }}
+
+          '
+        enabled: true
+      sequence:
+      - data:
+          value: '{% set departure_time = trigger.from_state.attributes.departure_time_actual
+            %} {% set delay = delay_from_hoorn %} {% set current_date = now().strftime(''%Y-%m-%d'')
+            %} {% set departure_datetime = as_datetime(current_date + '' '' + departure_time)
+            %} {{ (departure_datetime + timedelta(minutes=delay)).strftime(time_output_fmt)
+            }}
+
+            '
+        target:
+          entity_id:
+          - input_text.cached_train_nearby_time_enkhuizen_amsterdam_via_purmerend_3700
+        action: input_text.set_value
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_TRAIN_AMSTERDAM_ENKHUIZEN
+      - condition: template
+        value_template: '{{ trigger.from_state is not none and trigger.from_state.attributes.transfers
+          == 0 }}
+
+          '
+        enabled: true
+      sequence:
+      - data:
+          value: '{% set departure_time = trigger.from_state.attributes.departure_time_actual
+            %} {% set delay = delay_from_sloterdijk %} {% set current_date = now().strftime(''%Y-%m-%d'')
+            %} {% set departure_datetime = as_datetime(current_date + '' '' + departure_time)
+            %} {{ (departure_datetime + timedelta(minutes=delay)).strftime(time_output_fmt)
+            }}
+
+            '
+        target:
+          entity_id:
+          - input_text.cached_train_nearby_time_amsterdam_enkhuizen_via_purmerend_3700
+        action: input_text.set_value
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_TRAIN_ENKHUIZEN_MAASTRICHT
+      - condition: template
+        value_template: '{{ trigger.from_state is not none and trigger.from_state.attributes.transfers
+          == 0 }}
+
+          '
+      sequence:
+      - data:
+          value: '{% set departure_time = trigger.from_state.attributes.departure_time_actual
+            %} {% set delay = delay_from_hoorn %} {% set current_date = now().strftime(''%Y-%m-%d'')
+            %} {% set departure_datetime = as_datetime(current_date + '' '' + departure_time)
+            %} {{ (departure_datetime + timedelta(minutes=delay)).strftime(time_output_fmt)
+            }}
+
+            '
+        target:
+          entity_id:
+          - input_text.cached_train_nearby_time_enkhuizen_maastrict_2900
+        action: input_text.set_value
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_TRAIN_MAASTRICHT_ENKHUIZEN
+      - condition: template
+        value_template: '{{ trigger.from_state is not none and trigger.from_state.attributes.transfers
+          == 0 }}
+
+          '
+      sequence:
+      - data:
+          value: '{% set departure_time = trigger.from_state.attributes.departure_time_actual
+            %} {% set delay = delay_from_sloterdijk %} {% set current_date = now().strftime(''%Y-%m-%d'')
+            %} {% set departure_datetime = as_datetime(current_date + '' '' + departure_time)
+            %} {{ (departure_datetime + timedelta(minutes=delay)).strftime(time_output_fmt)
+            }}
+
+            '
+        target:
+          entity_id:
+          - input_text.cached_train_nearby_time_maastrict_enkhuizen_2900
+        action: input_text.set_value
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_TRAIN_ENKHUIZEN_VEERLEN
+      - condition: template
+        value_template: '{{ trigger.from_state is not none and trigger.from_state.attributes.transfers
+          == 0 }}
+
+          '
+      sequence:
+      - data:
+          value: '{% set departure_time = trigger.from_state.attributes.departure_time_actual
+            %} {% set delay = delay_from_hoorn %} {% set current_date = now().strftime(''%Y-%m-%d'')
+            %} {% set departure_datetime = as_datetime(current_date + '' '' + departure_time)
+            %} {{ (departure_datetime + timedelta(minutes=delay)).strftime(time_output_fmt)
+            }}
+
+            '
+        target:
+          entity_id:
+          - input_text.cached_train_nearby_time_enkhuizen_veerlen_3900
+        action: input_text.set_value
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_TRAIN_VEERLEN_ENKHUIZEN
+      - condition: template
+        value_template: '{{ trigger.from_state is not none and trigger.from_state.attributes.transfers
+          == 0 }}
+
+          '
+      sequence:
+      - data:
+          value: '{% set departure_time = trigger.from_state.attributes.departure_time_actual
+            %} {% set delay = delay_from_sloterdijk %} {% set current_date = now().strftime(''%Y-%m-%d'')
+            %} {% set departure_datetime = as_datetime(current_date + '' '' + departure_time)
+            %} {{ (departure_datetime + timedelta(minutes=delay)).strftime(time_output_fmt)
+            }}
+
+            '
+        target:
+          entity_id:
+          - input_text.cached_train_nearby_time_maastrict_enkhuizen_3900
+        action: input_text.set_value
+  mode: single
+- id: '1757240894062'
+  alias: '[Bedroom] -> [Air purifier] Filter air'
+  description: Filter air in the bedroom while asleep
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_select.daytime_mode
+    to: Night
+    id: TRIGGER_NIGHT
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 10
+  - trigger: state
+    entity_id:
+    - input_select.daytime_mode
+    to:
+    id: TRIGGER_MORNING
+    from: Night
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 10
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity_id: input_select.house_mode
+      state: At home
+    - condition: and
+      conditions:
+      - condition: device
+        device_id: dfdea792b08540d5240fb04629db0357
+        domain: fan
+        entity_id: 6657da298b0022a9a204c6c29d920f2a
+        type: is_on
+      - condition: trigger
+        id:
+        - TRIGGER_IT_IS_MORNING
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_MORNING
+      sequence:
+      - type: turn_off
+        device_id: dfdea792b08540d5240fb04629db0357
+        entity_id: 6657da298b0022a9a204c6c29d920f2a
+        domain: fan
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_NIGHT
+      sequence:
+      - type: turn_on
+        device_id: dfdea792b08540d5240fb04629db0357
+        entity_id: 6657da298b0022a9a204c6c29d920f2a
+        domain: fan
+  mode: single
+- id: '1757263718862'
+  alias: '[Laundry] -> Smart schedule washing machine'
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - input_button.schedule_washing_machine
+  conditions: []
+  actions:
+  - action: python_script.get_delay_to_save_electricity
+    data:
+      runtime_minutes: 65
+      weights:
+      - 6
+      - 2
+      - 3
+      - 2
+      - 3
+      - 4
+      max_delay_hours: 5
+    response_variable: OPTIMIZED_DELAY
+  - device_id: c629bd1d66d9e09815dee4d29522312f
+    domain: mobile_app
+    type: notify
+    message: Delay it by {{ OPTIMIZED_DELAY.optimal_delay_text }} to save {{ OPTIMIZED_DELAY.cost_savings_percent
+      }}%!
+    title: It's best to delay it
+  mode: single
+- id: '1757359879288'
+  alias: '[Living room] -> Control the room with a cube'
+  description: Aqara cube
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.0x00158d0007075415_action_to_side
+    to: '0'
+    id: ACTION_TO_SIDE_0
+  - trigger: state
+    entity_id:
+    - sensor.0x00158d0007075415_action_to_side
+    to: '2'
+    id: ACTION_TO_SIDE_2
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - ACTION_TO_SIDE_0
+      sequence:
+      - action: light.turn_off
+        metadata: {}
+        data: {}
+        target:
+          area_id: living_room
+    - conditions:
+      - condition: trigger
+        id:
+        - ACTION_TO_SIDE_2
+      sequence:
+      - action: light.turn_on
+        metadata: {}
+        data: {}
+        target:
+          area_id: living_room
+  mode: single
+- id: '1757626264360'
+  alias: '[helper] Update optimal consumption'
+  description: ''
+  triggers:
+  - minutes: /5
+    trigger: time_pattern
+  conditions:
+  - condition: state
+    entity_id: input_select.house_mode
+    state: At home
+  actions:
+  - data:
+      runtime_minutes: 137
+      weights:
+      - 1
+      - 5
+      - 5
+      - 2
+      - 4
+      - 4
+      - 2
+      max_delay_hours: 12
+    response_variable: OPTIMAL_TIME_DISHWASHER_AUTO
+    action: python_script.get_delay_to_save_electricity
+  - data:
+      value: '{{ OPTIMAL_TIME_DISHWASHER_AUTO[''optimal_start_at_text''] }}'
+    target:
+      entity_id: input_text.infra_dishwasher_auto_optimal_time
+    action: input_text.set_value
+  - data:
+      value: '{{ OPTIMAL_TIME_DISHWASHER_AUTO[''optimal_delay_minutes''] | int }}'
+    target:
+      entity_id: input_number.infra_dishwasher_auto_optimal_delay
+    action: input_number.set_value
+  - data:
+      value: '{{ OPTIMAL_TIME_DISHWASHER_AUTO[''cost_savings_percent''] }}'
+    target:
+      entity_id: input_text.infra_dishwasher_auto_optimal_savings
+    action: input_text.set_value
+  mode: single
+- id: '1757693573806'
+  alias: '[helper] [modes] Manual override'
+  description: ''
+  triggers:
+  - entity_id:
+    - input_select.daytime_mode
+    trigger: state
+    id: TRIGGER_DAYTIME_MODE
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+  - trigger: state
+    entity_id:
+    - input_boolean.office_laptop_charge_optimization_auto
+    to: 'off'
+    id: TRIGGER_LAPTOP_SMART_CHARGE
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+  conditions:
+  - condition: template
+    value_template: '{{''trigger.event.context.user_id'' != null}}'
+  - condition: or
+    conditions:
+    - condition: and
+      conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_DAYTIME_MODE
+      - condition: state
+        entity_id: input_boolean.daytime_mode_auto
+        state: 'on'
+      alias: Daytime mode auto is currently ON
+    - alias: Triggered by laptop optimization
+      condition: and
+      conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_LAPTOP_SMART_CHARGE
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_DAYTIME_MODE
+      sequence:
+      - target:
+          entity_id: input_boolean.daytime_mode_auto
+        action: input_boolean.turn_off
+        data: {}
+      - delay:
+          hours: 0
+          minutes: 30
+          seconds: 0
+          milliseconds: 0
+      - target:
+          entity_id: input_boolean.daytime_mode_auto
+        action: input_boolean.turn_on
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_LAPTOP_SMART_CHARGE
+      sequence:
+      - delay:
+          hours: 4
+          minutes: 0
+          seconds: 0
+          milliseconds: 0
+      - action: input_boolean.turn_on
+        data: {}
+        target:
+          entity_id: input_boolean.office_laptop_charge_optimization_auto
+  mode: parallel
+  max: 10
+- id: '1758731758263'
+  description: ''
+  triggers:
+  - trigger: time_pattern
+    hours: '*'
+  conditions: []
+  actions:
+  - alias: Turn off when prolonged not at home
+    if:
+    - condition: or
+      conditions:
+      - condition: state
+        entity_id: input_select.house_mode
+        state: Away
+        for:
+          hours: 2
+          minutes: 0
+          seconds: 0
+      - condition: state
+        entity_id: input_select.house_mode
+        state: Travel
+    then:
+    - type: turn_off
+      device_id: 750b149376b17978c997217021f077e4
+      entity_id: a57afdf553f4b1d4764b0de5262645dd
+      domain: switch
+    - type: turn_off
+      device_id: 2f03bd52e0287c35cb927001b5899f65
+      entity_id: 8e631cb4f2666eed528a6897bbfd2939
+      domain: switch
+    - stop: Nobody at home
+  - alias: Optimize laptop charger
+    sequence:
+    - condition: state
+      entity_id: input_boolean.office_laptop_charge_optimization_auto
+      state: 'on'
+    - action: python_script.cheapest_electricity_hours
+      data:
+        hours_needed: 6
+        window_hours: 12
+        guaranteed_per_block:
+          night: 3
+          morning: 1
+          day: 2
+          evening: 1
+        given_day: '{{ now().day }}'
+        given_hour: '{{ now().hour }}'
+      response_variable: CHEAPEST_HOURS
+    - if:
+      - condition: template
+        value_template: '{{ CHEAPEST_HOURS.charge_now | default(false) }}'
+      then:
+      - type: turn_on
+        device_id: 750b149376b17978c997217021f077e4
+        entity_id: a57afdf553f4b1d4764b0de5262645dd
+        domain: switch
+      else:
+      - type: turn_off
+        device_id: 750b149376b17978c997217021f077e4
+        entity_id: a57afdf553f4b1d4764b0de5262645dd
+        domain: switch
+      enabled: true
+  - alias: Optimize vacuum charger
+    sequence:
+    - condition: state
+      entity_id: input_boolean.living_room_vacuum_charge_optimization_auto
+      state: 'on'
+    - action: python_script.cheapest_electricity_hours
+      data:
+        hours_needed: 1
+        window_hours: 12
+        guaranteed_per_block:
+          night: 2
+          morning: 0
+          day: 0
+          evening: 0
+        given_day: '{{ now().day }}'
+        given_hour: '{{ now().hour }}'
+      response_variable: CHEAPEST_HOURS
+    - if:
+      - condition: template
+        value_template: '{{ CHEAPEST_HOURS.charge_now | default(false) }}'
+      then:
+      - type: turn_on
+        device_id: 2f03bd52e0287c35cb927001b5899f65
+        entity_id: 8e631cb4f2666eed528a6897bbfd2939
+        domain: switch
+      else:
+      - type: turn_off
+        device_id: 2f03bd52e0287c35cb927001b5899f65
+        entity_id: 8e631cb4f2666eed528a6897bbfd2939
+        domain: switch
+      enabled: true
+  mode: single
+- id: '1759087619599'
+  alias: '[Bedroom] Keep warm at night'
+  description: "Maintains comfortable temperature for sleeping \U0001F634"
+  triggers:
+  - trigger: time_pattern
+    hours: '*'
+    minutes: '2'
+  conditions:
+  - condition: state
+    entity_id: input_select.house_mode
+    state: At home
+  - condition: state
+    entity_id: input_select.daytime_mode
+    state:
+    - Night
+  - condition: numeric_state
+    entity_id: sensor.zhimi_mc2_a727_temperature
+    below: 18
+  actions:
+  - action: climate.set_temperature
+    metadata: {}
+    data:
+      hvac_mode: auto
+      temperature: 20
+    target:
+      device_id: 64c579f3c26853eff80caae688417ca7
+  - type: turn_on
+    device_id: 64c579f3c26853eff80caae688417ca7
+    entity_id: 001020cb2b684abd670f59410d6cd74c
+    domain: switch
+  - device_id: 64c579f3c26853eff80caae688417ca7
+    domain: number
+    entity_id: 3baf6cda8106a6c2975181bc27ede486
+    type: set_value
+    value: 0.5
+  - wait_for_trigger:
+    - trigger: numeric_state
+      entity_id:
+      - climate.bedroom_smart_heater
+      for:
+        hours: 0
+        minutes: 1
+        seconds: 0
+      attribute: current_temperature
+      above: 18
+  - device_id: 64c579f3c26853eff80caae688417ca7
+    domain: number
+    entity_id: 3baf6cda8106a6c2975181bc27ede486
+    type: set_value
+    value: 0
+  - type: turn_off
+    device_id: 64c579f3c26853eff80caae688417ca7
+    entity_id: 001020cb2b684abd670f59410d6cd74c
+    domain: switch
+  mode: restart
+- id: '1759089964194'
+  alias: '[helper] Set daytime mode'
+  description: Sets global daytime mode
+  triggers:
+  - trigger: time
+    at: 08:00:00
+    id: TRIGGER_MORNING
+  - trigger: time
+    at: '10:00:00'
+    id: TRIGGER_DAY
+  - trigger: time
+    at: '18:00:00'
+    id: TRIGGER_EVENING
+  - trigger: time
+    at: '22:00:00'
+    id: TRIGGER_NIGHT
+  conditions:
+  - condition: state
+    entity_id: input_boolean.daytime_mode_auto
+    state: 'on'
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_MORNING
+      sequence:
+      - action: input_select.select_option
+        metadata: {}
+        data:
+          option: Morning
+        target:
+          entity_id: input_select.daytime_mode
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_DAY
+      sequence:
+      - action: input_select.select_option
+        metadata: {}
+        data:
+          option: Day
+        target:
+          entity_id: input_select.daytime_mode
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_EVENING
+      sequence:
+      - action: input_select.select_option
+        metadata: {}
+        data:
+          option: Evening
+        target:
+          entity_id: input_select.daytime_mode
+    - conditions:
+      - condition: trigger
+        id:
+        - TRIGGER_NIGHT
+      sequence:
+      - action: input_select.select_option
+        metadata: {}
+        data:
+          option: Night
+        target:
+          entity_id: input_select.daytime_mode
+  mode: single
+- id: '1759773976066'
+  alias: '[reminder] Remind to heal the head'
+  description: ''
+  triggers:
+  - trigger: time
+    at: '15:00:00'
+    weekday:
+    - sun
+    - thu
+  conditions:
+  - condition: state
+    entity_id: input_select.house_mode
+    state: At home
+  actions:
+  - action: input_boolean.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.head_healed
+  - action: tts.speak
+    metadata: {}
+    data:
+      cache: false
+      media_player_entity_id: media_player.living_room_google_home
+      message: Chookity, don't forget about your head
+    target:
+      entity_id: tts.piper
+  - repeat:
+      until:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_boolean.head_healed
+          state: 'on'
+        - condition: not
+          conditions:
+          - condition: state
+            entity_id: input_select.house_mode
+            state: At home
+      sequence:
+      - delay:
+          hours: 0
+          minutes: 20
+          seconds: 0
+          milliseconds: 0
+      - condition: state
+        entity_id: input_boolean.head_healed
+        state: 'off'
+      - action: tts.speak
+        metadata: {}
+        data:
+          cache: true
+          media_player_entity_id: media_player.living_room_google_home
+          message: Reminder to heal the head
+        target:
+          entity_id: tts.piper
+  mode: single
+- id: '1760962312443'
+  alias: '[Reminder] Take your pills'
+  description: ''
+  triggers:
+  - trigger: time
+    at: '10:00:00'
+    weekday:
+    - mon
+    - wed
+    - fri
+    - tue
+    - sun
+    - thu
+    - sat
+  conditions:
+  - condition: state
+    entity_id: input_select.house_mode
+    state: At home
+  actions:
+  - action: input_boolean.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: input_boolean.vitamins_taken
+  - action: tts.speak
+    metadata: {}
+    data:
+      cache: true
+      media_player_entity_id: media_player.living_room_google_home
+      message: Chookity, time to take your pills!
+    target:
+      entity_id: tts.piper
+  - repeat:
+      until:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: input_boolean.vitamins_taken
+          state: 'on'
+        - condition: not
+          conditions:
+          - condition: state
+            entity_id: input_select.house_mode
+            state: At home
+      sequence:
+      - delay:
+          hours: 0
+          minutes: 20
+          seconds: 0
+          milliseconds: 0
+      - condition: state
+        entity_id: input_boolean.vitamins_taken
+        state: 'off'
+      - action: tts.speak
+        metadata: {}
+        data:
+          cache: true
+          media_player_entity_id: media_player.living_room_google_home
+          message: Reminder to take your pills
+        target:
+          entity_id: tts.piper
+  mode: single
+- id: '1761685086826'
+  alias: '[Office] -> Turn off the heater every day'
+  description: ''
+  triggers:
+  - trigger: time
+    at: '18:00:00'
+  - trigger: time
+    at: '21:00:00'
+  conditions: []
+  actions:
+  - action: climate.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: climate.office_alexey_ir_heater
+  - action: climate.turn_off
+    metadata: {}
+    target:
+      entity_id: climate.office_dani_ir_heater
+    data: {}
+  mode: single
+- id: '1767981522257'
+  alias: '[Bedroom] Light brightness control'
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - light.bedroom_ceiling_light
+    to:
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: input_select.daytime_mode
+        state: Morning
+      sequence:
+      - target:
+          entity_id: light.bedroom_ceiling_light
+        data:
+          brightness_pct: 60
+          color_temp_kelvin: 4000
+          transition: 0.5
+        action: light.turn_on
+    - conditions:
+      - condition: state
+        entity_id: input_select.daytime_mode
+        state: Day
+      sequence:
+      - target:
+          entity_id: light.bedroom_ceiling_light
+        data:
+          brightness_pct: 85
+          color_temp_kelvin: 5000
+          transition: 0.5
+        action: light.turn_on
+    - conditions:
+      - condition: state
+        entity_id: input_select.daytime_mode
+        state: Evening
+      sequence:
+      - target:
+          entity_id: light.bedroom_ceiling_light
+        data:
+          brightness_pct: 35
+          color_temp_kelvin: 2700
+          transition: 0.5
+        action: light.turn_on
+    - conditions:
+      - condition: state
+        entity_id: input_select.daytime_mode
+        state: Night
+      sequence:
+      - target:
+          entity_id: light.bedroom_ceiling_light
+        data:
+          brightness_pct: 5
+          color_temp_kelvin: 1700
+          transition: 0.5
+        action: light.turn_on
+  mode: single

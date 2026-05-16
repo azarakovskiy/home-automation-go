@@ -1,0 +1,55 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+lovelace:
+  mode: storage
+  dashboards:
+    lovelace-yaml:
+      mode: yaml
+      title: YAML
+      icon: mdi:script
+      show_in_sidebar: true
+      filename: dashboards.yaml
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.1.44
+
+logger:
+  default: info
+  logs:
+    custom_components.pyscript: debug
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+sensor: !include_dir_merge_list sensors
+template: !include_dir_merge_list templates
+
+# Helper entities
+input_boolean: !include_dir_merge_named helpers/input_boolean
+input_select: !include_dir_merge_named helpers/input_select
+input_datetime: !include_dir_merge_named helpers/input_datetime
+input_number: !include_dir_merge_named helpers/input_number
+input_text: !include_dir_merge_named helpers/input_text
+
+# Integrations
+# https://www.home-assistant.io/integrations/my/
+my:
+
+# MQTT Statestream
+mqtt_statestream:
+  base_topic: hass
+  publish_attributes: true
+  publish_timestamps: true
+
+# https://www.home-assistant.io/integrations/python_script/
+python_script:
+
+# https://hacs-pyscript.readthedocs.io/en/latest/reference.html#configuration
+pyscript: !include pyscript/config.yaml

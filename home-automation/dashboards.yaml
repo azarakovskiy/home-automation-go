@@ -1,0 +1,707 @@
+views:
+  - type: sections
+    visible:
+      - user: af81a7c83ead4943b89b639c1c8a73a8
+      - user: 0b1849ad933444af9f23e3a3aa0ff8e0
+    max_columns: 4
+    path: bubble
+    sections:
+      - type: grid
+        cards:
+          - square: false
+            type: grid
+            cards:
+              - show_state: true
+                show_name: false
+                camera_view: live
+                fit_mode: cover
+                type: picture-entity
+                entity: camera.doorbell_fluent
+                camera_image: camera.doorbell_fluent
+                theme: minimalist-mobile
+            columns: 1
+            visibility:
+              - condition: or
+                conditions:
+                  - condition: state
+                    entity: binary_sensor.doorbell_motion
+                    state: "on"
+                  - condition: state
+                    entity: binary_sensor.doorbell_person
+                    state: "on"
+                  - condition: state
+                    entity: binary_sensor.doorbell_package
+                    state: "on"
+        column_span: 4
+      - type: grid
+        cards:
+          - type: entities
+            entities:
+              - entity: sensor.alexey_phone_battery_level
+                secondary_info: last-updated
+                name: Battery
+              - entity: sensor.alexey_phone_battery_state
+                name: State
+                secondary_info: none
+            show_header_toggle: false
+            state_color: true
+            grid_options:
+              columns: 12
+              rows: auto
+            title: Chookity phone
+            visibility:
+              - condition: user
+                users:
+                  - af81a7c83ead4943b89b639c1c8a73a8
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: input_boolean.head_healed
+            grid_options:
+              columns: 6
+              rows: auto
+            show_last_updated: true
+            show_last_changed: false
+            icon: mdi:medication-outline
+            button_action: {}
+            visibility:
+              - condition: user
+                users:
+                  - af81a7c83ead4943b89b639c1c8a73a8
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: input_boolean.vitamins_taken
+            grid_options:
+              columns: 6
+              rows: auto
+            show_last_updated: true
+            show_last_changed: false
+            icon: mdi:medication-outline
+            button_action: {}
+            visibility:
+              - condition: user
+                users:
+                  - 0b1849ad933444af9f23e3a3aa0ff8e0
+        column_span: 4
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: First floor
+            grid_options:
+              columns: 12
+              rows: auto
+            subtitle: Living room, kitchen and hallway
+          - type: custom:mushroom-chips-card
+            chips:
+              - type: entity
+                entity: sensor.aqara_device_temperature
+            grid_options:
+              columns: 12
+              rows: auto
+          - type: custom:bubble-card
+            card_type: separator
+            name: Lights
+            card_layout: normal
+            sub_button: []
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: light.yeelink_color4_f547_light
+            show_attribute: false
+            show_state: false
+            name: Black lamp
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: light.yeelink_color4_0d71_light
+            show_attribute: false
+            show_state: false
+            name: Monstera lamp
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: light.yeelink_strip2_fc2f_light
+            show_attribute: false
+            show_state: false
+            name: TV light
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: custom:bubble-card
+            card_type: separator
+            name: Misc
+            card_layout: normal
+            sub_button: []
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: switch.living_room_vacuum_socket
+            show_name: true
+            show_state: true
+            icon: mdi:power-socket-eu
+            name: Dyson socket
+            show_attribute: false
+            button_action: {}
+            card_layout: large
+            grid_options:
+              columns: 6
+              rows: auto
+            sub_button:
+              - entity: input_boolean.living_room_vacuum_charge_optimization_auto
+                show_state: false
+                state_background: true
+                show_background: true
+                icon: mdi:battery-charging-wireless-70
+                tap_action:
+                  action: toggle
+                show_icon: true
+                show_name: false
+            show_last_updated: false
+            force_icon: false
+            show_last_changed: false
+            attribute: friendly_name
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: Second floor
+            subtitle: Bedroom and hallway
+          - type: custom:mushroom-chips-card
+            chips:
+              - type: entity
+                entity: sensor.zhimi_mc2_a727_temperature
+            grid_options:
+              columns: 12
+              rows: auto
+          - type: custom:bubble-card
+            card_type: separator
+            name: Climate
+            card_layout: normal
+            sub_button: []
+          - type: custom:bubble-card
+            card_type: climate
+            entity: climate.bedroom_smart_heater
+            sub_button:
+              - name: HVAC modes menu
+                select_attribute: hvac_modes
+                state_background: false
+                show_arrow: false
+                show_name: false
+                show_last_changed: false
+                show_attribute: false
+                show_last_updated: false
+                hide_when_parent_unavailable: false
+            name: Bedroom
+            force_icon: false
+            show_icon: true
+            scrolling_effect: true
+            show_state: false
+            show_last_changed: true
+            show_last_updated: false
+            show_attribute: true
+            attribute: current_temperature
+            min_temp: 18
+            max_temp: 24
+            hide_temperature: false
+            state_color: false
+            show_name: true
+            button_action: {}
+            card_layout: large
+            rows: "1"
+            grid_options:
+              columns: 12
+              rows: "1"
+          - type: custom:bubble-card
+            card_type: separator
+            name: Lights
+            card_layout: normal
+            sub_button: []
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: light.yeelink_color4_2316_light
+            show_attribute: false
+            show_state: false
+            name: Bedroom
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: light.yeelink_color4_37d1_light
+            show_attribute: false
+            show_state: false
+            name: Hallway
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: custom:bubble-card
+            card_type: separator
+            name: Misc
+            card_layout: normal
+            sub_button: []
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: switch.bedroom_space_socket
+            show_name: true
+            show_state: true
+            icon: mdi:power-socket-eu
+            name: Space socket
+            show_attribute: false
+            button_action: {}
+            card_layout: large
+            grid_options:
+              columns: 6
+              rows: auto
+            sub_button:
+              - entity: input_boolean.bedroom_space_socket_automation_on
+                show_state: false
+                state_background: true
+                show_background: true
+                icon: mdi:projector
+                tap_action:
+                  action: toggle
+                show_icon: true
+                show_name: false
+            show_last_updated: false
+            force_icon: false
+            show_last_changed: false
+            attribute: friendly_name
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: Third floor
+            subtitle: Office and laundry
+          - type: custom:mushroom-chips-card
+            chips:
+              - type: template
+                entity: climate.office_alexey_ir_heater
+                icon: mdi:thermometer
+                content: >
+                  {{ state_attr('climate.office_alexey_ir_heater',
+                  'current_temperature') }}°C
+          - type: custom:bubble-card
+            card_type: separator
+            name: Climate
+            card_layout: normal
+            sub_button: []
+          - type: custom:bubble-card
+            card_type: climate
+            entity: climate.office_alexey_ir_heater
+            sub_button:
+              - name: HVAC modes menu
+                select_attribute: hvac_modes
+                state_background: false
+                show_arrow: false
+                show_name: false
+                show_last_changed: false
+                show_attribute: false
+                show_last_updated: false
+                hide_when_parent_unavailable: false
+            name: "Office "
+            force_icon: false
+            show_icon: true
+            scrolling_effect: true
+            show_state: false
+            show_last_changed: true
+            show_last_updated: false
+            show_attribute: true
+            attribute: current_temperature
+            min_temp: 18
+            max_temp: 24
+            hide_temperature: false
+            state_color: false
+            show_name: true
+            button_action: {}
+            card_layout: large
+            rows: "1"
+            grid_options:
+              columns: 12
+              rows: "1"
+          - type: custom:bubble-card
+            card_type: separator
+            name: Misc
+            card_layout: normal
+            sub_button: []
+          - type: custom:bubble-card
+            card_type: button
+            button_type: switch
+            entity: switch.office_laptop_socket
+            show_name: true
+            show_state: true
+            icon: mdi:power-socket-eu
+            name: Laptop socket
+            show_attribute: false
+            button_action: {}
+            card_layout: large
+            grid_options:
+              columns: 6
+              rows: auto
+            sub_button:
+              - entity: input_boolean.office_laptop_charge_optimization_auto
+                show_state: false
+                state_background: true
+                show_background: true
+                icon: mdi:battery-charging-wireless-70
+                tap_action:
+                  action: toggle
+                show_icon: true
+            show_last_updated: false
+            force_icon: false
+            show_last_changed: false
+            attribute: friendly_name
+    badges:
+      - type: entity
+        show_name: false
+        show_state: true
+        show_icon: true
+        entity: input_select.house_mode
+        show_entity_picture: false
+        tap_action:
+          action: perform-action
+          perform_action: python_script.toggle_select
+          data:
+            entity_id: input_select.house_mode
+            options:
+              - At home
+              - Away
+        hold_action:
+          action: perform-action
+          perform_action: input_select.select_option
+          target:
+            entity_id: input_select.house_mode
+          data: {}
+      - type: entity
+        show_name: false
+        show_state: true
+        show_icon: true
+        entity: input_select.daytime_mode
+        tap_action:
+          action: perform-action
+          perform_action: python_script.toggle_select
+          data:
+            entity_id: input_select.daytime_mode
+            options:
+              - Morning
+              - Day
+              - Evening
+              - Night
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: person.alexey
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: person.pok
+      - type: entity
+        show_name: false
+        show_state: true
+        show_icon: true
+        entity: weather.forecast_home
+        state_content:
+          - state
+          - temperature
+          - humidity
+          - wind_speed
+        show_entity_picture: false
+      - type: entity
+        show_name: true
+        show_state: true
+        show_icon: true
+        entity: sensor.precipitation_intensity
+        name: Rain
+    header:
+      card:
+        type: markdown
+        content: "# Hello {{ user }}!"
+        text_only: true
+    dense_section_placement: false
+    cards: []
+    icon: mdi:home-circle-outline
+  - type: sections
+    max_columns: 3
+    title: Energy
+    path: energy
+    icon: mdi:lightning-bolt-outline
+    sections:
+      - type: grid
+        cards:
+          - type: custom:apexcharts-card
+            graph_span: 24h
+            span:
+              start: hour
+            now:
+              show: true
+              color: red
+            header:
+              show: true
+              show_states: true
+              colorize_states: true
+            yaxis:
+              - decimals: 2
+                min: 0
+                max: 0.6
+            apex_config:
+              chart:
+                toolbar:
+                  show: false
+              fill:
+                type: gradient
+                gradient:
+                  type: vertical
+                  colorStops:
+                    - offset: 0
+                      color: "#8B0000"
+                    - offset: 15
+                      color: "#FF0000"
+                    - offset: 24
+                      color: "#FF6F3C"
+                    - offset: 32
+                      color: "#FFA233"
+                    - offset: 44
+                      color: "#FFD633"
+                    - offset: 56
+                      color: "#D4F44C"
+                    - offset: 68
+                      color: "#A8E84B"
+                    - offset: 78
+                      color: "#61D64A"
+                    - offset: 83
+                      color: "#32CD32"
+                    - offset: 95
+                      color: "#2E8B57"
+                    - offset: 100
+                      color: "#808080"
+              stroke:
+                colors:
+                  - transparent
+            series:
+              - entity: sensor.frank_energie_prices_current_electricity_price_all_in
+                name: Electricity
+                type: area
+                curve: monotoneCubic
+                float_precision: 3
+                stroke_width: 0
+                fill_raw: zero
+                show:
+                  in_header: raw
+                  legend_value: false
+                data_generator: >
+                  return entity.attributes.prices.map((record) => [record.from,
+                  record.price]);
+  - type: sections
+    max_columns: 2
+    subview: true
+    path: washing-machine
+    title: Washing machine
+    icon: mdi:washing-machine
+    sections:
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: Saving money
+          - type: custom:mushroom-select-card
+            entity: select.washing_machine_temperature
+            name: Temperature
+            secondary_info: none
+          - type: custom:mushroom-select-card
+            entity: select.washing_machine_spin_speed
+            name: Spin RPM
+          - type: custom:mushroom-select-card
+            entity: select.washing_machine_selected_program
+            name: Program
+          - show_name: true
+            show_icon: true
+            type: button
+            entity: script.laundry_schedule_washing_machine
+            name: Schedule
+            tap_action:
+              action: perform-action
+              perform_action: script.laundry_schedule_washing_machine
+              target: {}
+              data:
+                program: Mix
+    badges:
+      - type: custom:mushroom-template-badge
+        icon: |-
+          {% set state = states('sensor.washing_machine_operation_state') %}
+          {% if state == 'inactive' %}
+            mdi:washing-machine-off
+          {% elif state == 'delayedstart' %}
+            mdi:washing-machine
+          {% elif state == 'run' %}
+            mdi:washing-machine
+          {% elif state == 'finished' %}
+            mdi:washing-machine
+          {% else %}
+            mdi:washing-machine-alert
+          {% endif %}
+        color: |-
+          {% set state = states('sensor.washing_machine_operation_state') %}
+          {% if state == 'inactive' %}
+            grey
+          {% elif state == 'delayedstart' %}
+            yellow
+          {% elif state == 'run' %}
+            light-blue
+          {% elif state == 'finished' %}
+            green
+          {% else %}
+            red
+          {% endif %}
+        entity: sensor.washing_machine_operation_state
+        area: laundry
+        content: |-
+          {% set state = states('sensor.washing_machine_operation_state') %}
+          {% if state == 'inactive' %}
+            Inactive
+          {% elif state == 'delayedstart' %}
+            Scheduled
+          {% elif state == 'run' %}
+            Running
+          {% elif state == 'finished' %}
+            Completed
+          {% else %}
+            Washing Machine
+          {% endif %}
+        label: |-
+          {% set state = states('sensor.washing_machine_operation_state') %}
+          {% if state == 'delayedstart' %}
+            Scheduled
+          {% elif state == 'run' %}
+            {{ states('input_datetime.washing_machine_finish_time') }}
+          {% elif state == 'finished' %}
+            Completed
+          {% endif %}
+      - type: custom:mushroom-template-badge
+        icon: |-
+          {% set state = states('sensor.washing_machine_operation_state') %}
+          {% if state == 'inactive' %}
+            mdi:washing-machine-off
+          {% elif state == 'delayedstart' %}
+            mdi:washing-machine
+          {% elif state == 'run' %}
+            mdi:washing-machine
+          {% elif state == 'finished' %}
+            mdi:washing-machine
+          {% else %}
+            mdi:washing-machine-alert
+          {% endif %}
+        color: |-
+          {% set state = states('sensor.washing_machine_operation_state') %}
+          {% if state == 'inactive' %}
+            grey
+          {% elif state == 'delayedstart' %}
+            yellow
+          {% elif state == 'run' %}
+            light-blue
+          {% elif state == 'finished' %}
+            green
+          {% else %}
+            red
+          {% endif %}
+        entity: sensor.washing_machine_operation_state
+        area: laundry
+        content: |-
+          {% set state = states('sensor.washing_machine_operation_state') %}
+          {% if state == 'inactive' %}
+            Inactive
+          {% elif state == 'delayedstart' %}
+            Scheduled
+          {% elif state == 'run' %}
+            Running
+          {% elif state == 'finished' %}
+            Completed
+          {% else %}
+            Washing Machine
+          {% endif %}
+        label: |-
+          {% set state = states('sensor.washing_machine_operation_state') %}
+          {% if state == 'delayedstart' %}
+            Scheduled
+          {% elif state == 'run' %}
+            {{ states('input_datetime.washing_machine_finish_time') }}
+          {% elif state == 'finished' %}
+            Completed
+          {% endif %}
+  - type: sections
+    max_columns: 2
+    title: Dishwasher
+    path: dishwasher
+    icon: mdi:dishwasher
+    subview: true
+    dense_section_placement: true
+    sections:
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: Energy saving
+          - type: custom:mushroom-template-card
+            secondary: >-
+              Start at {{
+              states('input_text.infra_dishwasher_auto_optimal_time') }} to save
+              {{ states('input_text.infra_dishwasher_auto_optimal_savings') |
+              int }}%
+            icon: mdi:sleep
+            features_position: bottom
+            entity: script.kitchen_start_dishwasher
+            area: kitchen
+            primary: Overnight AUTO
+            color: green
+            tap_action:
+              action: perform-action
+              perform_action: script.kitchen_start_dishwasher
+              target: {}
+          - type: custom:mushroom-template-card
+            secondary: >-
+              Start at {{
+              states('input_text.infra_dishwasher_auto_optimal_time') }} to save
+              {{ states('input_text.infra_dishwasher_auto_optimal_savings') |
+              int }}%
+            icon: mdi:sleep
+            features_position: bottom
+            entity: script.kitchen_start_dishwasher
+            area: kitchen
+            primary: Day AUTO
+            color: green
+            tap_action:
+              action: perform-action
+              perform_action: script.kitchen_start_dishwasher
+              target: {}
+          - type: custom:bubble-card
+            card_type: button
+            button_type: name
+            name: Start dishwasher
+            icon: mdi:dev-to
+            button_action:
+              tap_action:
+                action: perform-action
+                perform_action: script.dev_start_dishwasher
+                target: {}
+                data:
+                  device_name: dishwasher
+                  mode: auto
+                  max_delay_hours: 5
+        visibility:
+          - condition: numeric_state
+            entity: input_text.infra_dishwasher_auto_optimal_savings
+            above: -1
+  - type: sections
+    max_columns: 4
+    title: Max the Cat
+    path: max-the-cat
+    icon: mdi:cat
+    sections:
+      - type: grid
+        cards: []

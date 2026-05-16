@@ -1,0 +1,4 @@
+notify_message:
+    name: Notification Message
+    initial: ""
+    max: 255
