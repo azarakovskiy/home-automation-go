@@ -66,4 +66,3 @@ func (n *NotificationService) Notify(event Event) error {
 
 	return nil
 }
-

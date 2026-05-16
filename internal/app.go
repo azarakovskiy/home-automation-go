@@ -51,7 +51,6 @@ func Run(cfg config.Config) error {
 		Password:        cfg.MQTT.Password,
 		DiscoveryPrefix: cfg.MQTT.DiscoveryPrefix,
 		AppPrefix:       cfg.MQTT.AppPrefix,
-		DeviceName:      "home-go",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create runtime entities: %w", err)
@@ -148,4 +147,3 @@ func logStartupInfo(components []component.Component) {
 
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 }
-
