@@ -1,7 +1,0 @@
-# Stores serialized histogram of electricity prices learned by Go service
-energy_price_histogram:
-  name: Energy Price Histogram
-  icon: mdi:chart-bell-curve
-  max: 255
-  mode: text
-  initial: ""
