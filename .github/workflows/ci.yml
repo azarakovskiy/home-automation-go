@@ -100,6 +100,12 @@ jobs:
             ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
           platforms: linux/amd64
 
+      - name: Trigger Komodo redeploy
+        run: |
+          curl -sf -o /dev/null \
+            -H "x-komodo-secret: ${{ secrets.KOMODO_WEBHOOK_SECRET }}" \
+            "${{ secrets.KOMODO_WEBHOOK_URL }}"
+
   docker-release:
     name: build-and-push-release-image
     needs: verify
