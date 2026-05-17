@@ -19,8 +19,10 @@ func NewGenerator(noiseType string) (Generator, error) {
 		return &whiteGenerator{}, nil
 	case "pink":
 		return &pinkGenerator{}, nil
+	case "brown":
+		return &brownGenerator{}, nil
 	default:
-		return nil, fmt.Errorf("unknown noise type %q: want white or pink", noiseType)
+		return nil, fmt.Errorf("unknown noise type %q: want white, pink, or brown", noiseType)
 	}
 }
 
@@ -30,6 +32,28 @@ type whiteGenerator struct{}
 func (g *whiteGenerator) Fill(buf []int16) {
 	for i := range buf {
 		buf[i] = int16(rand.Int63n(65536) - 32768)
+	}
+}
+
+// brownGenerator produces brown (red/Brownian) noise using a leaky integer integrator.
+// Each sample accumulates a scaled white-noise increment; a per-sample leak term
+// prevents unbounded drift while preserving the 1/f² spectral slope.
+// Not safe for concurrent use; each goroutine must own its own instance.
+type brownGenerator struct {
+	running int32
+}
+
+func (g *brownGenerator) Fill(buf []int16) {
+	for i := range buf {
+		white := int32(rand.Int63n(65536)) - 32768
+		g.running += white >> 4
+		g.running -= g.running >> 7
+		if g.running > 32767 {
+			g.running = 32767
+		} else if g.running < -32768 {
+			g.running = -32768
+		}
+		buf[i] = int16(g.running)
 	}
 }
 

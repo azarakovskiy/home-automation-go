@@ -46,3 +46,22 @@ func TestPinkGenerator_fill(t *testing.T) {
 		t.Fatal("all samples are zero — generator appears broken")
 	}
 }
+
+func TestBrownGenerator_fill(t *testing.T) {
+	gen, err := NewGenerator("brown")
+	if err != nil {
+		t.Fatalf("NewGenerator: %v", err)
+	}
+	buf := make([]int16, 4096)
+	gen.Fill(buf)
+
+	allZero := true
+	for _, s := range buf {
+		if s != 0 {
+			allZero = false
+		}
+	}
+	if allZero {
+		t.Fatal("all samples are zero — generator appears broken")
+	}
+}
