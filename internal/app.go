@@ -13,7 +13,7 @@ import (
 	"home-go/internal/tech/homeassistant/devices/dishwasher"
 	"home-go/internal/tech/homeassistant/devices/laptop"
 	hareminders "home-go/internal/tech/homeassistant/devices/reminders"
-	hahealth "home-go/internal/tech/homeassistant/devices/health"
+	svchealth "home-go/internal/tech/homeassistant/devices/health"
 	"home-go/internal/tech/homeassistant/entities"
 	apphttp "home-go/internal/tech/http"
 	healthhttp "home-go/internal/tech/http/health"
@@ -110,7 +110,7 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 		return nil, fmt.Errorf("restore reminders component: %w", err)
 	}
 
-	healthComp, err := hahealth.New(ctx, base, runtimeEntities, startTime)
+	healthComp, err := svchealth.New(ctx, base, runtimeEntities, startTime)
 	if err != nil {
 		return nil, fmt.Errorf("build health component: %w", err)
 	}

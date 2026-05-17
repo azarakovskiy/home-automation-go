@@ -33,18 +33,12 @@ func NewServer(host string, port int, noiseHandler gin.HandlerFunc, healthHandle
 
 // Start listens and serves until ctx is cancelled, then shuts down gracefully.
 func (s *Server) Start(ctx context.Context) error {
-	errCh := make(chan error, 1)
 	go func() {
-		if err := s.srv.ListenAndServe(); err != nil && err != nethttp.ErrServerClosed {
-			errCh <- err
-		}
-		close(errCh)
+		<-ctx.Done()
+		s.srv.Shutdown(context.Background())
 	}()
-
-	select {
-	case err := <-errCh:
+	if err := s.srv.ListenAndServe(); err != nil && err != nethttp.ErrServerClosed {
 		return err
-	case <-ctx.Done():
-		return s.srv.Shutdown(context.Background())
 	}
+	return nil
 }
