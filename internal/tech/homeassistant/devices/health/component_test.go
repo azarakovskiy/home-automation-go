@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,5 +44,10 @@ func TestComponent_publish_setsNonEmptyUptime(t *testing.T) {
 
 	if mock.lastValue == "" {
 		t.Fatal("publish did not set any uptime value")
+	}
+	for _, sub := range []string{"ns", "µs", "ms"} {
+		if strings.Contains(mock.lastValue, sub) {
+			t.Fatalf("publish uptime %q contains sub-second unit %q", mock.lastValue, sub)
+		}
 	}
 }
