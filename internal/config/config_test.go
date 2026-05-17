@@ -4,11 +4,13 @@ import "testing"
 
 func TestLoad(t *testing.T) {
 	tests := []struct {
-		name      string
-		env       map[string]string
-		wantErr   bool
-		wantDebug bool
-		wantDry   bool
+		name         string
+		env          map[string]string
+		wantErr      bool
+		wantDebug    bool
+		wantDry      bool
+		wantHTTPHost string
+		wantHTTPPort int
 	}{
 		{
 			name: "loads config and runtime flags",
@@ -48,6 +50,28 @@ func TestLoad(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "uses HTTP defaults when env not set",
+			env: map[string]string{
+				"HA_URL":             "http://home-assistant:8123",
+				"HA_AUTH_TOKEN":      "token",
+				"HA_MQTT_BROKER_URL": "tcp://mqtt:1883",
+			},
+			wantHTTPHost: "0.0.0.0",
+			wantHTTPPort: 8080,
+		},
+		{
+			name: "reads HTTP_HOST and HTTP_PORT from env",
+			env: map[string]string{
+				"HA_URL":             "http://home-assistant:8123",
+				"HA_AUTH_TOKEN":      "token",
+				"HA_MQTT_BROKER_URL": "tcp://mqtt:1883",
+				"HTTP_HOST":          "127.0.0.1",
+				"HTTP_PORT":          "9090",
+			},
+			wantHTTPHost: "127.0.0.1",
+			wantHTTPPort: 9090,
+		},
 	}
 
 	for _, tt := range tests {
@@ -59,6 +83,8 @@ func TestLoad(t *testing.T) {
 			t.Setenv("HA_MQTT_PASSWORD", "")
 			t.Setenv("DEBUG", "")
 			t.Setenv("DRY_RUN", "")
+			t.Setenv("HTTP_HOST", "")
+			t.Setenv("HTTP_PORT", "")
 
 			for key, value := range tt.env {
 				t.Setenv(key, value)
@@ -95,6 +121,14 @@ func TestLoad(t *testing.T) {
 			}
 			if cfg.DryRun != tt.wantDry {
 				t.Fatalf("DryRun = %t, want %t", cfg.DryRun, tt.wantDry)
+			}
+			if tt.wantHTTPHost != "" {
+				if cfg.HTTP.Host != tt.wantHTTPHost {
+					t.Fatalf("HTTP.Host = %q, want %q", cfg.HTTP.Host, tt.wantHTTPHost)
+				}
+				if cfg.HTTP.Port != tt.wantHTTPPort {
+					t.Fatalf("HTTP.Port = %d, want %d", cfg.HTTP.Port, tt.wantHTTPPort)
+				}
 			}
 		})
 	}

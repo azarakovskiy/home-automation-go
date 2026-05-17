@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -11,6 +12,7 @@ type Config struct {
 	HAAuthToken string
 	MQTT        MQTTConfig
 	Database    DatabaseConfig
+	HTTP        HTTPConfig
 	Debug       bool
 	DryRun      bool
 }
@@ -27,6 +29,11 @@ type DatabaseConfig struct {
 	Path string
 }
 
+type HTTPConfig struct {
+	Host string
+	Port int
+}
+
 func Load() (Config, error) {
 	cfg := Config{
 		HAURL:       os.Getenv("HA_URL"),
@@ -40,6 +47,10 @@ func Load() (Config, error) {
 		},
 		Database: DatabaseConfig{
 			Path: envOrDefault("SQLITE_PATH", "./home_go.db"),
+		},
+		HTTP: HTTPConfig{
+			Host: envOrDefault("HTTP_HOST", "0.0.0.0"),
+			Port: envIntOrDefault("HTTP_PORT", 8080),
 		},
 		Debug:  isEnabled("DEBUG"),
 		DryRun: isEnabled("DRY_RUN"),
@@ -67,4 +78,16 @@ func envOrDefault(name, defaultValue string) string {
 		return v
 	}
 	return defaultValue
+}
+
+func envIntOrDefault(name string, def int) int {
+	v := strings.TrimSpace(os.Getenv(name))
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
 }
