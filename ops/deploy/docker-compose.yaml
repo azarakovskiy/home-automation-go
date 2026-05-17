@@ -3,6 +3,8 @@ services:
     image: ghcr.io/azarakovskiy/home-go:master
     restart: unless-stopped
     env_file: .env
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
     volumes:
       - data:/data
     environment:

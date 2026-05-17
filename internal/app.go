@@ -13,7 +13,11 @@ import (
 	"home-go/internal/tech/homeassistant/devices/dishwasher"
 	"home-go/internal/tech/homeassistant/devices/laptop"
 	hareminders "home-go/internal/tech/homeassistant/devices/reminders"
+	hahealth "home-go/internal/tech/homeassistant/devices/health"
 	"home-go/internal/tech/homeassistant/entities"
+	"home-go/internal/tech/http"
+	healthhttp "home-go/internal/tech/http/health"
+	noisehttp "home-go/internal/tech/http/noise"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
 	"home-go/internal/tech/sqlite"
@@ -35,6 +39,7 @@ func RunFromEnv() error {
 func Run(cfg config.Config) error {
 	dryrun.Init(cfg.DryRun)
 	debug.Init(cfg.Debug)
+	startTime := time.Now()
 
 	app, err := ga.NewApp(ga.NewAppRequest{
 		URL:         cfg.HAURL,
@@ -57,7 +62,6 @@ func Run(cfg config.Config) error {
 	}
 	defer runtimeEntities.Close()
 
-	// V1-49: open SQLite and build the reminders repository.
 	db, err := sqlite.Open(cfg.Database)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
@@ -65,10 +69,21 @@ func Run(cfg config.Config) error {
 	defer db.Close()
 	remindersRepo := sqlite.NewRemindersRepo(db)
 
-	// V1-50: build the reminders domain manager.
 	remindersManager := domainreminders.NewManager(remindersRepo, time.Now)
 
-	components, err := buildComponents(app, runtimeEntities, remindersManager)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	healthHTTPHandler := healthhttp.New(startTime)
+	noiseHTTPHandler := &noisehttp.Handler{}
+	srv := http.NewServer(cfg.HTTP.Host, cfg.HTTP.Port, noiseHTTPHandler.ServeNoise, healthHTTPHandler.ServeHealth)
+	go func() {
+		if err := srv.Start(ctx); err != nil {
+			log.Printf("ERROR: HTTP server: %v", err)
+		}
+	}()
+
+	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, startTime)
 	if err != nil {
 		return err
 	}
@@ -79,7 +94,7 @@ func Run(cfg config.Config) error {
 	return nil
 }
 
-func buildComponents(app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager) ([]component.Component, error) {
+func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
 	priceService := pricing.NewService(app.GetService(), app.GetState())
 
@@ -90,11 +105,14 @@ func buildComponents(app *ga.App, runtimeEntities *entities.Runtime, remindersMa
 	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
 	// vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
 
-	// V1-51: build and restore the reminders HA component.
 	remindersComp := hareminders.New(base, runtimeEntities, remindersManager)
-	// V1-52: restore active projections; stale MQTT entities are reconciled inside Restore.
-	if err := remindersComp.Restore(context.Background()); err != nil {
+	if err := remindersComp.Restore(ctx); err != nil {
 		return nil, fmt.Errorf("restore reminders component: %w", err)
+	}
+
+	healthComp, err := hahealth.New(ctx, base, runtimeEntities, startTime)
+	if err != nil {
+		return nil, fmt.Errorf("build health component: %w", err)
 	}
 
 	return []component.Component{
@@ -103,6 +121,7 @@ func buildComponents(app *ga.App, runtimeEntities *entities.Runtime, remindersMa
 		laptopChargerComp,
 		// vacuumChargerComp,
 		remindersComp,
+		healthComp,
 	}, nil
 }
 
