@@ -15,7 +15,7 @@ import (
 	hareminders "home-go/internal/tech/homeassistant/devices/reminders"
 	hahealth "home-go/internal/tech/homeassistant/devices/health"
 	"home-go/internal/tech/homeassistant/entities"
-	"home-go/internal/tech/http"
+	apphttp "home-go/internal/tech/http"
 	healthhttp "home-go/internal/tech/http/health"
 	noisehttp "home-go/internal/tech/http/noise"
 	"home-go/internal/tech/runtime/debug"
@@ -76,7 +76,7 @@ func Run(cfg config.Config) error {
 
 	healthHTTPHandler := healthhttp.New(startTime)
 	noiseHTTPHandler := &noisehttp.Handler{}
-	srv := http.NewServer(cfg.HTTP.Host, cfg.HTTP.Port, noiseHTTPHandler.ServeNoise, healthHTTPHandler.ServeHealth)
+	srv := apphttp.NewServer(cfg.HTTP.Host, cfg.HTTP.Port, noiseHTTPHandler.ServeNoise, healthHTTPHandler.ServeHealth)
 	go func() {
 		if err := srv.Start(ctx); err != nil {
 			log.Printf("ERROR: HTTP server: %v", err)
