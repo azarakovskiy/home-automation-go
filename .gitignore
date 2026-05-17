@@ -60,3 +60,6 @@ gen.yaml
 
 # DB
 home_go.db
+
+# Git worktrees
+.worktrees/
