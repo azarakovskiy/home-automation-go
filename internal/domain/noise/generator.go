@@ -36,6 +36,7 @@ func (g *whiteGenerator) Fill(buf []int16) {
 // pinkGenerator produces pink (1/f) noise using the Voss-McCartney algorithm.
 // 16 rows of running sums; one row updated per sample based on the trailing
 // zeros of an incrementing counter; sum divided by 17 to stay in int16 range.
+// Not safe for concurrent use; each goroutine must own its own instance.
 type pinkGenerator struct {
 	rows    [16]int32
 	running int32
