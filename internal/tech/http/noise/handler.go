@@ -20,11 +20,11 @@ var wavHeader = [44]byte{
 	'W', 'A', 'V', 'E',
 	'f', 'm', 't', ' ',
 	16, 0, 0, 0, // fmt chunk size = 16
-	1, 0,             // audio format: PCM
-	1, 0,             // channels: mono
+	1, 0, // audio format: PCM
+	1, 0, // channels: mono
 	0x44, 0xAC, 0, 0, // sample rate: 44100 Hz (LE)
 	0x88, 0x58, 1, 0, // byte rate: 88200 (LE)
-	2, 0,  // block align: 2 bytes
+	2, 0, // block align: 2 bytes
 	16, 0, // bits per sample: 16
 	'd', 'a', 't', 'a',
 	0xFF, 0xFF, 0xFF, 0x7F, // data chunk size = 0x7FFFFFFF (LE)

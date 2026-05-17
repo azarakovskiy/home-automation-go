@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"fmt"
+	"log"
 	nethttp "net/http"
 
 	"github.com/gin-gonic/gin"
@@ -35,7 +36,9 @@ func NewServer(host string, port int, noiseHandler gin.HandlerFunc, healthHandle
 func (s *Server) Start(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
-		s.srv.Shutdown(context.Background())
+		if err := s.srv.Shutdown(context.Background()); err != nil {
+			log.Printf("ERROR: HTTP server shutdown: %v", err)
+		}
 	}()
 	if err := s.srv.ListenAndServe(); err != nil && err != nethttp.ErrServerClosed {
 		return err

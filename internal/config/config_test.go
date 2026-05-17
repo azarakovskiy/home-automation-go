@@ -100,36 +100,40 @@ func TestLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load() error = %v", err)
 			}
-
-			if cfg.HAURL != tt.env["HA_URL"] {
-				t.Fatalf("HAURL = %q, want %q", cfg.HAURL, tt.env["HA_URL"])
-			}
-			if cfg.HAAuthToken != tt.env["HA_AUTH_TOKEN"] {
-				t.Fatalf("HAAuthToken = %q, want %q", cfg.HAAuthToken, tt.env["HA_AUTH_TOKEN"])
-			}
-			if cfg.MQTT.BrokerURL != tt.env["HA_MQTT_BROKER_URL"] {
-				t.Fatalf("MQTT.BrokerURL = %q, want %q", cfg.MQTT.BrokerURL, tt.env["HA_MQTT_BROKER_URL"])
-			}
-			if cfg.MQTT.Username != tt.env["HA_MQTT_USERNAME"] {
-				t.Fatalf("MQTT.Username = %q, want %q", cfg.MQTT.Username, tt.env["HA_MQTT_USERNAME"])
-			}
-			if cfg.MQTT.Password != tt.env["HA_MQTT_PASSWORD"] {
-				t.Fatalf("MQTT.Password = %q, want %q", cfg.MQTT.Password, tt.env["HA_MQTT_PASSWORD"])
-			}
-			if cfg.Debug != tt.wantDebug {
-				t.Fatalf("Debug = %t, want %t", cfg.Debug, tt.wantDebug)
-			}
-			if cfg.DryRun != tt.wantDry {
-				t.Fatalf("DryRun = %t, want %t", cfg.DryRun, tt.wantDry)
-			}
-			if tt.wantHTTPHost != "" {
-				if cfg.HTTP.Host != tt.wantHTTPHost {
-					t.Fatalf("HTTP.Host = %q, want %q", cfg.HTTP.Host, tt.wantHTTPHost)
-				}
-				if cfg.HTTP.Port != tt.wantHTTPPort {
-					t.Fatalf("HTTP.Port = %d, want %d", cfg.HTTP.Port, tt.wantHTTPPort)
-				}
-			}
+			assertConfig(t, cfg, tt.env, tt.wantDebug, tt.wantDry, tt.wantHTTPHost, tt.wantHTTPPort)
 		})
+	}
+}
+
+func assertConfig(t *testing.T, cfg Config, env map[string]string, wantDebug, wantDry bool, wantHTTPHost string, wantHTTPPort int) {
+	t.Helper()
+	if cfg.HAURL != env["HA_URL"] {
+		t.Fatalf("HAURL = %q, want %q", cfg.HAURL, env["HA_URL"])
+	}
+	if cfg.HAAuthToken != env["HA_AUTH_TOKEN"] {
+		t.Fatalf("HAAuthToken = %q, want %q", cfg.HAAuthToken, env["HA_AUTH_TOKEN"])
+	}
+	if cfg.MQTT.BrokerURL != env["HA_MQTT_BROKER_URL"] {
+		t.Fatalf("MQTT.BrokerURL = %q, want %q", cfg.MQTT.BrokerURL, env["HA_MQTT_BROKER_URL"])
+	}
+	if cfg.MQTT.Username != env["HA_MQTT_USERNAME"] {
+		t.Fatalf("MQTT.Username = %q, want %q", cfg.MQTT.Username, env["HA_MQTT_USERNAME"])
+	}
+	if cfg.MQTT.Password != env["HA_MQTT_PASSWORD"] {
+		t.Fatalf("MQTT.Password = %q, want %q", cfg.MQTT.Password, env["HA_MQTT_PASSWORD"])
+	}
+	if cfg.Debug != wantDebug {
+		t.Fatalf("Debug = %t, want %t", cfg.Debug, wantDebug)
+	}
+	if cfg.DryRun != wantDry {
+		t.Fatalf("DryRun = %t, want %t", cfg.DryRun, wantDry)
+	}
+	if wantHTTPHost != "" {
+		if cfg.HTTP.Host != wantHTTPHost {
+			t.Fatalf("HTTP.Host = %q, want %q", cfg.HTTP.Host, wantHTTPHost)
+		}
+		if cfg.HTTP.Port != wantHTTPPort {
+			t.Fatalf("HTTP.Port = %d, want %d", cfg.HTTP.Port, wantHTTPPort)
+		}
 	}
 }

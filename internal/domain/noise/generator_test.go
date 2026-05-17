@@ -22,9 +22,6 @@ func TestWhiteGenerator_fill(t *testing.T) {
 		if s != 0 {
 			allZero = false
 		}
-		if s < -32768 || s > 32767 {
-			t.Fatalf("sample %d out of int16 range", s)
-		}
 	}
 	if allZero {
 		t.Fatal("all samples are zero — generator appears broken")
@@ -43,9 +40,6 @@ func TestPinkGenerator_fill(t *testing.T) {
 	for _, s := range buf {
 		if s != 0 {
 			allZero = false
-		}
-		if s < -32768 || s > 32767 {
-			t.Fatalf("sample %d out of int16 range", s)
 		}
 	}
 	if allZero {
