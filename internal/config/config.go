@@ -26,7 +26,8 @@ type MQTTConfig struct {
 }
 
 type DatabaseConfig struct {
-	Path string
+	Path string // used by sqlite (removed in postgres migration)
+	DSN  string // postgres connection URL
 }
 
 type HTTPConfig struct {
