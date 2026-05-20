@@ -54,7 +54,7 @@ type numberState interface {
 	EntityID() string
 }
 
-func NewStateManager(runtime *entities.Runtime, state ga.State, controller *Controller) (*StateManager, error) {
+func NewStateManager(runtime entities.EntityDeclarer, state ga.State, controller *Controller) (*StateManager, error) {
 	if runtime == nil {
 		return nil, fmt.Errorf("runtime entities are required")
 	}
