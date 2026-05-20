@@ -702,3 +702,37 @@ func TestRuntimeDiscoveryPayloadContainsAppDevice(t *testing.T) {
 		t.Fatalf("device.name = %v, want home-go", device["name"])
 	}
 }
+
+func TestRuntimeForDeviceDiscoveryPayloadContainsNamedDevice(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+	dr := rt.ForDevice("Kitchen Dishwasher")
+
+	_, err := dr.Switch(context.Background(), SwitchSpec{
+		CommonSpec: CommonSpec{
+			Key:  "kitchen_dishwasher_is_scheduled",
+			Name: "Kitchen Dishwasher: Is Scheduled",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Switch() error = %v", err)
+	}
+
+	pub := transport.lastPublish("homeassistant/switch/kitchen_dishwasher_is_scheduled/config")
+	var payload map[string]any
+	if err := json.Unmarshal(pub.payload, &payload); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	device, ok := payload["device"].(map[string]any)
+	if !ok {
+		t.Fatalf("device block missing or wrong type")
+	}
+	ids, ok := device["identifiers"].([]any)
+	if !ok || len(ids) != 1 || ids[0] != "home-go_kitchen_dishwasher" {
+		t.Fatalf("device.identifiers = %v, want [home-go_kitchen_dishwasher]", device["identifiers"])
+	}
+	if device["name"] != "home-go / Kitchen Dishwasher" {
+		t.Fatalf("device.name = %v, want %q", device["name"], "home-go / Kitchen Dishwasher")
+	}
+}

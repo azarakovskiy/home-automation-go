@@ -122,6 +122,78 @@ type BinarySensorHandle struct {
 	key     string
 }
 
+// EntityDeclarer is the entity-declaration subset of *Runtime.
+// Both *Runtime and *DeviceRuntime satisfy this interface.
+type EntityDeclarer interface {
+	Switch(ctx context.Context, spec SwitchSpec) (*SwitchHandle, error)
+	NumberSensor(ctx context.Context, spec NumberSensorSpec) (*NumberSensorHandle, error)
+	TextSensor(ctx context.Context, spec TextSensorSpec) (*TextSensorHandle, error)
+	BinarySensor(ctx context.Context, spec BinarySensorSpec) (*BinarySensorHandle, error)
+}
+
+// DeviceRuntime wraps Runtime and injects a named device block into every declaration.
+type DeviceRuntime struct {
+	rt         *Runtime
+	deviceName string
+}
+
+// ForDevice returns a DeviceRuntime that groups all declared entities under
+// the named device (e.g., "Kitchen Dishwasher" → "home-go / Kitchen Dishwasher").
+func (r *Runtime) ForDevice(name string) *DeviceRuntime {
+	return &DeviceRuntime{rt: r, deviceName: name}
+}
+
+func (dr *DeviceRuntime) device() *runtimeDevice {
+	return &runtimeDevice{
+		identifier: dr.rt.appName + "_" + slugify(dr.deviceName),
+		name:       dr.rt.appName + dr.rt.deviceNameSeparator + dr.deviceName,
+	}
+}
+
+func (dr *DeviceRuntime) Switch(ctx context.Context, spec SwitchSpec) (*SwitchHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "switch"); err != nil {
+		return nil, err
+	}
+	entity, err := dr.rt.declare(ctx, runtimeKindSwitch, spec.CommonSpec, switchDiscoveryPayload(), dr.device())
+	if err != nil {
+		return nil, err
+	}
+	return &SwitchHandle{runtime: dr.rt, key: entity.key}, nil
+}
+
+func (dr *DeviceRuntime) NumberSensor(ctx context.Context, spec NumberSensorSpec) (*NumberSensorHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "number sensor"); err != nil {
+		return nil, err
+	}
+	entity, err := dr.rt.declare(ctx, runtimeKindSensor, spec.CommonSpec, numberSensorDiscoveryPayload(spec), dr.device())
+	if err != nil {
+		return nil, err
+	}
+	return &NumberSensorHandle{runtime: dr.rt, key: entity.key}, nil
+}
+
+func (dr *DeviceRuntime) TextSensor(ctx context.Context, spec TextSensorSpec) (*TextSensorHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "text sensor"); err != nil {
+		return nil, err
+	}
+	entity, err := dr.rt.declare(ctx, runtimeKindSensor, spec.CommonSpec, textSensorDiscoveryPayload(), dr.device())
+	if err != nil {
+		return nil, err
+	}
+	return &TextSensorHandle{runtime: dr.rt, key: entity.key}, nil
+}
+
+func (dr *DeviceRuntime) BinarySensor(ctx context.Context, spec BinarySensorSpec) (*BinarySensorHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "binary sensor"); err != nil {
+		return nil, err
+	}
+	entity, err := dr.rt.declare(ctx, runtimeKindBinarySensor, spec.CommonSpec, binarySensorDiscoveryPayload(), dr.device())
+	if err != nil {
+		return nil, err
+	}
+	return &BinarySensorHandle{runtime: dr.rt, key: entity.key}, nil
+}
+
 func NewRuntime(cfg RuntimeConfig) (*Runtime, error) {
 	if strings.TrimSpace(cfg.BrokerURL) == "" {
 		return nil, fmt.Errorf("broker URL is required")
