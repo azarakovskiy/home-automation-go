@@ -456,7 +456,7 @@ func (s *Service) classifyPrice(price float64) PriceLevel {
 		for _, slot := range slots {
 			prices = append(prices, slot.Price)
 		}
-		cheap, expensive = ComputeThresholdsFromPrices(prices, cheapPercentile, expensivePercentile)
+		cheap, expensive = ComputeThresholdsFromPrices(prices, CheapPercentile, ExpensivePercentile)
 	}
 
 	return DeterminePriceLevel(price, cheap, expensive)
@@ -464,12 +464,12 @@ func (s *Service) classifyPrice(price float64) PriceLevel {
 
 func thresholdsFromHistogram(hist map[float64]float64) (float64, float64) {
 	buckets, total := BuildBucketsFromHistogram(hist)
-	if total < minSamplesForHistogram {
+	if total < MinSamplesForHistogram {
 		return 0, 0
 	}
 
-	cheap := PercentileFromBuckets(buckets, total, cheapPercentile)
-	expensive := PercentileFromBuckets(buckets, total, expensivePercentile)
+	cheap := PercentileFromBuckets(buckets, total, CheapPercentile)
+	expensive := PercentileFromBuckets(buckets, total, ExpensivePercentile)
 	return cheap, expensive
 }
 

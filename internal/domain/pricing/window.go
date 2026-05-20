@@ -7,13 +7,6 @@ const (
 	announcementTimeTolerance = 30 * time.Minute
 )
 
-const (
-	priceBucketSize        = PriceBucketSize
-	cheapPercentile        = CheapPercentile
-	expensivePercentile    = ExpensivePercentile
-	minSamplesForHistogram = MinSamplesForHistogram
-)
-
 type priceWindow struct {
 	Level PriceLevel
 	Start time.Time
