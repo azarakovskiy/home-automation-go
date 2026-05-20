@@ -122,15 +122,6 @@ type BinarySensorHandle struct {
 	key     string
 }
 
-// EntityDeclarer is the entity-declaration subset of *Runtime.
-// Both *Runtime and *DeviceRuntime satisfy this interface.
-type EntityDeclarer interface {
-	Switch(ctx context.Context, spec SwitchSpec) (*SwitchHandle, error)
-	NumberSensor(ctx context.Context, spec NumberSensorSpec) (*NumberSensorHandle, error)
-	TextSensor(ctx context.Context, spec TextSensorSpec) (*TextSensorHandle, error)
-	BinarySensor(ctx context.Context, spec BinarySensorSpec) (*BinarySensorHandle, error)
-}
-
 // DeviceRuntime wraps Runtime and injects a named device block into every declaration.
 type DeviceRuntime struct {
 	rt         *Runtime
