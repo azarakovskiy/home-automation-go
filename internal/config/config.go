@@ -26,8 +26,7 @@ type MQTTConfig struct {
 }
 
 type DatabaseConfig struct {
-	Path string // used by sqlite (removed in postgres migration)
-	DSN  string // postgres connection URL
+	DSN string // postgres connection URL
 }
 
 type HTTPConfig struct {
@@ -47,7 +46,7 @@ func Load() (Config, error) {
 			AppPrefix:       "home-go",
 		},
 		Database: DatabaseConfig{
-			Path: envOrDefault("SQLITE_PATH", "./home_go.db"),
+			DSN: os.Getenv("DATABASE_URL"),
 		},
 		HTTP: HTTPConfig{
 			Host: envOrDefault("HTTP_HOST", "0.0.0.0"),

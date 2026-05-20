@@ -19,8 +19,8 @@ import (
 	healthhttp "home-go/internal/tech/http/health"
 	noisehttp "home-go/internal/tech/http/noise"
 	"home-go/internal/tech/runtime/debug"
+	"home-go/internal/tech/postgres"
 	"home-go/internal/tech/runtime/dryrun"
-	"home-go/internal/tech/sqlite"
 
 	ga "saml.dev/gome-assistant"
 )
@@ -62,12 +62,12 @@ func Run(cfg config.Config) error {
 	}
 	defer runtimeEntities.Close()
 
-	db, err := sqlite.Open(cfg.Database)
+	db, err := postgres.Open(cfg.Database)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
 	defer db.Close()
-	remindersRepo := sqlite.NewRemindersRepo(db)
+	remindersRepo := postgres.NewRemindersRepo(db)
 
 	remindersManager := domainreminders.NewManager(remindersRepo, time.Now)
 
