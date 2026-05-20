@@ -5,10 +5,5 @@ services:
     env_file: .env
     ports:
       - "${HTTP_PORT:-8080}:8080"
-    volumes:
-      - data:/data
     environment:
-      SQLITE_PATH: /data/home_go.db
-
-volumes:
-  data:
+      DATABASE_URL: "${DATABASE_URL}"
