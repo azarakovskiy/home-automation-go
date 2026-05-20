@@ -495,15 +495,17 @@ func newTestRuntime(t *testing.T, transport runtimeTransport, registryPath strin
 	}
 
 	rt := &Runtime{
-		mqtt:              transport,
-		discoveryPrefix:   "homeassistant",
-		appPrefix:         "home-go",
-		availabilityTopic: "home-go/status",
-		haStatusTopic:     "homeassistant/status",
-		commandTopic:      "home-go/entities/+/set",
-		registry:          registry,
-		entities:          make(map[string]*runtimeEntity),
-		switchHandlers:    make(map[string]func(context.Context, bool) error),
+		mqtt:                transport,
+		discoveryPrefix:     "homeassistant",
+		appPrefix:           "home-go",
+		appName:             "home-go",
+		deviceNameSeparator: " / ",
+		availabilityTopic:   "home-go/status",
+		haStatusTopic:       "homeassistant/status",
+		commandTopic:        "home-go/entities/+/set",
+		registry:            registry,
+		entities:            make(map[string]*runtimeEntity),
+		switchHandlers:      make(map[string]func(context.Context, bool) error),
 	}
 
 	if err := transport.Subscribe(context.Background(), rt.commandTopic, rt.handleCommand); err != nil {
@@ -668,5 +670,35 @@ func TestRuntimeReconcileRequiresRegistry(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "reconcile requires registry path") {
 		t.Fatalf("Reconcile() error = %v, want registry path error", err)
+	}
+}
+
+func TestRuntimeDiscoveryPayloadContainsAppDevice(t *testing.T) {
+	transport := newFakeRuntimeTransport()
+	rt := newTestRuntime(t, transport, "")
+
+	_, err := rt.Switch(context.Background(), SwitchSpec{
+		CommonSpec: CommonSpec{Key: "feature_x", Name: "Feature X"},
+	})
+	if err != nil {
+		t.Fatalf("Switch() error = %v", err)
+	}
+
+	pub := transport.lastPublish("homeassistant/switch/feature_x/config")
+	var payload map[string]any
+	if err := json.Unmarshal(pub.payload, &payload); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	device, ok := payload["device"].(map[string]any)
+	if !ok {
+		t.Fatalf("device block missing or wrong type, got %T", payload["device"])
+	}
+	ids, ok := device["identifiers"].([]any)
+	if !ok || len(ids) != 1 || ids[0] != "home-go" {
+		t.Fatalf("device.identifiers = %v, want [home-go]", device["identifiers"])
+	}
+	if device["name"] != "home-go" {
+		t.Fatalf("device.name = %v, want home-go", device["name"])
 	}
 }
