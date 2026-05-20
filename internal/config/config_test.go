@@ -85,6 +85,7 @@ func TestLoad(t *testing.T) {
 			t.Setenv("DRY_RUN", "")
 			t.Setenv("HTTP_HOST", "")
 			t.Setenv("HTTP_PORT", "")
+			t.Setenv("DATABASE_URL", "")
 
 			for key, value := range tt.env {
 				t.Setenv(key, value)
