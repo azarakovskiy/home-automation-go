@@ -17,9 +17,9 @@ type sensorHandle interface {
 	Set(ctx context.Context, value string) error
 }
 
-// runtimeAdapter wraps *entities.Runtime so it satisfies a testable interface.
+// runtimeAdapter wraps entities.EntityDeclarer so it satisfies a testable interface.
 type runtimeAdapter struct {
-	rt *entities.Runtime
+	rt entities.EntityDeclarer
 }
 
 func (r *runtimeAdapter) textSensor(ctx context.Context, spec entities.TextSensorSpec) (sensorHandle, error) {
@@ -34,7 +34,7 @@ type Component struct {
 }
 
 // New declares the MQTT health uptime sensor and returns a ready Component.
-func New(ctx context.Context, base component.Base, runtime *entities.Runtime, startTime time.Time) (*Component, error) {
+func New(ctx context.Context, base component.Base, runtime entities.EntityDeclarer, startTime time.Time) (*Component, error) {
 	adapter := &runtimeAdapter{rt: runtime}
 	handle, err := adapter.textSensor(ctx, entities.TextSensorSpec{
 		CommonSpec: entities.CommonSpec{
