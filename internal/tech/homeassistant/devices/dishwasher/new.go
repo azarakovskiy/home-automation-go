@@ -13,9 +13,11 @@ import (
 	ga "saml.dev/gome-assistant"
 )
 
+const deviceName = "Kitchen Dishwasher"
+
 func New(base component.Base, state ga.State, priceService *domainpricing.Service, runtime *entities.Runtime) (*domaindishwasher.Dishwasher, error) {
 	controller := NewController(base.Service)
-	stateManager, err := NewStateManager(runtime, state, controller)
+	stateManager, err := NewStateManager(runtime.ForDevice(deviceName), state, controller)
 	if err != nil {
 		return nil, fmt.Errorf("create state manager: %w", err)
 	}

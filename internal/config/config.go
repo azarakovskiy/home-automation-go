@@ -18,11 +18,13 @@ type Config struct {
 }
 
 type MQTTConfig struct {
-	BrokerURL       string
-	Username        string
-	Password        string
-	DiscoveryPrefix string
-	AppPrefix       string
+	BrokerURL           string
+	Username            string
+	Password            string
+	DiscoveryPrefix     string
+	AppPrefix           string
+	AppName             string
+	DeviceNameSeparator string
 }
 
 type DatabaseConfig struct {
@@ -39,11 +41,13 @@ func Load() (Config, error) {
 		HAURL:       os.Getenv("HA_URL"),
 		HAAuthToken: os.Getenv("HA_AUTH_TOKEN"),
 		MQTT: MQTTConfig{
-			BrokerURL:       os.Getenv("HA_MQTT_BROKER_URL"),
-			Username:        os.Getenv("HA_MQTT_USERNAME"),
-			Password:        os.Getenv("HA_MQTT_PASSWORD"),
-			DiscoveryPrefix: "homeassistant",
-			AppPrefix:       "home-go",
+			BrokerURL:           os.Getenv("HA_MQTT_BROKER_URL"),
+			Username:            os.Getenv("HA_MQTT_USERNAME"),
+			Password:            os.Getenv("HA_MQTT_PASSWORD"),
+			DiscoveryPrefix:     "homeassistant",
+			AppPrefix:           "home-go",
+			AppName:             envOrDefault("MQTT_APP_NAME", "home-go"),
+			DeviceNameSeparator: envOrDefault("MQTT_DEVICE_NAME_SEPARATOR", " / "),
 		},
 		Database: DatabaseConfig{
 			Path: envOrDefault("SQLITE_PATH", "./home_go.db"),

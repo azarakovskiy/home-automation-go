@@ -27,13 +27,15 @@ const (
 )
 
 type RuntimeConfig struct {
-	BrokerURL       string
-	Username        string
-	Password        string
-	DiscoveryPrefix string
-	AppPrefix       string
-	ClientID        string
-	RegistryPath    string
+	BrokerURL           string
+	Username            string
+	Password            string
+	DiscoveryPrefix     string
+	AppPrefix           string
+	ClientID            string
+	RegistryPath        string
+	AppName             string
+	DeviceNameSeparator string
 }
 
 type CommonSpec struct {
@@ -64,11 +66,13 @@ type BinarySensorSpec struct {
 type Runtime struct {
 	mqtt runtimeTransport
 
-	discoveryPrefix   string
-	appPrefix         string
-	availabilityTopic string
-	haStatusTopic     string
-	commandTopic      string
+	discoveryPrefix     string
+	appPrefix           string
+	appName             string
+	deviceNameSeparator string
+	availabilityTopic   string
+	haStatusTopic       string
+	commandTopic        string
 
 	registry *runtimeRegistry
 
@@ -87,6 +91,15 @@ type runtimeEntity struct {
 	discoveryPayload []byte
 	lastState        []byte
 	hasState         bool
+}
+
+type runtimeDevice struct {
+	name       string
+	identifier string
+}
+
+func slugify(s string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(s)), " ", "_")
 }
 
 type SwitchHandle struct {
@@ -109,6 +122,69 @@ type BinarySensorHandle struct {
 	key     string
 }
 
+// DeviceRuntime wraps Runtime and injects a named device block into every declaration.
+type DeviceRuntime struct {
+	rt         *Runtime
+	deviceName string
+}
+
+// ForDevice returns a DeviceRuntime that groups all declared entities under
+// the named device (e.g., "Kitchen Dishwasher" → "home-go / Kitchen Dishwasher").
+func (r *Runtime) ForDevice(name string) *DeviceRuntime {
+	return &DeviceRuntime{rt: r, deviceName: name}
+}
+
+func (dr *DeviceRuntime) device() *runtimeDevice {
+	return &runtimeDevice{
+		identifier: dr.rt.appName + "_" + slugify(dr.deviceName),
+		name:       dr.rt.appName + dr.rt.deviceNameSeparator + dr.deviceName,
+	}
+}
+
+func (dr *DeviceRuntime) Switch(ctx context.Context, spec SwitchSpec) (*SwitchHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "switch"); err != nil {
+		return nil, err
+	}
+	entity, err := dr.rt.declare(ctx, runtimeKindSwitch, spec.CommonSpec, switchDiscoveryPayload(), dr.device())
+	if err != nil {
+		return nil, err
+	}
+	return &SwitchHandle{runtime: dr.rt, key: entity.key}, nil
+}
+
+func (dr *DeviceRuntime) NumberSensor(ctx context.Context, spec NumberSensorSpec) (*NumberSensorHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "number sensor"); err != nil {
+		return nil, err
+	}
+	entity, err := dr.rt.declare(ctx, runtimeKindSensor, spec.CommonSpec, numberSensorDiscoveryPayload(spec), dr.device())
+	if err != nil {
+		return nil, err
+	}
+	return &NumberSensorHandle{runtime: dr.rt, key: entity.key}, nil
+}
+
+func (dr *DeviceRuntime) TextSensor(ctx context.Context, spec TextSensorSpec) (*TextSensorHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "text sensor"); err != nil {
+		return nil, err
+	}
+	entity, err := dr.rt.declare(ctx, runtimeKindSensor, spec.CommonSpec, textSensorDiscoveryPayload(), dr.device())
+	if err != nil {
+		return nil, err
+	}
+	return &TextSensorHandle{runtime: dr.rt, key: entity.key}, nil
+}
+
+func (dr *DeviceRuntime) BinarySensor(ctx context.Context, spec BinarySensorSpec) (*BinarySensorHandle, error) {
+	if err := validateCommonSpec(spec.CommonSpec, "binary sensor"); err != nil {
+		return nil, err
+	}
+	entity, err := dr.rt.declare(ctx, runtimeKindBinarySensor, spec.CommonSpec, binarySensorDiscoveryPayload(), dr.device())
+	if err != nil {
+		return nil, err
+	}
+	return &BinarySensorHandle{runtime: dr.rt, key: entity.key}, nil
+}
+
 func NewRuntime(cfg RuntimeConfig) (*Runtime, error) {
 	if strings.TrimSpace(cfg.BrokerURL) == "" {
 		return nil, fmt.Errorf("broker URL is required")
@@ -120,20 +196,29 @@ func NewRuntime(cfg RuntimeConfig) (*Runtime, error) {
 		return nil, fmt.Errorf("app prefix is required")
 	}
 
+	if strings.TrimSpace(cfg.AppName) == "" {
+		cfg.AppName = cfg.AppPrefix
+	}
+	if cfg.DeviceNameSeparator == "" {
+		cfg.DeviceNameSeparator = " / "
+	}
+
 	registry, err := newRuntimeRegistry(cfg.RegistryPath)
 	if err != nil {
 		return nil, fmt.Errorf("create runtime registry: %w", err)
 	}
 
 	rt := &Runtime{
-		discoveryPrefix:   cfg.DiscoveryPrefix,
-		appPrefix:         cfg.AppPrefix,
-		availabilityTopic: fmt.Sprintf("%s/status", cfg.AppPrefix),
-		haStatusTopic:     fmt.Sprintf("%s/status", cfg.DiscoveryPrefix),
-		commandTopic:      fmt.Sprintf("%s/entities/+/set", cfg.AppPrefix),
-		registry:          registry,
-		entities:          make(map[string]*runtimeEntity),
-		switchHandlers:    make(map[string]func(context.Context, bool) error),
+		discoveryPrefix:     cfg.DiscoveryPrefix,
+		appPrefix:           cfg.AppPrefix,
+		appName:             cfg.AppName,
+		deviceNameSeparator: cfg.DeviceNameSeparator,
+		availabilityTopic:   fmt.Sprintf("%s/status", cfg.AppPrefix),
+		haStatusTopic:       fmt.Sprintf("%s/status", cfg.DiscoveryPrefix),
+		commandTopic:        fmt.Sprintf("%s/entities/+/set", cfg.AppPrefix),
+		registry:            registry,
+		entities:            make(map[string]*runtimeEntity),
+		switchHandlers:      make(map[string]func(context.Context, bool) error),
 	}
 
 	transport, err := newPahoRuntimeTransport(cfg, rt.availabilityTopic)
@@ -166,7 +251,7 @@ func (r *Runtime) Switch(ctx context.Context, spec SwitchSpec) (*SwitchHandle, e
 	if err := validateCommonSpec(spec.CommonSpec, "switch"); err != nil {
 		return nil, err
 	}
-	entity, err := r.declare(ctx, runtimeKindSwitch, spec.CommonSpec, switchDiscoveryPayload())
+	entity, err := r.declare(ctx, runtimeKindSwitch, spec.CommonSpec, switchDiscoveryPayload(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +262,7 @@ func (r *Runtime) NumberSensor(ctx context.Context, spec NumberSensorSpec) (*Num
 	if err := validateCommonSpec(spec.CommonSpec, "number sensor"); err != nil {
 		return nil, err
 	}
-	entity, err := r.declare(ctx, runtimeKindSensor, spec.CommonSpec, numberSensorDiscoveryPayload(spec))
+	entity, err := r.declare(ctx, runtimeKindSensor, spec.CommonSpec, numberSensorDiscoveryPayload(spec), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +273,7 @@ func (r *Runtime) TextSensor(ctx context.Context, spec TextSensorSpec) (*TextSen
 	if err := validateCommonSpec(spec.CommonSpec, "text sensor"); err != nil {
 		return nil, err
 	}
-	entity, err := r.declare(ctx, runtimeKindSensor, spec.CommonSpec, textSensorDiscoveryPayload())
+	entity, err := r.declare(ctx, runtimeKindSensor, spec.CommonSpec, textSensorDiscoveryPayload(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +284,7 @@ func (r *Runtime) BinarySensor(ctx context.Context, spec BinarySensorSpec) (*Bin
 	if err := validateCommonSpec(spec.CommonSpec, "binary sensor"); err != nil {
 		return nil, err
 	}
-	entity, err := r.declare(ctx, runtimeKindBinarySensor, spec.CommonSpec, binarySensorDiscoveryPayload())
+	entity, err := r.declare(ctx, runtimeKindBinarySensor, spec.CommonSpec, binarySensorDiscoveryPayload(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -351,14 +436,14 @@ func (h *BinarySensorHandle) Remove(ctx context.Context) error {
 	return h.runtime.Remove(ctx, h.key)
 }
 
-func (r *Runtime) declare(ctx context.Context, kind runtimeEntityKind, spec CommonSpec, payload map[string]any) (*runtimeEntity, error) {
+func (r *Runtime) declare(ctx context.Context, kind runtimeEntityKind, spec CommonSpec, payload map[string]any, device *runtimeDevice) (*runtimeEntity, error) {
 	key, err := validateRuntimeKey(spec.Key)
 	if err != nil {
 		return nil, err
 	}
 
 	entity := r.buildEntity(key, kind)
-	discoveryPayload, err := json.Marshal(mergeDiscoveryPayload(payload, r.baseDiscoveryPayload(spec, entity)))
+	discoveryPayload, err := json.Marshal(mergeDiscoveryPayload(payload, r.baseDiscoveryPayload(spec, entity, device)))
 	if err != nil {
 		return nil, fmt.Errorf("marshal discovery payload for %s: %w", key, err)
 	}
@@ -486,7 +571,7 @@ func (r *Runtime) buildEntity(key string, kind runtimeEntityKind) *runtimeEntity
 	}
 }
 
-func (r *Runtime) baseDiscoveryPayload(spec CommonSpec, entity *runtimeEntity) map[string]any {
+func (r *Runtime) baseDiscoveryPayload(spec CommonSpec, entity *runtimeEntity, device *runtimeDevice) map[string]any {
 	payload := map[string]any{
 		"name":                  spec.Name,
 		"unique_id":             fmt.Sprintf("%s_%s", r.appPrefix, entity.key),
@@ -507,6 +592,17 @@ func (r *Runtime) baseDiscoveryPayload(spec CommonSpec, entity *runtimeEntity) m
 	}
 	if spec.DeviceClass != "" {
 		payload["device_class"] = spec.DeviceClass
+	}
+
+	deviceID := r.appName
+	deviceDisplayName := r.appName
+	if device != nil {
+		deviceID = device.identifier
+		deviceDisplayName = device.name
+	}
+	payload["device"] = map[string]any{
+		"identifiers": []string{deviceID},
+		"name":        deviceDisplayName,
 	}
 	return payload
 }

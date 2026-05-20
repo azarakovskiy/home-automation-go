@@ -37,6 +37,12 @@ type StateManager struct {
 	savingsPercent numberState
 }
 
+type entityDeclarer interface {
+	Switch(ctx context.Context, spec entities.SwitchSpec) (*entities.SwitchHandle, error)
+	TextSensor(ctx context.Context, spec entities.TextSensorSpec) (*entities.TextSensorHandle, error)
+	NumberSensor(ctx context.Context, spec entities.NumberSensorSpec) (*entities.NumberSensorHandle, error)
+}
+
 type scheduleSwitch interface {
 	On(context.Context) error
 	Off(context.Context) error
@@ -54,7 +60,7 @@ type numberState interface {
 	EntityID() string
 }
 
-func NewStateManager(runtime *entities.Runtime, state ga.State, controller *Controller) (*StateManager, error) {
+func NewStateManager(runtime entityDeclarer, state ga.State, controller *Controller) (*StateManager, error) {
 	if runtime == nil {
 		return nil, fmt.Errorf("runtime entities are required")
 	}
