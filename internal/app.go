@@ -18,8 +18,8 @@ import (
 	apphttp "home-go/internal/tech/http"
 	healthhttp "home-go/internal/tech/http/health"
 	noisehttp "home-go/internal/tech/http/noise"
-	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/postgres"
+	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
 
 	ga "saml.dev/gome-assistant"
