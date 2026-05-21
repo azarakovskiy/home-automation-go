@@ -191,54 +191,38 @@ func (s *Service) updateFromAttributes(attrs map[string]any) error {
 	if len(attrs) == 0 {
 		return fmt.Errorf("entity update missing attributes")
 	}
-
 	rawPrices, ok := attrs["prices"]
 	if !ok {
 		return fmt.Errorf("prices attribute missing")
 	}
-
-	slots, err := parsePriceSlots(rawPrices)
-	if err != nil {
-		return err
-	}
-
-	if !s.updateCache(slots) {
-		debug.Log("Pricing: cache already up to date from entity event")
-		return nil
-	}
-
-	log.Printf("Pricing: cache updated from entity event with %d slots", len(slots))
-	s.ingestHistogram(slots)
-	s.maybeAnnounce(slots)
-	return nil
+	return s.applyParsedPrices(rawPrices, "entity event")
 }
 
 func (s *Service) refreshFromState() error {
 	if s.state == nil {
 		return fmt.Errorf("state interface not configured")
 	}
-
 	state, err := s.state.Get(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn)
 	if err != nil {
 		return fmt.Errorf("failed to get price sensor: %w", err)
 	}
-
 	rawPrices, ok := state.Attributes["prices"]
 	if !ok {
 		return fmt.Errorf("prices attribute not found")
 	}
+	return s.applyParsedPrices(rawPrices, "HA sensor")
+}
 
+func (s *Service) applyParsedPrices(rawPrices any, source string) error {
 	slots, err := parsePriceSlots(rawPrices)
 	if err != nil {
 		return err
 	}
-
 	if !s.updateCache(slots) {
-		debug.Log("Pricing: cache refresh skipped (identical data from HA sensor)")
+		debug.Log("Pricing: cache already up to date from %s", source)
 		return nil
 	}
-
-	log.Printf("Pricing: refreshed prices from HA sensor (%d slots)", len(slots))
+	log.Printf("Pricing: cache updated from %s with %d slots", source, len(slots))
 	s.ingestHistogram(slots)
 	s.maybeAnnounce(slots)
 	return nil
@@ -456,7 +440,7 @@ func (s *Service) classifyPrice(price float64) PriceLevel {
 		for _, slot := range slots {
 			prices = append(prices, slot.Price)
 		}
-		cheap, expensive = ComputeThresholdsFromPrices(prices, cheapPercentile, expensivePercentile)
+		cheap, expensive = ComputeThresholdsFromPrices(prices, CheapPercentile, ExpensivePercentile)
 	}
 
 	return DeterminePriceLevel(price, cheap, expensive)
@@ -464,12 +448,12 @@ func (s *Service) classifyPrice(price float64) PriceLevel {
 
 func thresholdsFromHistogram(hist map[float64]float64) (float64, float64) {
 	buckets, total := BuildBucketsFromHistogram(hist)
-	if total < minSamplesForHistogram {
+	if total < MinSamplesForHistogram {
 		return 0, 0
 	}
 
-	cheap := PercentileFromBuckets(buckets, total, cheapPercentile)
-	expensive := PercentileFromBuckets(buckets, total, expensivePercentile)
+	cheap := PercentileFromBuckets(buckets, total, CheapPercentile)
+	expensive := PercentileFromBuckets(buckets, total, ExpensivePercentile)
 	return cheap, expensive
 }
 
