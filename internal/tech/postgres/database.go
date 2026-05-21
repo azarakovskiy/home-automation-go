@@ -1,4 +1,4 @@
-package sqlite
+package postgres
 
 import (
 	"database/sql"
@@ -9,28 +9,24 @@ import (
 	"home-go/internal/config"
 
 	"github.com/golang-migrate/migrate/v4"
-	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
+	migratepgx "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "modernc.org/sqlite" // register the sqlite driver for database/sql
+	_ "github.com/jackc/pgx/v5/stdlib" // registers "pgx" driver with database/sql
 )
 
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
-// Open opens (or creates) a SQLite database at cfg.Path and applies all
-// pending migrations embedded in the binary before returning.
+// Open runs all pending migrations against cfg.DSN, then returns an open *sql.DB.
 func Open(cfg config.DatabaseConfig) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", cfg.Path)
+	db, err := sql.Open("pgx", cfg.DSN)
 	if err != nil {
-		return nil, fmt.Errorf("open sqlite db: %w", err)
+		return nil, fmt.Errorf("open postgres db: %w", err)
 	}
-	db.SetMaxOpenConns(1) // SQLite is single-writer
-
 	if err := runMigrations(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
-
 	return db, nil
 }
 
@@ -39,20 +35,16 @@ func runMigrations(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("create migration source: %w", err)
 	}
-
-	driver, err := migratesqlite.WithInstance(db, &migratesqlite.Config{})
+	driver, err := migratepgx.WithInstance(db, &migratepgx.Config{})
 	if err != nil {
 		return fmt.Errorf("create migration driver: %w", err)
 	}
-
-	m, err := migrate.NewWithInstance("iofs", src, "sqlite", driver)
+	m, err := migrate.NewWithInstance("iofs", src, "pgx5", driver)
 	if err != nil {
 		return fmt.Errorf("create migrator: %w", err)
 	}
-
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
-
 	return nil
 }

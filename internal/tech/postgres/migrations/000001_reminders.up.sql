@@ -1,20 +1,20 @@
 CREATE TABLE IF NOT EXISTS reminders (
     id TEXT PRIMARY KEY,
     schedule_kind TEXT NOT NULL CHECK (schedule_kind IN ('once', 'recurring')),
-    trigger_at INTEGER NOT NULL,
-    next_run_at INTEGER,
-    recur_every_seconds INTEGER,
-    valid_until INTEGER,
-    requires_ack INTEGER NOT NULL DEFAULT 0,
+    trigger_at BIGINT NOT NULL,
+    next_run_at BIGINT,
+    recur_every_seconds BIGINT,
+    valid_until BIGINT,
+    requires_ack BIGINT NOT NULL DEFAULT 0,
     completion_policy TEXT NOT NULL DEFAULT 'all_targets_ack',
     profile TEXT NOT NULL DEFAULT 'normal',
     status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'deleted', 'expired')) DEFAULT 'active',
-    last_fired_at INTEGER,
+    last_fired_at BIGINT,
     source TEXT NOT NULL DEFAULT '',
     owner TEXT NOT NULL DEFAULT '',
     message TEXT NOT NULL DEFAULT '',
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS reminder_targets (
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS reminder_targets (
 CREATE TABLE IF NOT EXISTS reminder_acks (
     reminder_id TEXT NOT NULL REFERENCES reminders(id) ON DELETE CASCADE,
     user_id TEXT NOT NULL,
-    acked_at INTEGER NOT NULL,
+    acked_at BIGINT NOT NULL,
     PRIMARY KEY (reminder_id, user_id)
 );
 

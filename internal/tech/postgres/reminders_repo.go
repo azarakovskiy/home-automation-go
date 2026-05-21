@@ -1,4 +1,4 @@
-package sqlite
+package postgres
 
 import (
 	"context"
@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"home-go/internal/domain/reminders"
-	"home-go/internal/tech/sqlite/sqlc"
+	"home-go/internal/tech/postgres/sqlc"
 )
 
 // Conversion helpers live in conversion.go.
 
-// RemindersRepo implements reminders.Repository using SQLite via sqlc.
+// RemindersRepo implements reminders.Repository using PostgreSQL via sqlc.
 type RemindersRepo struct {
 	db      *sql.DB
 	queries *sqlc.Queries
@@ -37,7 +37,6 @@ func (r *RemindersRepo) Save(ctx context.Context, rem reminders.Reminder) error 
 
 	q := r.queries.WithTx(tx)
 
-	// Build UpsertReminderParams
 	params := sqlc.UpsertReminderParams{
 		ID:               rem.ID,
 		ScheduleKind:     string(rem.Schedule.Kind),
@@ -71,7 +70,6 @@ func (r *RemindersRepo) Save(ctx context.Context, rem reminders.Reminder) error 
 		return fmt.Errorf("upsert reminder: %w", err)
 	}
 
-	// Replace targets
 	if err := q.DeleteTargets(ctx, rem.ID); err != nil {
 		return fmt.Errorf("delete targets: %w", err)
 	}
@@ -84,7 +82,6 @@ func (r *RemindersRepo) Save(ctx context.Context, rem reminders.Reminder) error 
 		}
 	}
 
-	// Replace acks
 	if err := q.DeleteAcks(ctx, rem.ID); err != nil {
 		return fmt.Errorf("delete acks: %w", err)
 	}
@@ -113,7 +110,6 @@ func (r *RemindersRepo) GetByID(ctx context.Context, id reminders.ReminderID) (r
 		}
 		return reminders.Reminder{}, fmt.Errorf("get reminder: %w", err)
 	}
-
 	return r.loadAggregate(ctx, row)
 }
 
@@ -151,19 +147,15 @@ func (r *RemindersRepo) Delete(ctx context.Context, id reminders.ReminderID) err
 	return r.Save(ctx, rem)
 }
 
-// --- helpers ---
-
 func (r *RemindersRepo) loadAggregate(ctx context.Context, row sqlc.Reminder) (reminders.Reminder, error) {
 	targets, err := r.queries.ListTargets(ctx, row.ID)
 	if err != nil {
 		return reminders.Reminder{}, fmt.Errorf("list targets for %s: %w", row.ID, err)
 	}
-
 	ackRows, err := r.queries.ListAcks(ctx, row.ID)
 	if err != nil {
 		return reminders.Reminder{}, fmt.Errorf("list acks for %s: %w", row.ID, err)
 	}
-
 	return rowToReminder(row, targets, ackRows), nil
 }
 

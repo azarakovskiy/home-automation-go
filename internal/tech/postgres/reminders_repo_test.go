@@ -1,4 +1,4 @@
-package sqlite_test
+package postgres_test
 
 import (
 	"context"
@@ -7,7 +7,11 @@ import (
 
 	"home-go/internal/config"
 	"home-go/internal/domain/reminders"
-	"home-go/internal/tech/sqlite"
+	"home-go/internal/tech/postgres"
+
+	testcontainers "github.com/testcontainers/testcontainers-go"
+	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 // baseTime is a fixed reference time with second precision (no sub-seconds, since
@@ -18,12 +22,36 @@ const testUserAlice = "alice"
 
 func openDB(t *testing.T) *reminders.Repository {
 	t.Helper()
-	db, err := sqlite.Open(config.DatabaseConfig{Path: ":memory:"})
+	ctx := context.Background()
+	ctr, err := tcpostgres.Run(ctx,
+		"postgres:16-alpine",
+		tcpostgres.WithDatabase("testdb"),
+		tcpostgres.WithUsername("test"),
+		tcpostgres.WithPassword("test"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(30*time.Second),
+		),
+	)
+	if err != nil {
+		t.Fatalf("start postgres container: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := ctr.Terminate(ctx); err != nil {
+			t.Logf("terminate postgres container: %v", err)
+		}
+	})
+	dsn, err := ctr.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatalf("get connection string: %v", err)
+	}
+	db, err := postgres.Open(config.DatabaseConfig{DSN: dsn})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
-	repo := sqlite.NewRemindersRepo(db)
+	repo := postgres.NewRemindersRepo(db)
 	var r reminders.Repository = repo
 	return &r
 }
@@ -171,12 +199,10 @@ func TestSaveAndGetByID_RoundTrip(t *testing.T) {
 	assertReminderState(t, got.State, rem.State)
 	assertReminderMeta(t, got.Meta, rem.Meta)
 
-	// Targets (sorted)
 	if len(got.Targets) != 2 || got.Targets[0] != testUserAlice || got.Targets[1] != "bob" {
 		t.Errorf("Targets: got %v, want [alice bob]", got.Targets)
 	}
 
-	// Acks
 	if len(got.Acks) != 1 || got.Acks[0].UserID != testUserAlice || !got.Acks[0].AckedAt.Equal(baseTime) {
 		t.Errorf("Acks: got %v", got.Acks)
 	}
@@ -242,7 +268,6 @@ func TestListDueBefore_NextRunAt(t *testing.T) {
 	repo := *repoPtr
 	ctx := context.Background()
 
-	// Recurring reminder with next_run_at set
 	nextEarly := baseTime.Add(-30 * time.Minute)
 	nextLate := baseTime.Add(30 * time.Minute)
 	recurEvery := time.Hour
@@ -292,7 +317,6 @@ func TestMultiTarget_PreservedAcrossRoundTrip(t *testing.T) {
 	if len(got.Targets) != 3 {
 		t.Fatalf("Targets: got %d, want 3", len(got.Targets))
 	}
-	// Targets are sorted
 	want := []string{"alice", "bob", "charlie"}
 	for i, u := range want {
 		if got.Targets[i] != u {
@@ -310,7 +334,6 @@ func TestAcks_SaveLoadUpdateIdempotent(t *testing.T) {
 	rem.Targets = []string{testUserAlice, "bob"}
 	rem.Policy.RequiresAck = true
 
-	// Save with no acks
 	if err := repo.Save(ctx, rem); err != nil {
 		t.Fatalf("Save (no acks): %v", err)
 	}
@@ -323,7 +346,6 @@ func TestAcks_SaveLoadUpdateIdempotent(t *testing.T) {
 		t.Errorf("expected 0 acks, got %d", len(got.Acks))
 	}
 
-	// Save with one ack
 	ackTime := baseTime.Add(5 * time.Minute)
 	rem.Acks = []reminders.UserAck{{UserID: testUserAlice, AckedAt: ackTime}}
 	if err := repo.Save(ctx, rem); err != nil {
@@ -338,7 +360,6 @@ func TestAcks_SaveLoadUpdateIdempotent(t *testing.T) {
 		t.Errorf("Acks after first save: %v", got.Acks)
 	}
 
-	// Idempotent upsert: resave same ack with updated time
 	updatedAckTime := ackTime.Add(time.Minute)
 	rem.Acks[0].AckedAt = updatedAckTime
 	if err := repo.Save(ctx, rem); err != nil {
@@ -384,7 +405,6 @@ func TestDelete_RemovesFromListActive(t *testing.T) {
 		t.Errorf("expected 0 active reminders after delete, got %d", len(list))
 	}
 
-	// GetByID still works, status is deleted
 	got, err := repo.GetByID(ctx, "del-1")
 	if err != nil {
 		t.Fatalf("GetByID after delete: %v", err)

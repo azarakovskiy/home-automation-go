@@ -11,7 +11,7 @@ import (
 )
 
 const deleteAcks = `-- name: DeleteAcks :exec
-DELETE FROM reminder_acks WHERE reminder_id = ?
+DELETE FROM reminder_acks WHERE reminder_id = $1
 `
 
 func (q *Queries) DeleteAcks(ctx context.Context, reminderID string) error {
@@ -20,7 +20,7 @@ func (q *Queries) DeleteAcks(ctx context.Context, reminderID string) error {
 }
 
 const deleteTargets = `-- name: DeleteTargets :exec
-DELETE FROM reminder_targets WHERE reminder_id = ?
+DELETE FROM reminder_targets WHERE reminder_id = $1
 `
 
 func (q *Queries) DeleteTargets(ctx context.Context, reminderID string) error {
@@ -29,7 +29,7 @@ func (q *Queries) DeleteTargets(ctx context.Context, reminderID string) error {
 }
 
 const getReminder = `-- name: GetReminder :one
-SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at FROM reminders WHERE id = ?
+SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at FROM reminders WHERE id = $1
 `
 
 func (q *Queries) GetReminder(ctx context.Context, id string) (Reminder, error) {
@@ -57,7 +57,7 @@ func (q *Queries) GetReminder(ctx context.Context, id string) (Reminder, error) 
 }
 
 const listAcks = `-- name: ListAcks :many
-SELECT user_id, acked_at FROM reminder_acks WHERE reminder_id = ? ORDER BY user_id
+SELECT user_id, acked_at FROM reminder_acks WHERE reminder_id = $1 ORDER BY user_id
 `
 
 type ListAcksRow struct {
@@ -136,8 +136,8 @@ const listRemindersDueBefore = `-- name: ListRemindersDueBefore :many
 SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at FROM reminders
 WHERE status = 'active'
   AND (
-    (next_run_at IS NOT NULL AND next_run_at <= ?)
-    OR (next_run_at IS NULL AND trigger_at <= ?)
+    (next_run_at IS NOT NULL AND next_run_at <= $1)
+    OR (next_run_at IS NULL AND trigger_at <= $2)
   )
 `
 
@@ -187,7 +187,7 @@ func (q *Queries) ListRemindersDueBefore(ctx context.Context, arg ListRemindersD
 }
 
 const listTargets = `-- name: ListTargets :many
-SELECT user_id FROM reminder_targets WHERE reminder_id = ? ORDER BY user_id
+SELECT user_id FROM reminder_targets WHERE reminder_id = $1 ORDER BY user_id
 `
 
 func (q *Queries) ListTargets(ctx context.Context, reminderID string) ([]string, error) {
@@ -214,7 +214,7 @@ func (q *Queries) ListTargets(ctx context.Context, reminderID string) ([]string,
 }
 
 const upsertAck = `-- name: UpsertAck :exec
-INSERT INTO reminder_acks (reminder_id, user_id, acked_at) VALUES (?, ?, ?)
+INSERT INTO reminder_acks (reminder_id, user_id, acked_at) VALUES ($1, $2, $3)
 ON CONFLICT(reminder_id, user_id) DO UPDATE SET acked_at = excluded.acked_at
 `
 
@@ -232,7 +232,7 @@ func (q *Queries) UpsertAck(ctx context.Context, arg UpsertAckParams) error {
 const upsertReminder = `-- name: UpsertReminder :exec
 INSERT INTO reminders (id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until,
     requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 ON CONFLICT(id) DO UPDATE SET
     schedule_kind = excluded.schedule_kind,
     trigger_at = excluded.trigger_at,
@@ -292,7 +292,7 @@ func (q *Queries) UpsertReminder(ctx context.Context, arg UpsertReminderParams) 
 }
 
 const upsertTarget = `-- name: UpsertTarget :exec
-INSERT OR IGNORE INTO reminder_targets (reminder_id, user_id) VALUES (?, ?)
+INSERT INTO reminder_targets (reminder_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING
 `
 
 type UpsertTargetParams struct {
