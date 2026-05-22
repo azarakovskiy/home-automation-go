@@ -100,7 +100,7 @@ func Run(cfg config.Config) error {
 
 func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time, mqttPrefix string) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
-	priceService := pricing.NewService(app.GetService(), app.GetState())
+	priceService := pricing.NewService(app.GetState())
 
 	dishwasherComp, err := dishwasher.New(base, app.GetState(), priceService, runtimeEntities)
 	if err != nil {
