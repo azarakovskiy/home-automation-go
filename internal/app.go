@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
 
 	"home-go/internal/config"
+	"home-go/internal/domain/devices/priceannouncer"
 	"home-go/internal/domain/pricing"
 	domainreminders "home-go/internal/domain/reminders"
 	"home-go/internal/tech/homeassistant/component"
@@ -25,6 +27,26 @@ import (
 
 	ga "saml.dev/gome-assistant"
 )
+
+type haModeProvider struct {
+	state ga.State
+}
+
+func (p *haModeProvider) IsNight() (bool, error) {
+	s, err := p.state.Get(entities.InputSelect.DaytimeMode)
+	if err != nil {
+		return false, fmt.Errorf("get daytime mode: %w", err)
+	}
+	return s.State == "Night", nil
+}
+
+func (p *haModeProvider) IsAway() (bool, error) {
+	s, err := p.state.Get(entities.InputSelect.HouseMode)
+	if err != nil {
+		return false, fmt.Errorf("get house mode: %w", err)
+	}
+	return s.State == "Away" || s.State == "Travel", nil
+}
 
 // RunFromEnv loads config from the environment and starts the application.
 func RunFromEnv() error {
@@ -87,7 +109,7 @@ func Run(cfg config.Config) error {
 		}
 	}()
 
-	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, startTime, cfg.MQTT.AppPrefix)
+	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, startTime, db, cfg.MQTT.AppPrefix)
 	if err != nil {
 		return err
 	}
@@ -98,9 +120,18 @@ func Run(cfg config.Config) error {
 	return nil
 }
 
-func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time, mqttPrefix string) ([]component.Component, error) {
+func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time, db *sql.DB, mqttPrefix string) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
 	priceService := pricing.NewService(app.GetState())
+
+	announcerRepo := postgres.NewAnnouncerRepo(db)
+	notifier := notifications.NewNotificationService(app.GetService())
+	modeProvider := &haModeProvider{state: app.GetState()}
+	announcerComp := priceannouncer.New(priceService, modeProvider, notifier, announcerRepo, priceannouncer.AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+		MorningEntityID:    entities.InputSelect.DaytimeMode,
+	})
 
 	dishwasherComp, err := dishwasher.New(base, app.GetState(), priceService, runtimeEntities)
 	if err != nil {
@@ -121,6 +152,7 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 
 	return []component.Component{
 		priceService,
+		announcerComp,
 		dishwasherComp,
 		laptopChargerComp,
 		// vacuumChargerComp,
