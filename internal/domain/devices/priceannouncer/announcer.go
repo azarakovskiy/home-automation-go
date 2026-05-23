@@ -111,7 +111,7 @@ func (a *Announcer) handleMorning(_ *ga.Service, _ ga.State, _ ga.EntityData) {
 		return
 	}
 
-	a.sendDaySummary(ctx)
+	a.sendDaySummary()
 
 	if err := a.db.SetLastAnnouncedDate(ctx, a.now()); err != nil {
 		log.Printf("Announcer: failed to persist announced date: %v", err)
@@ -122,7 +122,7 @@ func (a *Announcer) handleOnDemand(_ *ga.Service, _ ga.State, _ ga.EventData) {
 	if a.isSuppressed() {
 		return
 	}
-	a.sendDaySummary(context.Background())
+	a.sendDaySummary()
 }
 
 func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData) {
@@ -146,10 +146,7 @@ func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData
 	}
 
 	dur := till.Sub(from)
-	hours := int(dur.Hours())
-	if hours < 1 {
-		hours = 1
-	}
+	hours := max(int(dur.Hours()), 1)
 
 	msg := fmt.Sprintf("Heads up: %s for %d consecutive hours starting at %s.",
 		kind, hours, from.Format("15:04"))
@@ -169,7 +166,7 @@ func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData
 	}
 }
 
-func (a *Announcer) sendDaySummary(ctx context.Context) {
+func (a *Announcer) sendDaySummary() {
 	idx, err := a.service.CurrentIndex()
 	if err != nil {
 		log.Printf("Announcer: price index unavailable for day summary: %v", err)
