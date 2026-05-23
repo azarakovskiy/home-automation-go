@@ -417,6 +417,51 @@ func TestPolicyForProfile(t *testing.T) {
 	}
 }
 
+func TestPolicyForProfile_Quiet(t *testing.T) {
+	ep := PolicyForProfile(ProfileQuiet)
+	if ep.InitialDelay != 30*time.Minute {
+		t.Errorf("quiet InitialDelay = %v, want 30m", ep.InitialDelay)
+	}
+	if ep.RepeatInterval != time.Hour {
+		t.Errorf("quiet RepeatInterval = %v, want 1h", ep.RepeatInterval)
+	}
+	if ep.MaxRepeats != 3 {
+		t.Errorf("quiet MaxRepeats = %d, want 3", ep.MaxRepeats)
+	}
+}
+
+func TestPolicyForProfile_Normal(t *testing.T) {
+	ep := PolicyForProfile(ProfileNormal)
+	if ep.InitialDelay != 15*time.Minute {
+		t.Errorf("normal InitialDelay = %v, want 15m", ep.InitialDelay)
+	}
+	if ep.RepeatInterval != 15*time.Minute {
+		t.Errorf("normal RepeatInterval = %v, want 15m", ep.RepeatInterval)
+	}
+	if ep.MaxRepeats != 0 {
+		t.Errorf("normal MaxRepeats = %d, want 0", ep.MaxRepeats)
+	}
+}
+
+func TestPolicyForProfile_Annoying(t *testing.T) {
+	ep := PolicyForProfile(ProfileAnnoying)
+	if ep.InitialDelay != 15*time.Minute {
+		t.Errorf("annoying InitialDelay = %v, want 15m", ep.InitialDelay)
+	}
+	if ep.RepeatInterval != 15*time.Minute {
+		t.Errorf("annoying RepeatInterval = %v, want 15m", ep.RepeatInterval)
+	}
+	if ep.DecreaseStep != 2*time.Minute {
+		t.Errorf("annoying DecreaseStep = %v, want 2m", ep.DecreaseStep)
+	}
+	if ep.MinInterval != 5*time.Minute {
+		t.Errorf("annoying MinInterval = %v, want 5m", ep.MinInterval)
+	}
+	if ep.MaxRepeats != 0 {
+		t.Errorf("annoying MaxRepeats = %d, want 0", ep.MaxRepeats)
+	}
+}
+
 // --- Helpers ---
 
 func timePtr(t time.Time) *time.Time { return &t }
