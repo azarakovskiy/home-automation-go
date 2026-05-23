@@ -2,6 +2,7 @@ package priceannouncer
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,16 +13,19 @@ import (
 )
 
 type fakeStore struct {
-	last time.Time
-	err  error
+	last     time.Time
+	writeErr error // returned by SetLastAnnouncedDate; does not update last when set
 }
 
 func (f *fakeStore) LastAnnouncedDate(_ context.Context) (time.Time, error) {
-	return f.last, f.err
+	return f.last, nil
 }
 func (f *fakeStore) SetLastAnnouncedDate(_ context.Context, t time.Time) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
 	f.last = t
-	return f.err
+	return nil
 }
 
 type fakeSender struct {
@@ -188,5 +192,47 @@ func TestAnnouncer_Reactive_IgnoresShortExtremeRun(t *testing.T) {
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no alert for sub-threshold spike run, got %d", len(sender.events))
+	}
+}
+
+func TestAnnouncer_MorningSummary_SuppressedWhenAway(t *testing.T) {
+	base := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
+	store := &fakeStore{}
+	sender := &fakeSender{}
+	modes := &fakeModes{away: true}
+	svc := makePricingService(baseSlots(base))
+
+	a := New(svc, modes, sender, store, AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+		MorningEntityID:    "sensor.fake_morning",
+	})
+	a.now = func() time.Time { return base }
+
+	a.handleMorning(nil, nil, ga.EntityData{})
+
+	if len(sender.events) != 0 {
+		t.Fatalf("expected no notification when away, got %d", len(sender.events))
+	}
+}
+
+func TestAnnouncer_MorningSummary_NoSendWhenPersistFails(t *testing.T) {
+	base := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
+	store := &fakeStore{writeErr: fmt.Errorf("db down")}
+	sender := &fakeSender{}
+	modes := &fakeModes{}
+	svc := makePricingService(baseSlots(base))
+
+	a := New(svc, modes, sender, store, AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+		MorningEntityID:    "sensor.fake_morning",
+	})
+	a.now = func() time.Time { return base }
+
+	a.handleMorning(nil, nil, ga.EntityData{})
+
+	if len(sender.events) != 0 {
+		t.Fatalf("expected no notification when state persist fails, got %d", len(sender.events))
 	}
 }

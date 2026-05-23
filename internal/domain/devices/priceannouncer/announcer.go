@@ -111,11 +111,12 @@ func (a *Announcer) handleMorning(_ *ga.Service, _ ga.State, _ ga.EntityData) {
 		return
 	}
 
-	a.sendDaySummary()
-
 	if err := a.db.SetLastAnnouncedDate(ctx, a.now()); err != nil {
 		log.Printf("Announcer: failed to persist announced date: %v", err)
+		return
 	}
+
+	a.sendDaySummary()
 }
 
 func (a *Announcer) handleOnDemand(_ *ga.Service, _ ga.State, _ ga.EventData) {
