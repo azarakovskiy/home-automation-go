@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -28,6 +29,9 @@ func (r *AnnouncerRepo) LastAnnouncedDate(ctx context.Context) (time.Time, error
 		announcerStateKey,
 	).Scan(&unix)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, nil
+		}
 		return time.Time{}, fmt.Errorf("read announcer state: %w", err)
 	}
 	if unix == 0 {
@@ -39,8 +43,9 @@ func (r *AnnouncerRepo) LastAnnouncedDate(ctx context.Context) (time.Time, error
 // SetLastAnnouncedDate records the time of the latest morning announcement.
 func (r *AnnouncerRepo) SetLastAnnouncedDate(ctx context.Context, t time.Time) error {
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE announcer_state SET announced_at = $1 WHERE key = $2`,
-		t.Unix(), announcerStateKey,
+		`INSERT INTO announcer_state (key, announced_at) VALUES ($1, $2)
+		 ON CONFLICT (key) DO UPDATE SET announced_at = $2`,
+		announcerStateKey, t.Unix(),
 	)
 	if err != nil {
 		return fmt.Errorf("update announcer state: %w", err)
