@@ -25,12 +25,13 @@ type IndexSummary struct {
 // Constructed from a []PriceSlot snapshot; IO-free.
 type PriceIndex struct {
 	slots          []PriceSlot
+	median         float64
 	cheapThreshold float64
 	expThreshold   float64
 }
 
 // NewPriceIndex builds an index from a slot snapshot.
-// Thresholds are computed once using day-relative percentiles.
+// Thresholds and median are computed once from the full slot set.
 func NewPriceIndex(slots []PriceSlot) PriceIndex {
 	if len(slots) == 0 {
 		return PriceIndex{}
@@ -40,9 +41,19 @@ func NewPriceIndex(slots []PriceSlot) PriceIndex {
 		prices[i] = s.Price
 	}
 	cheap, exp := ComputeThresholdsFromPrices(prices, CheapPercentile, ExpensivePercentile)
+	sorted := make([]float64, len(prices))
+	copy(sorted, prices)
+	sort.Float64s(sorted)
+	mid := len(sorted) / 2
+	var median float64
+	if len(sorted)%2 == 0 {
+		median = (sorted[mid-1] + sorted[mid]) / 2
+	} else {
+		median = sorted[mid]
+	}
 	cp := make([]PriceSlot, len(slots))
 	copy(cp, slots)
-	return PriceIndex{slots: cp, cheapThreshold: cheap, expThreshold: exp}
+	return PriceIndex{slots: cp, median: median, cheapThreshold: cheap, expThreshold: exp}
 }
 
 // IsEmpty reports whether the index has no slots.
@@ -74,21 +85,7 @@ func (idx PriceIndex) Level(slot PriceSlot) PriceLevel {
 }
 
 // MedianPrice returns the median of all slot prices in the index.
-func (idx PriceIndex) MedianPrice() float64 {
-	if len(idx.slots) == 0 {
-		return 0
-	}
-	prices := make([]float64, len(idx.slots))
-	for i, s := range idx.slots {
-		prices[i] = s.Price
-	}
-	sort.Float64s(prices)
-	mid := len(prices) / 2
-	if len(prices)%2 == 0 {
-		return (prices[mid-1] + prices[mid]) / 2
-	}
-	return prices[mid]
-}
+func (idx PriceIndex) MedianPrice() float64 { return idx.median }
 
 // IsExtreme reports whether a slot is extreme: negative or above spikeMultiplier × median.
 func (idx PriceIndex) IsExtreme(slot PriceSlot, spikeMultiplier float64) bool {

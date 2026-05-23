@@ -74,17 +74,16 @@ func TestAnnouncer_MorningSummary_SendsOncePerDay(t *testing.T) {
 	a := New(svc, modes, sender, store, AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: time.Hour,
-		MorningEntityID:    "sensor.fake_morning",
 	})
 	a.now = func() time.Time { return base }
 
-	a.handleMorning(nil, nil, ga.EntityData{})
+	a.HandleMorning(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(sender.events))
 	}
 
-	a.handleMorning(nil, nil, ga.EntityData{})
+	a.HandleMorning(nil, nil, ga.EntityData{})
 	if len(sender.events) != 1 {
 		t.Fatalf("expected no duplicate on same day, got %d", len(sender.events))
 	}
@@ -100,11 +99,10 @@ func TestAnnouncer_MorningSummary_SuppressedAtNight(t *testing.T) {
 	a := New(svc, modes, sender, store, AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: time.Hour,
-		MorningEntityID:    "sensor.fake_morning",
 	})
 	a.now = func() time.Time { return base }
 
-	a.handleMorning(nil, nil, ga.EntityData{})
+	a.HandleMorning(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no notification during night, got %d", len(sender.events))
@@ -121,12 +119,11 @@ func TestAnnouncer_OnDemand_NoCooldown(t *testing.T) {
 	a := New(svc, modes, sender, store, AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: time.Hour,
-		MorningEntityID:    "sensor.fake_morning",
 	})
 	a.now = func() time.Time { return base }
 
-	a.handleOnDemand(nil, nil, ga.EventData{})
-	a.handleOnDemand(nil, nil, ga.EventData{})
+	a.HandleOnDemand()
+	a.HandleOnDemand()
 
 	if len(sender.events) != 2 {
 		t.Fatalf("expected 2 on-demand notifications, got %d", len(sender.events))
@@ -153,7 +150,6 @@ func TestAnnouncer_Reactive_FiresOnExtremeRun(t *testing.T) {
 	a := New(svc, modes, sender, store, AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: time.Hour,
-		MorningEntityID:    "sensor.fake_morning",
 	})
 	a.now = func() time.Time { return base }
 
@@ -184,7 +180,6 @@ func TestAnnouncer_Reactive_IgnoresShortExtremeRun(t *testing.T) {
 	a := New(svc, modes, sender, store, AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: 2 * time.Hour,
-		MorningEntityID:    "sensor.fake_morning",
 	})
 	a.now = func() time.Time { return base }
 
@@ -205,11 +200,10 @@ func TestAnnouncer_MorningSummary_SuppressedWhenAway(t *testing.T) {
 	a := New(svc, modes, sender, store, AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: time.Hour,
-		MorningEntityID:    "sensor.fake_morning",
 	})
 	a.now = func() time.Time { return base }
 
-	a.handleMorning(nil, nil, ga.EntityData{})
+	a.HandleMorning(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no notification when away, got %d", len(sender.events))
@@ -226,11 +220,10 @@ func TestAnnouncer_MorningSummary_NoSendWhenPersistFails(t *testing.T) {
 	a := New(svc, modes, sender, store, AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: time.Hour,
-		MorningEntityID:    "sensor.fake_morning",
 	})
 	a.now = func() time.Time { return base }
 
-	a.handleMorning(nil, nil, ga.EntityData{})
+	a.HandleMorning(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no notification when state persist fails, got %d", len(sender.events))

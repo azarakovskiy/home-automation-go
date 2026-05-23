@@ -29,7 +29,6 @@ type AnnouncerStateStore interface {
 type AnnouncerConfig struct {
 	SpikeMultiplier    float64
 	MinExtremeDuration time.Duration
-	MorningEntityID    string
 }
 
 // Announcer owns all price announcement logic.
@@ -60,31 +59,18 @@ func New(
 	}
 }
 
-// EventListeners registers the on-demand trigger.
-func (a *Announcer) EventListeners() []ga.EventListener {
-	return []ga.EventListener{
-		ga.NewEventListener().
-			EventTypes(entities.CustomEvents.GetPriceSummary).
-			Call(a.handleOnDemand).
-			Build(),
-	}
-}
+// EventListeners implements component.Component.
+func (a *Announcer) EventListeners() []ga.EventListener { return nil }
 
-// EntityListeners registers the morning and reactive triggers.
+// EntityListeners registers the reactive price-update trigger.
+// The morning trigger is registered externally by the caller via HandleMorning.
 func (a *Announcer) EntityListeners() []ga.EntityListener {
-	listeners := []ga.EntityListener{
+	return []ga.EntityListener{
 		ga.NewEntityListener().
 			EntityIds(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
 			Call(a.handlePriceUpdate).
 			Build(),
 	}
-	if a.cfg.MorningEntityID != "" {
-		listeners = append(listeners, ga.NewEntityListener().
-			EntityIds(a.cfg.MorningEntityID).
-			Call(a.handleMorning).
-			Build())
-	}
-	return listeners
 }
 
 // Schedules implements component.Component (unused).
@@ -93,7 +79,9 @@ func (a *Announcer) Schedules() []ga.DailySchedule { return nil }
 // Intervals implements component.Component (unused).
 func (a *Announcer) Intervals() []ga.Interval { return nil }
 
-func (a *Announcer) handleMorning(_ *ga.Service, _ ga.State, _ ga.EntityData) {
+// HandleMorning sends the daily morning summary if conditions allow.
+// Register this against any entity whose state change signals morning (e.g. daytime mode).
+func (a *Announcer) HandleMorning(_ *ga.Service, _ ga.State, _ ga.EntityData) {
 	if a.isSuppressed() {
 		return
 	}
@@ -119,7 +107,9 @@ func (a *Announcer) handleMorning(_ *ga.Service, _ ga.State, _ ga.EntityData) {
 	a.sendDaySummary()
 }
 
-func (a *Announcer) handleOnDemand(_ *ga.Service, _ ga.State, _ ga.EventData) {
+// HandleOnDemand sends the day summary immediately, bypassing the once-per-day cooldown.
+// Wire this to an MQTT command or any external trigger.
+func (a *Announcer) HandleOnDemand() {
 	if a.isSuppressed() {
 		return
 	}

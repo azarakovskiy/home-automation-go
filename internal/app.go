@@ -130,8 +130,34 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 	announcerComp := priceannouncer.New(priceService, modeProvider, notifier, announcerRepo, priceannouncer.AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: time.Hour,
-		MorningEntityID:    entities.InputSelect.DaytimeMode,
 	})
+
+	// Morning trigger: fire HandleMorning whenever the daytime mode changes.
+	// The Announcer handles once-per-day dedup and suppression internally.
+	app.RegisterEntityListeners(ga.NewEntityListener().
+		EntityIds(entities.InputSelect.DaytimeMode).
+		Call(announcerComp.HandleMorning).
+		Build())
+
+	// On-demand trigger: an MQTT switch that sends the day summary when turned ON.
+	priceSummarySwitch, err := runtimeEntities.Switch(ctx, entities.SwitchSpec{
+		CommonSpec: entities.CommonSpec{
+			Key:  "price_summary_trigger",
+			Name: "Price Summary",
+			Icon: "mdi:currency-eur",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("declare price summary switch: %w", err)
+	}
+	if err := priceSummarySwitch.OnCommand(func(_ context.Context, on bool) error {
+		if on {
+			announcerComp.HandleOnDemand()
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("register price summary command handler: %w", err)
+	}
 
 	dishwasherComp, err := dishwasher.New(base, app.GetState(), priceService, runtimeEntities)
 	if err != nil {

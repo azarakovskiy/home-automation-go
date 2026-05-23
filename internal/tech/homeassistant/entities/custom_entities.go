@@ -1,21 +1,19 @@
 package entities
 
 type CustomEventsDomain struct {
-	ScheduledStart  string
-	Notify          string
-	ReminderCreate  string
-	ReminderAck     string
-	ReminderDelete  string
-	GetPriceSummary string
+	ScheduledStart string
+	Notify         string
+	ReminderCreate string
+	ReminderAck    string
+	ReminderDelete string
 }
 
 var CustomEvents = CustomEventsDomain{
-	ScheduledStart:  "event.custom_scheduled_start",
-	Notify:          "event.custom_notify",
-	ReminderCreate:  "event.custom_reminder_create",
-	ReminderAck:     "event.custom_reminder_ack",
-	ReminderDelete:  "event.custom_reminder_delete",
-	GetPriceSummary: "event.custom_get_price_summary",
+	ScheduledStart: "event.custom_scheduled_start",
+	Notify:         "event.custom_notify",
+	ReminderCreate: "event.custom_reminder_create",
+	ReminderAck:    "event.custom_reminder_ack",
+	ReminderDelete: "event.custom_reminder_delete",
 }
 
 // CustomSensorsDomain contains sensors that are not auto-generated
