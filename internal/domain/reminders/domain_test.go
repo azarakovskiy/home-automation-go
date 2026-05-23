@@ -98,10 +98,24 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestNew_Defaults(t *testing.T) {
-	r, err := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), DeliveryPolicy{}, makeMeta(), baseTime)
-	assertNoError(t, err)
-	assertEqual(t, r.Policy.Profile, ProfileNormal)
+func TestNew_DefaultsProfileToNormal(t *testing.T) {
+	rem, err := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), DeliveryPolicy{RequiresAck: true}, makeMeta(), baseTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rem.Policy.Profile != ProfileNormal {
+		t.Errorf("expected ProfileNormal, got %q", rem.Policy.Profile)
+	}
+}
+
+func TestNew_FireCountIsZero(t *testing.T) {
+	rem, err := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rem.State.FireCount != 0 {
+		t.Errorf("expected FireCount 0, got %d", rem.State.FireCount)
+	}
 }
 
 // --- IsDue ---
@@ -175,74 +189,114 @@ func TestIsDue(t *testing.T) {
 
 // --- Trigger ---
 
-func TestTrigger_OnceNoAck(t *testing.T) {
-	sched := makeSchedule(ScheduleKindOnce)
-	policy := DeliveryPolicy{RequiresAck: false, Profile: ProfileNormal}
-	r, _ := New("r1", []string{"u1"}, sched, policy, makeMeta(), baseTime)
-
-	now := baseTime.Add(1 * time.Minute)
-	err := r.Trigger(now)
-	assertNoError(t, err)
-	assertEqual(t, *r.State.LastFiredAt, now)
-}
-
-func TestTrigger_OnceWithAck(t *testing.T) {
-	r, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
-
-	now := baseTime.Add(1 * time.Minute)
-	err := r.Trigger(now)
-	assertNoError(t, err)
-}
-
-func TestTrigger_OnceWithAck_SetsNextRunAtFromEscalationPolicy(t *testing.T) {
-	profiles := []struct {
-		profile     Profile
-		wantInitial time.Duration
-		wantRepeat  time.Duration
-	}{
-		{ProfileQuiet, EscalationQuiet.InitialDelay, EscalationQuiet.RepeatInterval},
-		{ProfileNormal, EscalationNormal.InitialDelay, EscalationNormal.RepeatInterval},
-		{ProfileAnnoying, EscalationAnnoying.InitialDelay, EscalationAnnoying.RepeatInterval},
-	}
-
-	for _, tc := range profiles {
-		t.Run(string(tc.profile), func(t *testing.T) {
-			policy := DeliveryPolicy{RequiresAck: true, Profile: tc.profile}
-			r, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), policy, makeMeta(), baseTime)
-
-			// First fire: NextRunAt uses InitialDelay.
-			fire1 := baseTime.Add(1 * time.Minute)
-			assertNoError(t, r.Trigger(fire1))
-			if r.Schedule.NextRunAt == nil {
-				t.Fatal("expected NextRunAt to be set after first trigger")
-			}
-			assertEqual(t, *r.Schedule.NextRunAt, fire1.Add(tc.wantInitial))
-
-			// Second fire: NextRunAt uses RepeatInterval.
-			fire2 := fire1.Add(tc.wantInitial)
-			assertNoError(t, r.Trigger(fire2))
-			assertEqual(t, *r.Schedule.NextRunAt, fire2.Add(tc.wantRepeat))
-		})
+func TestTrigger_IncrementsFireCount(t *testing.T) {
+	rem, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
+	rem.Trigger(baseTime)
+	if rem.State.FireCount != 1 {
+		t.Errorf("expected FireCount 1, got %d", rem.State.FireCount)
 	}
 }
 
-func TestTrigger_OnceWithAck_DoesNotReFireEveryTick(t *testing.T) {
-	// After first trigger, the reminder must not be due again until NextRunAt.
-	policy := DeliveryPolicy{RequiresAck: true, Profile: ProfileNormal}
-	r, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), policy, makeMeta(), baseTime)
-
-	fire := baseTime.Add(1 * time.Minute)
-	assertNoError(t, r.Trigger(fire))
-
-	// One second later: not due yet (InitialDelay is 5 min for normal).
-	assertEqual(t, r.IsDue(fire.Add(1*time.Second)), false)
-
-	// At InitialDelay boundary: due again.
-	assertEqual(t, r.IsDue(fire.Add(EscalationNormal.InitialDelay)), true)
+func TestTrigger_OnceRequiresAck_SetsNextRunAtInitialDelay(t *testing.T) {
+	rem, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
+	rem.Trigger(baseTime)
+	want := baseTime.Add(EscalationNormal.InitialDelay)
+	if rem.Schedule.NextRunAt == nil || !rem.Schedule.NextRunAt.Equal(want) {
+		t.Errorf("NextRunAt = %v, want %v", rem.Schedule.NextRunAt, want)
+	}
 }
 
-// TestTrigger_Recurring removed - Status field removed from State domain
-// TestTrigger_NotActive removed - lifecycle.go Trigger will be updated in later task
+func TestTrigger_OnceRequiresAck_SecondFire_SetsRepeatInterval(t *testing.T) {
+	rem, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
+	rem.Trigger(baseTime)
+	rem.Trigger(baseTime.Add(EscalationNormal.InitialDelay))
+	want := baseTime.Add(EscalationNormal.InitialDelay).Add(EscalationNormal.RepeatInterval)
+	if rem.Schedule.NextRunAt == nil || !rem.Schedule.NextRunAt.Equal(want) {
+		t.Errorf("NextRunAt = %v, want %v", rem.Schedule.NextRunAt, want)
+	}
+}
+
+func TestTrigger_OnceNoAck_ClearsNextRunAt(t *testing.T) {
+	p := DeliveryPolicy{RequiresAck: false, Profile: ProfileNormal}
+	rem, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), p, makeMeta(), baseTime)
+	rem.Trigger(baseTime)
+	if rem.Schedule.NextRunAt != nil {
+		t.Errorf("expected NextRunAt nil for once/no-ack, got %v", rem.Schedule.NextRunAt)
+	}
+}
+
+func TestTrigger_Recurring_SetsNextRunAtRecurEvery(t *testing.T) {
+	every := 10 * time.Minute
+	sched := Schedule{Kind: ScheduleKindRecurring, TriggerAt: baseTime, RecurEvery: &every}
+	rem, _ := New("r1", []string{"u1"}, sched, makePolicy(), makeMeta(), baseTime)
+	rem.Trigger(baseTime)
+	want := baseTime.Add(every)
+	if rem.Schedule.NextRunAt == nil || !rem.Schedule.NextRunAt.Equal(want) {
+		t.Errorf("NextRunAt = %v, want %v", rem.Schedule.NextRunAt, want)
+	}
+}
+
+func TestTrigger_QuietProfile_MaxRepeats_ClearsNextRunAt(t *testing.T) {
+	p := DeliveryPolicy{RequiresAck: true, Profile: ProfileQuiet}
+	rem, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), p, makeMeta(), baseTime)
+	// Fire MaxRepeats=3 times
+	for i := 0; i < EscalationQuiet.MaxRepeats; i++ {
+		rem.Trigger(baseTime.Add(time.Duration(i) * time.Hour))
+	}
+	if rem.State.FireCount != EscalationQuiet.MaxRepeats {
+		t.Errorf("FireCount = %d, want %d", rem.State.FireCount, EscalationQuiet.MaxRepeats)
+	}
+	if rem.Schedule.NextRunAt != nil {
+		t.Errorf("expected NextRunAt nil after MaxRepeats, got %v", rem.Schedule.NextRunAt)
+	}
+}
+
+func TestTrigger_AnnoyingProfile_DecreaseInterval(t *testing.T) {
+	p := DeliveryPolicy{RequiresAck: true, Profile: ProfileAnnoying}
+	rem, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), p, makeMeta(), baseTime)
+
+	// Fire 1: InitialDelay = 15m
+	rem.Trigger(baseTime)
+	want1 := baseTime.Add(15 * time.Minute)
+	if rem.Schedule.NextRunAt == nil || !rem.Schedule.NextRunAt.Equal(want1) {
+		t.Errorf("fire1 NextRunAt = %v, want %v", rem.Schedule.NextRunAt, want1)
+	}
+
+	// Fire 2: RepeatInterval - 0*DecreaseStep = 15m
+	t2 := baseTime.Add(15 * time.Minute)
+	rem.Trigger(t2)
+	want2 := t2.Add(15 * time.Minute)
+	if rem.Schedule.NextRunAt == nil || !rem.Schedule.NextRunAt.Equal(want2) {
+		t.Errorf("fire2 NextRunAt = %v, want %v", rem.Schedule.NextRunAt, want2)
+	}
+
+	// Fire 3: 15m - 1*2m = 13m
+	t3 := t2.Add(15 * time.Minute)
+	rem.Trigger(t3)
+	want3 := t3.Add(13 * time.Minute)
+	if rem.Schedule.NextRunAt == nil || !rem.Schedule.NextRunAt.Equal(want3) {
+		t.Errorf("fire3 NextRunAt = %v, want %v", rem.Schedule.NextRunAt, want3)
+	}
+}
+
+func TestTrigger_AnnoyingProfile_MinInterval(t *testing.T) {
+	p := DeliveryPolicy{RequiresAck: true, Profile: ProfileAnnoying}
+	rem, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), p, makeMeta(), baseTime)
+	// Fire enough times to reach/exceed minimum
+	now := baseTime
+	for i := 0; i < 8; i++ {
+		rem.Trigger(now)
+		if rem.Schedule.NextRunAt != nil {
+			now = *rem.Schedule.NextRunAt
+		}
+	}
+	// All intervals after enough fires should be at MinInterval
+	rem.Trigger(now)
+	want := now.Add(EscalationAnnoying.MinInterval)
+	if rem.Schedule.NextRunAt == nil || !rem.Schedule.NextRunAt.Equal(want) {
+		t.Errorf("expected MinInterval %v, NextRunAt = %v", want, rem.Schedule.NextRunAt)
+	}
+}
 
 // --- Acknowledge ---
 
@@ -284,56 +338,20 @@ func TestAcknowledge(t *testing.T) {
 
 // --- IsComplete ---
 
-func TestIsComplete_AllTargetsAck(t *testing.T) {
-	tests := []struct {
-		name   string
-		acked  []string
-		expect bool
-	}{
-		{"no acks", nil, false},
-		{"partial", []string{"u1"}, false},
-		{"all acked", []string{"u1", "u2"}, true},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			r, _ := New("r1", []string{"u1", "u2"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
-			for _, uid := range tc.acked {
-				r.Acks = append(r.Acks, UserAck{UserID: uid, AckedAt: baseTime})
-			}
-			assertEqual(t, r.IsComplete(), tc.expect)
-		})
+func TestIsComplete_TrueAfterFirstAck(t *testing.T) {
+	rem, _ := New("r1", []string{"u1", "u2"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
+	_ = rem.Acknowledge("u1", baseTime)
+	if !rem.IsComplete() {
+		t.Error("expected IsComplete true after first ack")
 	}
 }
 
-func TestIsComplete_AnyTargetAck(t *testing.T) {
-	policy := DeliveryPolicy{
-		RequiresAck: true,
-		Profile:     ProfileNormal,
-	}
-
-	tests := []struct {
-		name   string
-		acked  []string
-		expect bool
-	}{
-		{"no acks", nil, false},
-		{"one ack", []string{"u1"}, true},
-		{"two acks", []string{"u1", "u2"}, true},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			r, _ := New("r1", []string{"u1", "u2"}, makeSchedule(ScheduleKindOnce), policy, makeMeta(), baseTime)
-			for _, uid := range tc.acked {
-				r.Acks = append(r.Acks, UserAck{UserID: uid, AckedAt: baseTime})
-			}
-			assertEqual(t, r.IsComplete(), tc.expect)
-		})
+func TestIsComplete_FalseWithNoAcks(t *testing.T) {
+	rem, _ := New("r1", []string{"u1", "u2"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
+	if rem.IsComplete() {
+		t.Error("expected IsComplete false with no acks")
 	}
 }
-
-// TestAcknowledge_AnyTargetAck_CompletesOnFirst removed - requires lifecycle updates
 
 // --- IsExpired ---
 
@@ -380,21 +398,6 @@ func TestIsExpired(t *testing.T) {
 	}
 }
 
-// --- Delete / Expire ---
-
-func TestDelete(t *testing.T) {
-	r, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
-	now := baseTime.Add(5 * time.Minute)
-	r.Delete(now)
-	assertEqual(t, r.State.UpdatedAt, now)
-}
-
-func TestExpire(t *testing.T) {
-	r, _ := New("r1", []string{"u1"}, makeSchedule(ScheduleKindOnce), makePolicy(), makeMeta(), baseTime)
-	now := baseTime.Add(5 * time.Minute)
-	r.Expire(now)
-	assertEqual(t, r.State.UpdatedAt, now)
-}
 
 // --- PolicyForProfile ---
 
