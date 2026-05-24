@@ -15,6 +15,7 @@ import (
 	"home-go/internal/tech/homeassistant/devices/laptop"
 	hareminders "home-go/internal/tech/homeassistant/devices/reminders"
 	"home-go/internal/tech/homeassistant/entities"
+	"home-go/internal/tech/homeassistant/notifications"
 	apphttp "home-go/internal/tech/http"
 	healthhttp "home-go/internal/tech/http/health"
 	noisehttp "home-go/internal/tech/http/noise"
@@ -24,6 +25,24 @@ import (
 
 	ga "saml.dev/gome-assistant"
 )
+
+// notificationAdapter wraps notifications.NotificationService to satisfy reminders.Notifier.
+type notificationAdapter struct {
+	svc *notifications.NotificationService
+}
+
+func (a *notificationAdapter) Notify(_ context.Context, n domainreminders.Notification) error {
+	for _, userID := range n.To {
+		if err := a.svc.Notify(notifications.Event{
+			Device:  userID,
+			Type:    "reminder",
+			Message: n.Body,
+		}); err != nil {
+			return fmt.Errorf("notify %s: %w", userID, err)
+		}
+	}
+	return nil
+}
 
 // RunFromEnv loads config from the environment and starts the application.
 func RunFromEnv() error {
@@ -71,7 +90,9 @@ func Run(cfg config.Config) error {
 	defer db.Close()
 	remindersRepo := postgres.NewRemindersRepo(db)
 
-	remindersManager := domainreminders.NewManager(remindersRepo, time.Now)
+	notifSvc := notifications.NewNotificationService(app.GetService())
+	remindersNotifier := &notificationAdapter{svc: notifSvc}
+	remindersManager := domainreminders.NewManager(remindersRepo, remindersNotifier, time.Now)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -85,7 +106,7 @@ func Run(cfg config.Config) error {
 		}
 	}()
 
-	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, startTime)
+	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, startTime, cfg.MQTT.AppPrefix)
 	if err != nil {
 		return err
 	}
@@ -96,7 +117,7 @@ func Run(cfg config.Config) error {
 	return nil
 }
 
-func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time) ([]component.Component, error) {
+func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time, mqttPrefix string) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
 	priceService := pricing.NewService(app.GetService(), app.GetState())
 
@@ -107,9 +128,9 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
 	// vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
 
-	remindersComp := hareminders.New(base, runtimeEntities, remindersManager)
-	if err := remindersComp.Restore(ctx); err != nil {
-		return nil, fmt.Errorf("restore reminders component: %w", err)
+	remindersHandler := hareminders.New(base, runtimeEntities, remindersManager, mqttPrefix)
+	if err := remindersHandler.Start(ctx); err != nil {
+		return nil, fmt.Errorf("start reminders handler: %w", err)
 	}
 
 	healthComp, err := svchealth.New(ctx, base, runtimeEntities, startTime)
@@ -122,7 +143,7 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 		dishwasherComp,
 		laptopChargerComp,
 		// vacuumChargerComp,
-		remindersComp,
+		remindersHandler,
 		healthComp,
 	}, nil
 }
