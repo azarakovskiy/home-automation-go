@@ -19,6 +19,15 @@ func (q *Queries) DeleteAcks(ctx context.Context, reminderID string) error {
 	return err
 }
 
+const deleteReminder = `-- name: DeleteReminder :exec
+DELETE FROM reminders WHERE id = $1
+`
+
+func (q *Queries) DeleteReminder(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteReminder, id)
+	return err
+}
+
 const deleteTargets = `-- name: DeleteTargets :exec
 DELETE FROM reminder_targets WHERE reminder_id = $1
 `
@@ -29,7 +38,7 @@ func (q *Queries) DeleteTargets(ctx context.Context, reminderID string) error {
 }
 
 const getReminder = `-- name: GetReminder :one
-SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at FROM reminders WHERE id = $1
+SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, profile, fire_count, last_fired_at, source, owner, message, created_at, updated_at FROM reminders WHERE id = $1
 `
 
 func (q *Queries) GetReminder(ctx context.Context, id string) (Reminder, error) {
@@ -43,9 +52,8 @@ func (q *Queries) GetReminder(ctx context.Context, id string) (Reminder, error) 
 		&i.RecurEverySeconds,
 		&i.ValidUntil,
 		&i.RequiresAck,
-		&i.CompletionPolicy,
 		&i.Profile,
-		&i.Status,
+		&i.FireCount,
 		&i.LastFiredAt,
 		&i.Source,
 		&i.Owner,
@@ -89,7 +97,7 @@ func (q *Queries) ListAcks(ctx context.Context, reminderID string) ([]ListAcksRo
 }
 
 const listActiveReminders = `-- name: ListActiveReminders :many
-SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at FROM reminders WHERE status = 'active'
+SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, profile, fire_count, last_fired_at, source, owner, message, created_at, updated_at FROM reminders
 `
 
 func (q *Queries) ListActiveReminders(ctx context.Context) ([]Reminder, error) {
@@ -109,9 +117,8 @@ func (q *Queries) ListActiveReminders(ctx context.Context) ([]Reminder, error) {
 			&i.RecurEverySeconds,
 			&i.ValidUntil,
 			&i.RequiresAck,
-			&i.CompletionPolicy,
 			&i.Profile,
-			&i.Status,
+			&i.FireCount,
 			&i.LastFiredAt,
 			&i.Source,
 			&i.Owner,
@@ -133,12 +140,11 @@ func (q *Queries) ListActiveReminders(ctx context.Context) ([]Reminder, error) {
 }
 
 const listRemindersDueBefore = `-- name: ListRemindersDueBefore :many
-SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at FROM reminders
-WHERE status = 'active'
-  AND (
+SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, profile, fire_count, last_fired_at, source, owner, message, created_at, updated_at FROM reminders
+WHERE (
     (next_run_at IS NOT NULL AND next_run_at <= $1)
     OR (next_run_at IS NULL AND trigger_at <= $2)
-  )
+)
 `
 
 type ListRemindersDueBeforeParams struct {
@@ -163,9 +169,8 @@ func (q *Queries) ListRemindersDueBefore(ctx context.Context, arg ListRemindersD
 			&i.RecurEverySeconds,
 			&i.ValidUntil,
 			&i.RequiresAck,
-			&i.CompletionPolicy,
 			&i.Profile,
-			&i.Status,
+			&i.FireCount,
 			&i.LastFiredAt,
 			&i.Source,
 			&i.Owner,
@@ -231,8 +236,8 @@ func (q *Queries) UpsertAck(ctx context.Context, arg UpsertAckParams) error {
 
 const upsertReminder = `-- name: UpsertReminder :exec
 INSERT INTO reminders (id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until,
-    requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    requires_ack, profile, fire_count, last_fired_at, source, owner, message, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 ON CONFLICT(id) DO UPDATE SET
     schedule_kind = excluded.schedule_kind,
     trigger_at = excluded.trigger_at,
@@ -240,9 +245,8 @@ ON CONFLICT(id) DO UPDATE SET
     recur_every_seconds = excluded.recur_every_seconds,
     valid_until = excluded.valid_until,
     requires_ack = excluded.requires_ack,
-    completion_policy = excluded.completion_policy,
     profile = excluded.profile,
-    status = excluded.status,
+    fire_count = excluded.fire_count,
     last_fired_at = excluded.last_fired_at,
     source = excluded.source,
     owner = excluded.owner,
@@ -257,10 +261,9 @@ type UpsertReminderParams struct {
 	NextRunAt         sql.NullInt64 `json:"next_run_at"`
 	RecurEverySeconds sql.NullInt64 `json:"recur_every_seconds"`
 	ValidUntil        sql.NullInt64 `json:"valid_until"`
-	RequiresAck       int64         `json:"requires_ack"`
-	CompletionPolicy  string        `json:"completion_policy"`
+	RequiresAck       bool          `json:"requires_ack"`
 	Profile           string        `json:"profile"`
-	Status            string        `json:"status"`
+	FireCount         int32         `json:"fire_count"`
 	LastFiredAt       sql.NullInt64 `json:"last_fired_at"`
 	Source            string        `json:"source"`
 	Owner             string        `json:"owner"`
@@ -278,9 +281,8 @@ func (q *Queries) UpsertReminder(ctx context.Context, arg UpsertReminderParams) 
 		arg.RecurEverySeconds,
 		arg.ValidUntil,
 		arg.RequiresAck,
-		arg.CompletionPolicy,
 		arg.Profile,
-		arg.Status,
+		arg.FireCount,
 		arg.LastFiredAt,
 		arg.Source,
 		arg.Owner,

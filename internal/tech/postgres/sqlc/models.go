@@ -15,10 +15,9 @@ type Reminder struct {
 	NextRunAt         sql.NullInt64 `json:"next_run_at"`
 	RecurEverySeconds sql.NullInt64 `json:"recur_every_seconds"`
 	ValidUntil        sql.NullInt64 `json:"valid_until"`
-	RequiresAck       int64         `json:"requires_ack"`
-	CompletionPolicy  string        `json:"completion_policy"`
+	RequiresAck       bool          `json:"requires_ack"`
 	Profile           string        `json:"profile"`
-	Status            string        `json:"status"`
+	FireCount         int32         `json:"fire_count"`
 	LastFiredAt       sql.NullInt64 `json:"last_fired_at"`
 	Source            string        `json:"source"`
 	Owner             string        `json:"owner"`

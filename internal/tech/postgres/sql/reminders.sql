@@ -1,7 +1,7 @@
 -- name: UpsertReminder :exec
 INSERT INTO reminders (id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until,
-    requires_ack, completion_policy, profile, status, last_fired_at, source, owner, message, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    requires_ack, profile, fire_count, last_fired_at, source, owner, message, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 ON CONFLICT(id) DO UPDATE SET
     schedule_kind = excluded.schedule_kind,
     trigger_at = excluded.trigger_at,
@@ -9,9 +9,8 @@ ON CONFLICT(id) DO UPDATE SET
     recur_every_seconds = excluded.recur_every_seconds,
     valid_until = excluded.valid_until,
     requires_ack = excluded.requires_ack,
-    completion_policy = excluded.completion_policy,
     profile = excluded.profile,
-    status = excluded.status,
+    fire_count = excluded.fire_count,
     last_fired_at = excluded.last_fired_at,
     source = excluded.source,
     owner = excluded.owner,
@@ -22,15 +21,17 @@ ON CONFLICT(id) DO UPDATE SET
 SELECT * FROM reminders WHERE id = $1;
 
 -- name: ListActiveReminders :many
-SELECT * FROM reminders WHERE status = 'active';
+SELECT * FROM reminders;
 
 -- name: ListRemindersDueBefore :many
 SELECT * FROM reminders
-WHERE status = 'active'
-  AND (
+WHERE (
     (next_run_at IS NOT NULL AND next_run_at <= $1)
     OR (next_run_at IS NULL AND trigger_at <= $2)
-  );
+);
+
+-- name: DeleteReminder :exec
+DELETE FROM reminders WHERE id = $1;
 
 -- name: UpsertTarget :exec
 INSERT INTO reminder_targets (reminder_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING;
