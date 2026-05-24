@@ -79,7 +79,7 @@ func (r Reminder) repeatDelay(ep EscalationPolicy) time.Duration {
 		return ep.InitialDelay
 	}
 	if ep.DecreaseStep > 0 {
-		reduced := ep.RepeatInterval - time.Duration(r.State.FireCount-1)*ep.DecreaseStep
+		reduced := ep.RepeatInterval - time.Duration(r.State.FireCount-2)*ep.DecreaseStep
 		if reduced < ep.MinInterval {
 			return ep.MinInterval
 		}
