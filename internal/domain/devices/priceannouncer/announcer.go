@@ -129,9 +129,8 @@ func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData
 
 	now := a.now()
 	midnight := now.Truncate(24 * time.Hour).Add(24 * time.Hour)
-	slots := idx.Slots()
 
-	found, from, till, kind := a.firstExtremeRun(idx, slots, now, midnight)
+	found, from, till, kind := a.firstExtremeRun(idx, now, midnight)
 	if !found {
 		return
 	}
@@ -200,13 +199,13 @@ func (a *Announcer) isSuppressed() bool {
 	return false
 }
 
-func (a *Announcer) firstExtremeRun(idx pricing.PriceIndex, slots []pricing.PriceSlot, from, deadline time.Time) (bool, time.Time, time.Time, string) {
+func (a *Announcer) firstExtremeRun(idx pricing.PriceIndex, from, deadline time.Time) (bool, time.Time, time.Time, string) {
 	var runFrom time.Time
 	var runDur time.Duration
 	var runKind string
 	inRun := false
 
-	for _, s := range slots {
+	for _, s := range idx.Slots() {
 		if !s.Till.After(from) || s.From.After(deadline) {
 			continue
 		}

@@ -210,6 +210,24 @@ func TestAnnouncer_MorningSummary_SuppressedWhenAway(t *testing.T) {
 	}
 }
 
+func TestAnnouncer_Reactive_IndexNotReady(t *testing.T) {
+	store := &fakeStore{}
+	sender := &fakeSender{}
+	modes := &fakeModes{}
+	svc := pricing.NewService(nil) // no UpdateIndex — CurrentIndex() returns error
+
+	a := New(svc, modes, sender, store, AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+	})
+
+	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+
+	if len(sender.events) != 0 {
+		t.Fatalf("expected no notification when index not ready, got %d", len(sender.events))
+	}
+}
+
 func TestAnnouncer_MorningSummary_NoSendWhenPersistFails(t *testing.T) {
 	base := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
 	store := &fakeStore{writeErr: fmt.Errorf("db down")}
