@@ -2,6 +2,7 @@ package postgres_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -66,19 +67,18 @@ func newOnceReminder(id string, triggerAt time.Time) reminders.Reminder {
 			TriggerAt: triggerAt,
 		},
 		Policy: reminders.DeliveryPolicy{
-			RequiresAck:      false,
-			CompletionPolicy: reminders.CompletionPolicyAllTargetsAck,
-			Profile:          reminders.ProfileNormal,
+			RequiresAck: false,
+			Profile:     reminders.ProfileNormal,
 		},
 		State: reminders.State{
-			Status:    reminders.StatusActive,
+			FireCount: 0,
 			CreatedAt: baseTime,
 			UpdatedAt: baseTime,
 		},
 		Meta: reminders.Metadata{
 			Source:  "test",
 			Owner:   "owner1",
-			Message: "hello",
+			Message: "take out the trash",
 		},
 	}
 }
@@ -91,14 +91,20 @@ func assertReminderSchedule(t *testing.T, got, want reminders.Schedule) {
 	if !got.TriggerAt.Equal(want.TriggerAt) {
 		t.Errorf("TriggerAt: got %v, want %v", got.TriggerAt, want.TriggerAt)
 	}
-	if got.NextRunAt == nil || !got.NextRunAt.Equal(*want.NextRunAt) {
-		t.Errorf("NextRunAt: got %v, want %v", got.NextRunAt, want.NextRunAt)
+	if want.NextRunAt != nil {
+		if got.NextRunAt == nil || !got.NextRunAt.Equal(*want.NextRunAt) {
+			t.Errorf("NextRunAt: got %v, want %v", got.NextRunAt, want.NextRunAt)
+		}
 	}
-	if got.RecurEvery == nil || *got.RecurEvery != *want.RecurEvery {
-		t.Errorf("RecurEvery: got %v, want %v", got.RecurEvery, want.RecurEvery)
+	if want.RecurEvery != nil {
+		if got.RecurEvery == nil || *got.RecurEvery != *want.RecurEvery {
+			t.Errorf("RecurEvery: got %v, want %v", got.RecurEvery, want.RecurEvery)
+		}
 	}
-	if got.ValidUntil == nil || !got.ValidUntil.Equal(*want.ValidUntil) {
-		t.Errorf("ValidUntil: got %v, want %v", got.ValidUntil, want.ValidUntil)
+	if want.ValidUntil != nil {
+		if got.ValidUntil == nil || !got.ValidUntil.Equal(*want.ValidUntil) {
+			t.Errorf("ValidUntil: got %v, want %v", got.ValidUntil, want.ValidUntil)
+		}
 	}
 }
 
@@ -107,9 +113,6 @@ func assertReminderPolicy(t *testing.T, got, want reminders.DeliveryPolicy) {
 	if got.RequiresAck != want.RequiresAck {
 		t.Errorf("RequiresAck: got %v, want %v", got.RequiresAck, want.RequiresAck)
 	}
-	if got.CompletionPolicy != want.CompletionPolicy {
-		t.Errorf("CompletionPolicy: got %q, want %q", got.CompletionPolicy, want.CompletionPolicy)
-	}
 	if got.Profile != want.Profile {
 		t.Errorf("Profile: got %q, want %q", got.Profile, want.Profile)
 	}
@@ -117,11 +120,13 @@ func assertReminderPolicy(t *testing.T, got, want reminders.DeliveryPolicy) {
 
 func assertReminderState(t *testing.T, got, want reminders.State) {
 	t.Helper()
-	if got.Status != want.Status {
-		t.Errorf("Status: got %q, want %q", got.Status, want.Status)
+	if got.FireCount != want.FireCount {
+		t.Errorf("FireCount: got %d, want %d", got.FireCount, want.FireCount)
 	}
-	if got.LastFiredAt == nil || !got.LastFiredAt.Equal(*want.LastFiredAt) {
-		t.Errorf("LastFiredAt: got %v, want %v", got.LastFiredAt, want.LastFiredAt)
+	if want.LastFiredAt != nil {
+		if got.LastFiredAt == nil || !got.LastFiredAt.Equal(*want.LastFiredAt) {
+			t.Errorf("LastFiredAt: got %v, want %v", got.LastFiredAt, want.LastFiredAt)
+		}
 	}
 	if !got.CreatedAt.Equal(want.CreatedAt) {
 		t.Errorf("CreatedAt: got %v, want %v", got.CreatedAt, want.CreatedAt)
@@ -165,12 +170,11 @@ func TestSaveAndGetByID_RoundTrip(t *testing.T) {
 			ValidUntil: &validUntil,
 		},
 		Policy: reminders.DeliveryPolicy{
-			RequiresAck:      true,
-			CompletionPolicy: reminders.CompletionPolicyAnyTargetAck,
-			Profile:          reminders.ProfileAnnoying,
+			RequiresAck: true,
+			Profile:     reminders.ProfileAnnoying,
 		},
 		State: reminders.State{
-			Status:      reminders.StatusActive,
+			FireCount:   3,
 			LastFiredAt: &lastFired,
 			CreatedAt:   baseTime,
 			UpdatedAt:   baseTime,
@@ -208,24 +212,15 @@ func TestSaveAndGetByID_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestListActive_FiltersStatus(t *testing.T) {
+func TestListActive_ReturnsAll(t *testing.T) {
 	repoPtr := openDB(t)
 	repo := *repoPtr
 	ctx := context.Background()
 
-	active := newOnceReminder("active-1", baseTime)
-	active.State.Status = reminders.StatusActive
+	r1 := newOnceReminder("r1", baseTime)
+	r2 := newOnceReminder("r2", baseTime.Add(time.Hour))
 
-	completed := newOnceReminder("completed-1", baseTime)
-	completed.State.Status = reminders.StatusCompleted
-
-	deleted := newOnceReminder("deleted-1", baseTime)
-	deleted.State.Status = reminders.StatusDeleted
-
-	expired := newOnceReminder("expired-1", baseTime)
-	expired.State.Status = reminders.StatusExpired
-
-	for _, r := range []reminders.Reminder{active, completed, deleted, expired} {
+	for _, r := range []reminders.Reminder{r1, r2} {
 		if err := repo.Save(ctx, r); err != nil {
 			t.Fatalf("Save %s: %v", r.ID, err)
 		}
@@ -235,8 +230,8 @@ func TestListActive_FiltersStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListActive: %v", err)
 	}
-	if len(list) != 1 || list[0].ID != "active-1" {
-		t.Errorf("ListActive: got %v IDs, want [active-1]", idsOf(list))
+	if len(list) != 2 {
+		t.Errorf("ListActive: got %d reminders, want 2", len(list))
 	}
 }
 
@@ -375,62 +370,59 @@ func TestAcks_SaveLoadUpdateIdempotent(t *testing.T) {
 	}
 }
 
-func TestDelete_RemovesFromListActive(t *testing.T) {
+func TestRemove_HardDeletes(t *testing.T) {
 	repoPtr := openDB(t)
 	repo := *repoPtr
 	ctx := context.Background()
 
-	rem := newOnceReminder("del-1", baseTime)
+	rem := newOnceReminder("r-remove", baseTime)
 	if err := repo.Save(ctx, rem); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
 	list, err := repo.ListActive(ctx)
 	if err != nil {
-		t.Fatalf("ListActive before delete: %v", err)
+		t.Fatalf("ListActive before remove: %v", err)
 	}
 	if len(list) != 1 {
-		t.Fatalf("expected 1 active reminder before delete, got %d", len(list))
+		t.Fatalf("expected 1 active reminder before remove, got %d", len(list))
 	}
 
-	if err := repo.Delete(ctx, "del-1"); err != nil {
-		t.Fatalf("Delete: %v", err)
+	if err := repo.Remove(ctx, "r-remove"); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+
+	_, err = repo.GetByID(ctx, "r-remove")
+	if !errors.Is(err, reminders.ErrNotFound) {
+		t.Errorf("expected ErrNotFound after remove, got %v", err)
 	}
 
 	list, err = repo.ListActive(ctx)
 	if err != nil {
-		t.Fatalf("ListActive after delete: %v", err)
+		t.Fatalf("ListActive after remove: %v", err)
 	}
 	if len(list) != 0 {
-		t.Errorf("expected 0 active reminders after delete, got %d", len(list))
-	}
-
-	got, err := repo.GetByID(ctx, "del-1")
-	if err != nil {
-		t.Fatalf("GetByID after delete: %v", err)
-	}
-	if got.State.Status != reminders.StatusDeleted {
-		t.Errorf("Status after delete: got %q, want %q", got.State.Status, reminders.StatusDeleted)
+		t.Errorf("expected 0 active reminders after remove, got %d", len(list))
 	}
 }
 
-func TestExpired_RemovesFromListActive(t *testing.T) {
+func TestSave_RoundTrips_FireCount(t *testing.T) {
 	repoPtr := openDB(t)
 	repo := *repoPtr
 	ctx := context.Background()
 
-	rem := newOnceReminder("exp-1", baseTime)
-	rem.State.Status = reminders.StatusExpired
+	rem := newOnceReminder("r-fc", baseTime)
+	rem.State.FireCount = 5
 	if err := repo.Save(ctx, rem); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
-	list, err := repo.ListActive(ctx)
+	got, err := repo.GetByID(ctx, "r-fc")
 	if err != nil {
-		t.Fatalf("ListActive: %v", err)
+		t.Fatalf("GetByID: %v", err)
 	}
-	if len(list) != 0 {
-		t.Errorf("expected 0 active reminders for expired, got %d", len(list))
+	if got.State.FireCount != 5 {
+		t.Errorf("FireCount = %d, want 5", got.State.FireCount)
 	}
 }
 
@@ -443,7 +435,7 @@ func TestGetByID_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if err != reminders.ErrNotFound {
+	if !errors.Is(err, reminders.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }

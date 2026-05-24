@@ -38,18 +38,17 @@ func (r *RemindersRepo) Save(ctx context.Context, rem reminders.Reminder) error 
 	q := r.queries.WithTx(tx)
 
 	params := sqlc.UpsertReminderParams{
-		ID:               rem.ID,
-		ScheduleKind:     string(rem.Schedule.Kind),
-		TriggerAt:        rem.Schedule.TriggerAt.Unix(),
-		RequiresAck:      boolToInt(rem.Policy.RequiresAck),
-		CompletionPolicy: string(rem.Policy.CompletionPolicy),
-		Profile:          string(rem.Policy.Profile),
-		Status:           string(rem.State.Status),
-		Source:           rem.Meta.Source,
-		Owner:            rem.Meta.Owner,
-		Message:          rem.Meta.Message,
-		CreatedAt:        rem.State.CreatedAt.Unix(),
-		UpdatedAt:        rem.State.UpdatedAt.Unix(),
+		ID:           rem.ID,
+		ScheduleKind: string(rem.Schedule.Kind),
+		TriggerAt:    rem.Schedule.TriggerAt.Unix(),
+		RequiresAck:  rem.Policy.RequiresAck,
+		Profile:      string(rem.Policy.Profile),
+		FireCount:    int32(rem.State.FireCount),
+		Source:       rem.Meta.Source,
+		Owner:        rem.Meta.Owner,
+		Message:      rem.Meta.Message,
+		CreatedAt:    rem.State.CreatedAt.Unix(),
+		UpdatedAt:    rem.State.UpdatedAt.Unix(),
 	}
 
 	if rem.Schedule.NextRunAt != nil {
@@ -113,7 +112,7 @@ func (r *RemindersRepo) GetByID(ctx context.Context, id reminders.ReminderID) (r
 	return r.loadAggregate(ctx, row)
 }
 
-// ListActive returns all reminders with status = 'active', with full aggregates.
+// ListActive returns all stored reminders (all stored reminders are active).
 func (r *RemindersRepo) ListActive(ctx context.Context) ([]reminders.Reminder, error) {
 	rows, err := r.queries.ListActiveReminders(ctx)
 	if err != nil {
@@ -136,15 +135,12 @@ func (r *RemindersRepo) ListDueBefore(ctx context.Context, t time.Time) ([]remin
 	return r.hydrateList(ctx, rows)
 }
 
-// Delete marks a reminder as deleted by updating its status.
-func (r *RemindersRepo) Delete(ctx context.Context, id reminders.ReminderID) error {
-	rem, err := r.GetByID(ctx, id)
-	if err != nil {
-		return err
+// Remove hard-deletes a reminder by ID.
+func (r *RemindersRepo) Remove(ctx context.Context, id reminders.ReminderID) error {
+	if err := r.queries.DeleteReminder(ctx, id); err != nil {
+		return fmt.Errorf("delete reminder %s: %w", id, err)
 	}
-	rem.State.Status = reminders.StatusDeleted
-	rem.State.UpdatedAt = time.Now().UTC()
-	return r.Save(ctx, rem)
+	return nil
 }
 
 func (r *RemindersRepo) loadAggregate(ctx context.Context, row sqlc.Reminder) (reminders.Reminder, error) {

@@ -26,7 +26,7 @@ func rowToReminder(row sqlc.Reminder, targets []string, ackRows []sqlc.ListAcksR
 	}
 
 	state := reminders.State{
-		Status:    reminders.ReminderStatus(row.Status),
+		FireCount: int(row.FireCount),
 		CreatedAt: time.Unix(row.CreatedAt, 0).UTC(),
 		UpdatedAt: time.Unix(row.UpdatedAt, 0).UTC(),
 	}
@@ -44,14 +44,13 @@ func rowToReminder(row sqlc.Reminder, targets []string, ackRows []sqlc.ListAcksR
 	}
 
 	return reminders.Reminder{
-		ID:       row.ID,
-		Targets:  targets,
-		Acks:     acks,
+		ID:      row.ID,
+		Targets: targets,
+		Acks:    acks,
 		Schedule: sched,
 		Policy: reminders.DeliveryPolicy{
-			RequiresAck:      row.RequiresAck != 0,
-			CompletionPolicy: reminders.CompletionPolicy(row.CompletionPolicy),
-			Profile:          reminders.Profile(row.Profile),
+			RequiresAck: row.RequiresAck,
+			Profile:     reminders.Profile(row.Profile),
 		},
 		State: state,
 		Meta: reminders.Metadata{
@@ -60,11 +59,4 @@ func rowToReminder(row sqlc.Reminder, targets []string, ackRows []sqlc.ListAcksR
 			Message: row.Message,
 		},
 	}
-}
-
-func boolToInt(b bool) int64 {
-	if b {
-		return 1
-	}
-	return 0
 }
