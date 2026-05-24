@@ -2,6 +2,7 @@ package reminders_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -20,57 +21,38 @@ func fixedNow(t time.Time) func() time.Time {
 	return func() time.Time { return t }
 }
 
-func newTestManager(t *testing.T) (*reminders.Manager, *mocks.MockRepository) {
+func newTestManager(t *testing.T) (*reminders.Manager, *mocks.MockRepository, *mocks.MockNotifier) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	repo := mocks.NewMockRepository(ctrl)
-	mgr := reminders.NewManager(repo, fixedNow(managerNow))
-	return mgr, repo
+	notifier := mocks.NewMockNotifier(ctrl)
+	mgr := reminders.NewManager(repo, notifier, fixedNow(managerNow))
+	return mgr, repo, notifier
 }
 
-func onceSched(at time.Time) reminders.Schedule {
-	return reminders.Schedule{
-		Kind:      reminders.ScheduleKindOnce,
-		TriggerAt: at,
+func onceCmd(id string, at time.Time) reminders.CreateCommand {
+	return reminders.CreateCommand{
+		ID:      id,
+		Targets: []string{"u1"},
+		Schedule: reminders.Schedule{
+			Kind:      reminders.ScheduleKindOnce,
+			TriggerAt: at,
+		},
+		Policy: reminders.DeliveryPolicy{Profile: reminders.ProfileNormal},
+		Meta:   reminders.Metadata{Message: "do it"},
 	}
 }
 
-func recurSched(at time.Time, every time.Duration) reminders.Schedule {
-	return reminders.Schedule{
-		Kind:       reminders.ScheduleKindRecurring,
-		TriggerAt:  at,
-		RecurEvery: &every,
-	}
-}
-
-func defaultPolicy() reminders.DeliveryPolicy {
-	return reminders.DeliveryPolicy{
-		RequiresAck:      false,
-		CompletionPolicy: reminders.CompletionPolicyAllTargetsAck,
-		Profile:          reminders.ProfileNormal,
-	}
-}
-
-func ackPolicy() reminders.DeliveryPolicy {
-	return reminders.DeliveryPolicy{
-		RequiresAck:      true,
-		CompletionPolicy: reminders.CompletionPolicyAllTargetsAck,
-		Profile:          reminders.ProfileNormal,
-	}
-}
-
-func anyAckPolicy() reminders.DeliveryPolicy {
-	return reminders.DeliveryPolicy{
-		RequiresAck:      true,
-		CompletionPolicy: reminders.CompletionPolicyAnyTargetAck,
-		Profile:          reminders.ProfileNormal,
-	}
+func ackCmd(id string, at time.Time) reminders.CreateCommand {
+	cmd := onceCmd(id, at)
+	cmd.Policy.RequiresAck = true
+	return cmd
 }
 
 // --- Create ---
 
-func TestManager_Create_SavesAndReturnsShowAction(t *testing.T) {
-	mgr, repo := newTestManager(t)
+func TestManager_Create_SavesAndReturnsReminder(t *testing.T) {
+	mgr, repo, _ := newTestManager(t)
 
 	repo.EXPECT().
 		Save(managerCtx, gomock.Any()).
@@ -78,360 +60,216 @@ func TestManager_Create_SavesAndReturnsShowAction(t *testing.T) {
 			if r.ID != "rem-1" {
 				t.Errorf("expected ID rem-1, got %q", r.ID)
 			}
-			if r.State.Status != reminders.StatusActive {
-				t.Errorf("expected active status, got %q", r.State.Status)
+			if r.State.FireCount != 0 {
+				t.Errorf("expected FireCount 0 on create, got %d", r.State.FireCount)
 			}
 			return nil
 		})
 
-	action, err := mgr.Create(managerCtx, "rem-1", []string{"alice"}, onceSched(managerNow), defaultPolicy(), reminders.Metadata{Message: "test"})
+	rem, err := mgr.Create(managerCtx, onceCmd("rem-1", managerNow))
 	if err != nil {
-		t.Fatalf("Create: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if action.Kind != reminders.ActionShowProjection {
-		t.Errorf("action kind: got %q, want %q", action.Kind, reminders.ActionShowProjection)
-	}
-	if action.Reminder.ID != "rem-1" {
-		t.Errorf("action reminder ID: got %q, want rem-1", action.Reminder.ID)
+	if rem.ID != "rem-1" {
+		t.Errorf("returned reminder ID = %q, want rem-1", rem.ID)
 	}
 }
 
-func TestManager_Create_FailsWithNoTargets(t *testing.T) {
-	mgr, _ := newTestManager(t)
+func TestManager_Create_PropagatesRepoError(t *testing.T) {
+	mgr, repo, _ := newTestManager(t)
+	repo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(errors.New("db down"))
 
-	_, err := mgr.Create(managerCtx, "rem-1", nil, onceSched(managerNow), defaultPolicy(), reminders.Metadata{})
+	_, err := mgr.Create(managerCtx, onceCmd("r1", managerNow))
 	if err == nil {
-		t.Fatal("expected error for no targets")
-	}
-}
-
-// --- Delete ---
-
-func TestManager_Delete_ReturnsRemoveAction(t *testing.T) {
-	mgr, repo := newTestManager(t)
-
-	existing := reminders.Reminder{
-		ID:       "rem-2",
-		Targets:  []string{"alice"},
-		Acks:     []reminders.UserAck{},
-		Schedule: onceSched(managerNow),
-		Policy:   defaultPolicy(),
-		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
-	}
-
-	repo.EXPECT().GetByID(managerCtx, "rem-2").Return(existing, nil)
-	repo.EXPECT().Save(managerCtx, gomock.Any()).
-		DoAndReturn(func(_ context.Context, r reminders.Reminder) error {
-			if r.State.Status != reminders.StatusDeleted {
-				t.Errorf("expected deleted status, got %q", r.State.Status)
-			}
-			return nil
-		})
-
-	action, err := mgr.Delete(managerCtx, "rem-2")
-	if err != nil {
-		t.Fatalf("Delete: %v", err)
-	}
-	if action.Kind != reminders.ActionRemoveProjection {
-		t.Errorf("action kind: got %q, want %q", action.Kind, reminders.ActionRemoveProjection)
-	}
-}
-
-func TestManager_Delete_NotFound(t *testing.T) {
-	mgr, repo := newTestManager(t)
-
-	repo.EXPECT().GetByID(managerCtx, "missing").Return(reminders.Reminder{}, reminders.ErrNotFound)
-
-	_, err := mgr.Delete(managerCtx, "missing")
-	if err == nil {
-		t.Fatal("expected error for not found")
+		t.Fatal("expected error, got nil")
 	}
 }
 
 // --- Ack ---
 
-func TestManager_Ack_SingleUser_CompletesAndRemoves(t *testing.T) {
-	mgr, repo := newTestManager(t)
+func TestManager_Ack_Complete_Removes(t *testing.T) {
+	mgr, repo, _ := newTestManager(t)
 
-	existing := reminders.Reminder{
-		ID:       "rem-3",
-		Targets:  []string{"alice"},
-		Acks:     []reminders.UserAck{},
-		Schedule: onceSched(managerNow.Add(-time.Hour)),
-		Policy:   ackPolicy(),
-		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+	stored := reminders.Reminder{
+		ID:      "r1",
+		Targets: []string{"u1"},
+		Schedule: reminders.Schedule{Kind: reminders.ScheduleKindOnce, TriggerAt: managerNow},
+		Policy:  reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
+		State:   reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
+		Meta:    reminders.Metadata{Message: "m"},
 	}
 
-	repo.EXPECT().GetByID(managerCtx, "rem-3").Return(existing, nil)
-	repo.EXPECT().Save(managerCtx, gomock.Any()).
-		DoAndReturn(func(_ context.Context, r reminders.Reminder) error {
-			if r.State.Status != reminders.StatusCompleted {
-				t.Errorf("expected completed, got %q", r.State.Status)
-			}
-			return nil
-		})
+	repo.EXPECT().GetByID(managerCtx, "r1").Return(stored, nil)
+	repo.EXPECT().Remove(managerCtx, "r1").Return(nil)
 
-	action, err := mgr.Ack(managerCtx, "rem-3", "alice")
-	if err != nil {
-		t.Fatalf("Ack: %v", err)
-	}
-	if action.Kind != reminders.ActionRemoveProjection {
-		t.Errorf("action kind: got %q, want %q", action.Kind, reminders.ActionRemoveProjection)
+	if err := mgr.Ack(managerCtx, "r1", "u1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestManager_Ack_MultiUser_PartialAck_AllTargetsPolicy(t *testing.T) {
-	mgr, repo := newTestManager(t)
+func TestManager_Ack_MultiTarget_NotComplete_Saves(t *testing.T) {
+	mgr, repo, _ := newTestManager(t)
 
-	existing := reminders.Reminder{
-		ID:       "rem-4",
-		Targets:  []string{"alice", "bob"},
-		Acks:     []reminders.UserAck{},
-		Schedule: onceSched(managerNow.Add(-time.Hour)),
-		Policy:   ackPolicy(), // all_targets_ack
-		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+	stored := reminders.Reminder{
+		ID:      "r1",
+		Targets: []string{"u1", "u2"},
+		Schedule: reminders.Schedule{Kind: reminders.ScheduleKindOnce, TriggerAt: managerNow},
+		Policy:  reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
+		State:   reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
+		Meta:    reminders.Metadata{Message: "m"},
 	}
 
-	repo.EXPECT().GetByID(managerCtx, "rem-4").Return(existing, nil)
-	repo.EXPECT().Save(managerCtx, gomock.Any()).
-		DoAndReturn(func(_ context.Context, r reminders.Reminder) error {
-			if r.State.Status != reminders.StatusActive {
-				t.Errorf("expected active (partial ack), got %q", r.State.Status)
-			}
-			return nil
-		})
+	// First ack from u1 still completes (any-ack policy)
+	repo.EXPECT().GetByID(managerCtx, "r1").Return(stored, nil)
+	repo.EXPECT().Remove(managerCtx, "r1").Return(nil)
 
-	action, err := mgr.Ack(managerCtx, "rem-4", "alice")
-	if err != nil {
-		t.Fatalf("Ack: %v", err)
-	}
-	if action.Kind != reminders.ActionShowProjection {
-		t.Errorf("action kind: got %q, want %q (partial ack should refresh)", action.Kind, reminders.ActionShowProjection)
+	if err := mgr.Ack(managerCtx, "r1", "u1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestManager_Ack_MultiUser_AllAck_AllTargetsPolicy(t *testing.T) {
-	mgr, repo := newTestManager(t)
+func TestManager_Ack_NotTarget_Errors(t *testing.T) {
+	mgr, repo, _ := newTestManager(t)
 
-	aliceAckedAt := managerNow.Add(-5 * time.Minute)
-	existing := reminders.Reminder{
-		ID:       "rem-5",
-		Targets:  []string{"alice", "bob"},
-		Acks:     []reminders.UserAck{{UserID: "alice", AckedAt: aliceAckedAt}},
-		Schedule: onceSched(managerNow.Add(-time.Hour)),
-		Policy:   ackPolicy(), // all_targets_ack
-		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+	stored := reminders.Reminder{
+		ID:      "r1",
+		Targets: []string{"u1"},
+		Schedule: reminders.Schedule{Kind: reminders.ScheduleKindOnce, TriggerAt: managerNow},
+		Policy:  reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
+		State:   reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
+		Meta:    reminders.Metadata{Message: "m"},
 	}
 
-	repo.EXPECT().GetByID(managerCtx, "rem-5").Return(existing, nil)
-	repo.EXPECT().Save(managerCtx, gomock.Any()).
-		DoAndReturn(func(_ context.Context, r reminders.Reminder) error {
-			if r.State.Status != reminders.StatusCompleted {
-				t.Errorf("expected completed (all acked), got %q", r.State.Status)
-			}
-			return nil
-		})
+	repo.EXPECT().GetByID(managerCtx, "r1").Return(stored, nil)
 
-	action, err := mgr.Ack(managerCtx, "rem-5", "bob")
-	if err != nil {
-		t.Fatalf("Ack: %v", err)
-	}
-	if action.Kind != reminders.ActionRemoveProjection {
-		t.Errorf("action kind: got %q, want %q", action.Kind, reminders.ActionRemoveProjection)
+	err := mgr.Ack(managerCtx, "r1", "u-not-a-target")
+	if !errors.Is(err, reminders.ErrNotTarget) {
+		t.Errorf("expected ErrNotTarget, got %v", err)
 	}
 }
 
-func TestManager_Ack_AnyTargetPolicy_CompletesOnFirstAck(t *testing.T) {
-	mgr, repo := newTestManager(t)
+// --- Delete ---
 
-	existing := reminders.Reminder{
-		ID:       "rem-6",
-		Targets:  []string{"alice", "bob"},
-		Acks:     []reminders.UserAck{},
-		Schedule: onceSched(managerNow.Add(-time.Hour)),
-		Policy:   anyAckPolicy(), // any_target_ack
-		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
-	}
+func TestManager_Delete_Removes(t *testing.T) {
+	mgr, repo, _ := newTestManager(t)
+	repo.EXPECT().Remove(managerCtx, "r1").Return(nil)
 
-	repo.EXPECT().GetByID(managerCtx, "rem-6").Return(existing, nil)
-	repo.EXPECT().Save(managerCtx, gomock.Any()).
-		DoAndReturn(func(_ context.Context, r reminders.Reminder) error {
-			if r.State.Status != reminders.StatusCompleted {
-				t.Errorf("expected completed on first ack with any_target_ack, got %q", r.State.Status)
-			}
-			return nil
-		})
-
-	action, err := mgr.Ack(managerCtx, "rem-6", "alice")
-	if err != nil {
-		t.Fatalf("Ack: %v", err)
-	}
-	if action.Kind != reminders.ActionRemoveProjection {
-		t.Errorf("action kind: got %q, want %q", action.Kind, reminders.ActionRemoveProjection)
-	}
-}
-
-// --- Restore ---
-
-func TestManager_Restore_ReturnsActiveReminders(t *testing.T) {
-	mgr, repo := newTestManager(t)
-
-	active := []reminders.Reminder{
-		{ID: "rem-a", State: reminders.State{Status: reminders.StatusActive}},
-		{ID: "rem-b", State: reminders.State{Status: reminders.StatusActive}},
-	}
-
-	repo.EXPECT().ListActive(managerCtx).Return(active, nil)
-
-	got, err := mgr.Restore(managerCtx)
-	if err != nil {
-		t.Fatalf("Restore: %v", err)
-	}
-	if len(got) != 2 {
-		t.Errorf("Restore: got %d reminders, want 2", len(got))
+	if err := mgr.Delete(managerCtx, "r1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 // --- Tick ---
 
-func TestManager_Tick_OnceDueNoAck_CompletesAndRemoves(t *testing.T) {
-	mgr, repo := newTestManager(t)
-
-	due := reminders.Reminder{
-		ID:       "rem-7",
-		Targets:  []string{"alice"},
-		Acks:     []reminders.UserAck{},
-		Schedule: onceSched(managerNow.Add(-time.Minute)),
-		Policy:   defaultPolicy(), // no ack required
-		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
-	}
-
-	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{due}, nil)
-	repo.EXPECT().Save(managerCtx, gomock.Any()).
-		DoAndReturn(func(_ context.Context, r reminders.Reminder) error {
-			if r.State.Status != reminders.StatusCompleted {
-				t.Errorf("expected completed, got %q", r.State.Status)
-			}
-			return nil
-		})
-
-	actions, err := mgr.Tick(managerCtx, managerNow)
-	if err != nil {
-		t.Fatalf("Tick: %v", err)
-	}
-	if len(actions) != 1 || actions[0].Kind != reminders.ActionRemoveProjection {
-		t.Errorf("expected 1 RemoveProjection action, got %v", actions)
+func makeDueReminder(id string, requiresAck bool) reminders.Reminder {
+	return reminders.Reminder{
+		ID:      id,
+		Targets: []string{"u1"},
+		Schedule: reminders.Schedule{
+			Kind:      reminders.ScheduleKindOnce,
+			TriggerAt: managerNow.Add(-time.Minute),
+		},
+		Policy: reminders.DeliveryPolicy{RequiresAck: requiresAck, Profile: reminders.ProfileNormal},
+		State:  reminders.State{CreatedAt: managerNow.Add(-time.Hour), UpdatedAt: managerNow.Add(-time.Hour)},
+		Meta:   reminders.Metadata{Message: "do it"},
 	}
 }
 
-func TestManager_Tick_OnceWithAck_ShowsProjection(t *testing.T) {
-	mgr, repo := newTestManager(t)
+func TestManager_Tick_Expired_Removes_NoNotify(t *testing.T) {
+	mgr, repo, notifier := newTestManager(t)
 
-	due := reminders.Reminder{
-		ID:       "rem-8",
-		Targets:  []string{"alice"},
-		Acks:     []reminders.UserAck{},
-		Schedule: onceSched(managerNow.Add(-time.Minute)),
-		Policy:   ackPolicy(), // requires ack
-		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+	validUntil := managerNow.Add(-time.Second)
+	rem := makeDueReminder("r1", false)
+	rem.Schedule.ValidUntil = &validUntil
+
+	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{rem}, nil)
+	repo.EXPECT().Remove(managerCtx, "r1").Return(nil)
+	// notifier.Notify must NOT be called
+	notifier.EXPECT().Notify(gomock.Any(), gomock.Any()).Times(0)
+
+	if err := mgr.Tick(managerCtx, managerNow); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
+}
 
-	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{due}, nil)
+func TestManager_Tick_OnceNoAck_NotifiesAndRemoves(t *testing.T) {
+	mgr, repo, notifier := newTestManager(t)
+
+	rem := makeDueReminder("r1", false)
+	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{rem}, nil)
+	notifier.EXPECT().Notify(managerCtx, gomock.Any()).Return(nil)
+	repo.EXPECT().Remove(managerCtx, "r1").Return(nil)
+
+	if err := mgr.Tick(managerCtx, managerNow); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestManager_Tick_OnceRequiresAck_NotifiesAndSaves(t *testing.T) {
+	mgr, repo, notifier := newTestManager(t)
+
+	rem := makeDueReminder("r1", true)
+	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{rem}, nil)
+	notifier.EXPECT().Notify(managerCtx, gomock.Any()).Return(nil)
 	repo.EXPECT().Save(managerCtx, gomock.Any()).Return(nil)
 
-	actions, err := mgr.Tick(managerCtx, managerNow)
-	if err != nil {
-		t.Fatalf("Tick: %v", err)
-	}
-	if len(actions) != 1 || actions[0].Kind != reminders.ActionShowProjection {
-		t.Errorf("expected 1 ShowProjection action, got %v", actions)
+	if err := mgr.Tick(managerCtx, managerNow); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestManager_Tick_Recurring_ShowsProjection(t *testing.T) {
-	mgr, repo := newTestManager(t)
+func TestManager_Tick_MaxRepeats_Removes_NoNotify(t *testing.T) {
+	mgr, repo, notifier := newTestManager(t)
 
-	every := time.Hour
-	due := reminders.Reminder{
-		ID:       "rem-9",
-		Targets:  []string{"alice"},
-		Acks:     []reminders.UserAck{},
-		Schedule: recurSched(managerNow.Add(-time.Hour), every),
-		Policy:   defaultPolicy(),
-		State:    reminders.State{Status: reminders.StatusActive, CreatedAt: managerNow, UpdatedAt: managerNow},
+	// Quiet profile: MaxRepeats=3; pre-set FireCount to 2 so next Trigger hits limit
+	rem := reminders.Reminder{
+		ID:      "r1",
+		Targets: []string{"u1"},
+		Schedule: reminders.Schedule{
+			Kind:      reminders.ScheduleKindOnce,
+			TriggerAt: managerNow.Add(-time.Hour),
+			NextRunAt: func() *time.Time { t := managerNow.Add(-time.Minute); return &t }(),
+		},
+		Policy: reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileQuiet},
+		State: reminders.State{
+			FireCount: 2, // next Trigger → FireCount=3 = MaxRepeats → silent remove
+			CreatedAt: managerNow.Add(-3 * time.Hour),
+			UpdatedAt: managerNow.Add(-3 * time.Hour),
+		},
+		Meta: reminders.Metadata{Message: "m"},
 	}
 
-	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{due}, nil)
-	repo.EXPECT().Save(managerCtx, gomock.Any()).
-		DoAndReturn(func(_ context.Context, r reminders.Reminder) error {
-			if r.State.Status != reminders.StatusActive {
-				t.Errorf("recurring should stay active, got %q", r.State.Status)
-			}
-			if r.Schedule.NextRunAt == nil {
-				t.Error("NextRunAt should be set after trigger")
-			}
-			return nil
-		})
+	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{rem}, nil)
+	repo.EXPECT().Remove(managerCtx, "r1").Return(nil)
+	notifier.EXPECT().Notify(gomock.Any(), gomock.Any()).Times(0)
 
-	actions, err := mgr.Tick(managerCtx, managerNow)
-	if err != nil {
-		t.Fatalf("Tick: %v", err)
-	}
-	if len(actions) != 1 || actions[0].Kind != reminders.ActionShowProjection {
-		t.Errorf("expected 1 ShowProjection action, got %v", actions)
+	if err := mgr.Tick(managerCtx, managerNow); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestManager_Tick_ExpiredReminder_Expires(t *testing.T) {
-	mgr, repo := newTestManager(t)
+func TestManager_Tick_Recurring_NotifiesAndSaves(t *testing.T) {
+	mgr, repo, notifier := newTestManager(t)
 
-	past := managerNow.Add(-2 * time.Hour)
-	validUntil := managerNow.Add(-time.Hour) // already expired
-	every := time.Minute
-
-	due := reminders.Reminder{
-		ID:      "rem-exp",
-		Targets: []string{"alice"},
-		Acks:    []reminders.UserAck{},
+	every := 10 * time.Minute
+	rem := reminders.Reminder{
+		ID:      "r1",
+		Targets: []string{"u1"},
 		Schedule: reminders.Schedule{
 			Kind:       reminders.ScheduleKindRecurring,
-			TriggerAt:  past,
-			NextRunAt:  &past,
+			TriggerAt:  managerNow.Add(-time.Hour),
 			RecurEvery: &every,
-			ValidUntil: &validUntil,
 		},
-		Policy: defaultPolicy(),
-		State:  reminders.State{Status: reminders.StatusActive, CreatedAt: past, UpdatedAt: past},
+		Policy: reminders.DeliveryPolicy{Profile: reminders.ProfileNormal},
+		State:  reminders.State{CreatedAt: managerNow.Add(-time.Hour), UpdatedAt: managerNow.Add(-time.Hour)},
+		Meta:   reminders.Metadata{Message: "recurring"},
 	}
 
-	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{due}, nil)
-	repo.EXPECT().Save(managerCtx, gomock.Any()).
-		DoAndReturn(func(_ context.Context, r reminders.Reminder) error {
-			if r.State.Status != reminders.StatusExpired {
-				t.Errorf("expected expired, got %q", r.State.Status)
-			}
-			return nil
-		})
+	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return([]reminders.Reminder{rem}, nil)
+	notifier.EXPECT().Notify(managerCtx, gomock.Any()).Return(nil)
+	repo.EXPECT().Save(managerCtx, gomock.Any()).Return(nil)
 
-	actions, err := mgr.Tick(managerCtx, managerNow)
-	if err != nil {
-		t.Fatalf("Tick: %v", err)
-	}
-	if len(actions) != 1 || actions[0].Kind != reminders.ActionRemoveProjection {
-		t.Errorf("expected 1 RemoveProjection for expired reminder, got %v", actions)
-	}
-}
-
-func TestManager_Tick_NothingDue_ReturnsEmpty(t *testing.T) {
-	mgr, repo := newTestManager(t)
-
-	repo.EXPECT().ListDueBefore(managerCtx, managerNow).Return(nil, nil)
-
-	actions, err := mgr.Tick(managerCtx, managerNow)
-	if err != nil {
-		t.Fatalf("Tick: %v", err)
-	}
-	if len(actions) != 0 {
-		t.Errorf("expected no actions, got %d", len(actions))
+	if err := mgr.Tick(managerCtx, managerNow); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
