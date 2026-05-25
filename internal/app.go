@@ -130,6 +130,15 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 		MinExtremeDuration: time.Hour,
 	})
 
+	// Reactive trigger: fire HandlePriceUpdate on every price-sensor change.
+	// Entity ID lives here (app layer) rather than in the domain.
+	app.RegisterEntityListeners(
+		ga.NewEntityListener().
+			EntityIds(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+			Call(announcerComp.HandlePriceUpdate).
+			Build(),
+	)
+
 	// On-demand trigger: an MQTT switch that sends the day summary when turned ON.
 	priceSummarySwitch, err := runtimeEntities.Switch(ctx, entities.SwitchSpec{
 		CommonSpec: entities.CommonSpec{

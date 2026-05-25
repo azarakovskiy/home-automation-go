@@ -89,7 +89,7 @@ func TestAnnouncer_Reactive_FiresOnExtremeRun(t *testing.T) {
 	})
 	a.now = func() time.Time { return base }
 
-	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+	a.HandlePriceUpdate(nil, nil, ga.EntityData{})
 
 	if len(sender.events) == 0 {
 		t.Fatal("expected reactive alert for 3-hour spike run")
@@ -118,7 +118,7 @@ func TestAnnouncer_Reactive_IgnoresShortExtremeRun(t *testing.T) {
 	})
 	a.now = func() time.Time { return base }
 
-	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+	a.HandlePriceUpdate(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no alert for sub-threshold spike run, got %d", len(sender.events))
@@ -135,7 +135,7 @@ func TestAnnouncer_Reactive_IndexNotReady(t *testing.T) {
 		MinExtremeDuration: time.Hour,
 	})
 
-	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+	a.HandlePriceUpdate(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no notification when index not ready, got %d", len(sender.events))
@@ -231,8 +231,8 @@ func TestAnnouncer_Reactive_NoDuplicateAlert(t *testing.T) {
 	})
 	a.now = func() time.Time { return base }
 
-	a.handlePriceUpdate(nil, nil, ga.EntityData{})
-	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+	a.HandlePriceUpdate(nil, nil, ga.EntityData{})
+	a.HandlePriceUpdate(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 1 {
 		t.Fatalf("expected 1 alert (no duplicate for same run), got %d", len(sender.events))
@@ -260,7 +260,7 @@ func TestAnnouncer_Reactive_SuppressedAtNight(t *testing.T) {
 	})
 	a.now = func() time.Time { return base }
 
-	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+	a.HandlePriceUpdate(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no reactive alert during night, got %d", len(sender.events))
@@ -288,7 +288,7 @@ func TestAnnouncer_Reactive_SuppressedWhenAway(t *testing.T) {
 	})
 	a.now = func() time.Time { return base }
 
-	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+	a.HandlePriceUpdate(nil, nil, ga.EntityData{})
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no reactive alert when away, got %d", len(sender.events))

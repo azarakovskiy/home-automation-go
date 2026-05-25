@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"home-go/internal/domain/pricing"
-	"home-go/internal/tech/homeassistant/entities"
 	"home-go/internal/tech/homeassistant/notifications"
 	"home-go/internal/tech/runtime/debug"
 
@@ -57,16 +56,10 @@ func New(
 // EventListeners implements component.Component.
 func (a *Announcer) EventListeners() []ga.EventListener { return nil }
 
-// EntityListeners registers the reactive price-update trigger.
-// On-demand summaries are triggered via the MQTT price summary switch, not here.
-func (a *Announcer) EntityListeners() []ga.EntityListener {
-	return []ga.EntityListener{
-		ga.NewEntityListener().
-			EntityIds(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
-			Call(a.handlePriceUpdate).
-			Build(),
-	}
-}
+// EntityListeners implements component.Component. The reactive price-sensor listener
+// is registered by the caller (app layer) via HandlePriceUpdate, keeping entity IDs
+// out of the domain.
+func (a *Announcer) EntityListeners() []ga.EntityListener { return nil }
 
 // Schedules implements component.Component (unused).
 func (a *Announcer) Schedules() []ga.DailySchedule { return nil }
@@ -123,7 +116,8 @@ func (a *Announcer) HandleOnDemand() {
 	}
 }
 
-func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData) {
+// HandlePriceUpdate is called by the app layer on every price-sensor entity change.
+func (a *Announcer) HandlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData) {
 	if a.isSuppressed() {
 		return
 	}
