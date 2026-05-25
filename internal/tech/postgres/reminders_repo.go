@@ -112,8 +112,8 @@ func (r *RemindersRepo) GetByID(ctx context.Context, id reminders.ReminderID) (r
 	return r.loadAggregate(ctx, row)
 }
 
-// ListActive returns all stored reminders (all stored reminders are active).
-func (r *RemindersRepo) ListActive(ctx context.Context) ([]reminders.Reminder, error) {
+// List returns all stored reminders.
+func (r *RemindersRepo) List(ctx context.Context) ([]reminders.Reminder, error) {
 	rows, err := r.queries.ListActiveReminders(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list active reminders: %w", err)

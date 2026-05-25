@@ -212,7 +212,7 @@ func TestSaveAndGetByID_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestListActive_ReturnsAll(t *testing.T) {
+func TestList_ReturnsAll(t *testing.T) {
 	repoPtr := openDB(t)
 	repo := *repoPtr
 	ctx := context.Background()
@@ -226,12 +226,12 @@ func TestListActive_ReturnsAll(t *testing.T) {
 		}
 	}
 
-	list, err := repo.ListActive(ctx)
+	list, err := repo.List(ctx)
 	if err != nil {
-		t.Fatalf("ListActive: %v", err)
+		t.Fatalf("List: %v", err)
 	}
 	if len(list) != 2 {
-		t.Errorf("ListActive: got %d reminders, want 2", len(list))
+		t.Errorf("List: got %d reminders, want 2", len(list))
 	}
 }
 
@@ -380,9 +380,9 @@ func TestRemove_HardDeletes(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	list, err := repo.ListActive(ctx)
+	list, err := repo.List(ctx)
 	if err != nil {
-		t.Fatalf("ListActive before remove: %v", err)
+		t.Fatalf("List before remove: %v", err)
 	}
 	if len(list) != 1 {
 		t.Fatalf("expected 1 active reminder before remove, got %d", len(list))
@@ -397,9 +397,9 @@ func TestRemove_HardDeletes(t *testing.T) {
 		t.Errorf("expected ErrNotFound after remove, got %v", err)
 	}
 
-	list, err = repo.ListActive(ctx)
+	list, err = repo.List(ctx)
 	if err != nil {
-		t.Fatalf("ListActive after remove: %v", err)
+		t.Fatalf("List after remove: %v", err)
 	}
 	if len(list) != 0 {
 		t.Errorf("expected 0 active reminders after remove, got %d", len(list))

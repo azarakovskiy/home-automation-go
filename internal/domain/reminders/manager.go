@@ -61,6 +61,11 @@ func (m *Manager) Ack(ctx context.Context, reminderID ReminderID, targetUserID s
 	return m.repo.Save(ctx, rem)
 }
 
+// List returns all stored reminders.
+func (m *Manager) List(ctx context.Context) ([]Reminder, error) {
+	return m.repo.List(ctx)
+}
+
 // Delete hard-deletes a reminder immediately.
 func (m *Manager) Delete(ctx context.Context, reminderID ReminderID) error {
 	return m.repo.Remove(ctx, reminderID)

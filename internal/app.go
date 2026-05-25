@@ -109,7 +109,7 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
 	// vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
 
-	remindersHandler := hareminders.New(base, runtimeEntities, remindersManager, mqttPrefix)
+	remindersHandler := hareminders.New(base, runtimeEntities, remindersManager, hareminders.AdaptDeviceRuntime(runtimeEntities.ForDevice("Reminders")), mqttPrefix)
 	if err := remindersHandler.Start(ctx); err != nil {
 		return nil, fmt.Errorf("start reminders handler: %w", err)
 	}

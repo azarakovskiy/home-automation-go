@@ -44,11 +44,15 @@ func (r Reminder) IsDue(now time.Time) bool {
 }
 
 // Trigger fires the reminder, advancing FireCount and computing the next run time.
+// For recurring reminders, Acks are reset so the next cycle starts unacknowledged.
 func (r *Reminder) Trigger(now time.Time) {
 	r.State.FireCount++
 	r.State.LastFiredAt = &now
 	r.State.UpdatedAt = now
 	r.Schedule.NextRunAt = r.computeNextRunAt(now)
+	if r.Schedule.Kind == ScheduleKindRecurring {
+		r.Acks = nil
+	}
 }
 
 // computeNextRunAt returns the next time the reminder should fire after a trigger at now,

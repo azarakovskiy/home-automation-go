@@ -185,6 +185,10 @@ func (dr *DeviceRuntime) BinarySensor(ctx context.Context, spec BinarySensorSpec
 	return &BinarySensorHandle{runtime: dr.rt, key: entity.key}, nil
 }
 
+func (dr *DeviceRuntime) Remove(ctx context.Context, key string) error {
+	return dr.rt.Remove(ctx, key)
+}
+
 func NewRuntime(cfg RuntimeConfig) (*Runtime, error) {
 	if strings.TrimSpace(cfg.BrokerURL) == "" {
 		return nil, fmt.Errorf("broker URL is required")

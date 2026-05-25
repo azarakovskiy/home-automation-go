@@ -57,19 +57,19 @@ func (mr *MockRepositoryMockRecorder) GetByID(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockRepository)(nil).GetByID), ctx, id)
 }
 
-// ListActive mocks base method.
-func (m *MockRepository) ListActive(ctx context.Context) ([]reminders.Reminder, error) {
+// List mocks base method.
+func (m *MockRepository) List(ctx context.Context) ([]reminders.Reminder, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListActive", ctx)
+	ret := m.ctrl.Call(m, "List", ctx)
 	ret0, _ := ret[0].([]reminders.Reminder)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListActive indicates an expected call of ListActive.
-func (mr *MockRepositoryMockRecorder) ListActive(ctx any) *gomock.Call {
+// List indicates an expected call of List.
+func (mr *MockRepositoryMockRecorder) List(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListActive", reflect.TypeOf((*MockRepository)(nil).ListActive), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockRepository)(nil).List), ctx)
 }
 
 // ListDueBefore mocks base method.
