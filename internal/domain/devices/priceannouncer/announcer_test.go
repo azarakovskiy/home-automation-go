@@ -3,6 +3,7 @@ package priceannouncer
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -245,5 +246,72 @@ func TestAnnouncer_MorningSummary_NoSendWhenPersistFails(t *testing.T) {
 
 	if len(sender.events) != 0 {
 		t.Fatalf("expected no notification when state persist fails, got %d", len(sender.events))
+	}
+}
+
+func TestAnnouncer_OnDemand_MorningFormat(t *testing.T) {
+	// Hour 8 < 11 → morning bucket; slots have a cheap window.
+	base := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
+	// prices: three very cheap slots at hours 8-11, rest average
+	prices := []float64{0.01, 0.01, 0.01, 0.20, 0.20, 0.20, 0.20, 0.20}
+	slots := make([]pricing.PriceSlot, len(prices))
+	for i, p := range prices {
+		slots[i] = pricing.PriceSlot{
+			From:  base.Add(time.Duration(i) * time.Hour),
+			Till:  base.Add(time.Duration(i+1) * time.Hour),
+			Price: p,
+		}
+	}
+	sender := &fakeSender{}
+	modes := &fakeModes{}
+	svc := makePricingService(slots)
+
+	a := New(svc, modes, sender, nil, AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+	})
+	a.now = func() time.Time { return base }
+
+	a.HandleOnDemand()
+
+	if len(sender.events) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(sender.events))
+	}
+	if !strings.Contains(strings.ToLower(sender.events[0].Message), "cheap") {
+		t.Errorf("morning message with cheap window should mention cheap; got: %s", sender.events[0].Message)
+	}
+}
+
+func TestAnnouncer_OnDemand_AfternoonFormat(t *testing.T) {
+	// Slots: hours 8-16. Cheap at hours 12-15 (indices 4-6), rest average.
+	// now = 12:00, hour 12 >= 11 → afternoon bucket; current slot is cheap.
+	base := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
+	prices := []float64{0.20, 0.20, 0.20, 0.20, 0.01, 0.01, 0.01, 0.20}
+	slots := make([]pricing.PriceSlot, len(prices))
+	for i, p := range prices {
+		slots[i] = pricing.PriceSlot{
+			From:  base.Add(time.Duration(i) * time.Hour),
+			Till:  base.Add(time.Duration(i+1) * time.Hour),
+			Price: p,
+		}
+	}
+	sender := &fakeSender{}
+	modes := &fakeModes{}
+	svc := makePricingService(slots)
+
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC) // in cheap window, hour 12
+	a := New(svc, modes, sender, nil, AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+	})
+	a.now = func() time.Time { return now }
+
+	a.HandleOnDemand()
+
+	if len(sender.events) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(sender.events))
+	}
+	if !strings.Contains(strings.ToLower(sender.events[0].Message), "cheap") {
+		t.Errorf("afternoon message when current is cheap should mention cheap; got: %s", sender.events[0].Message)
 	}
 }

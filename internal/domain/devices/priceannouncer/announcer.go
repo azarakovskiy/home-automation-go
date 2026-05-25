@@ -39,6 +39,7 @@ type Announcer struct {
 	db           AnnouncerStateStore
 	cfg          AnnouncerConfig
 	now          func() time.Time
+	formatter    MessageFormatter
 }
 
 // New constructs an Announcer.
@@ -56,6 +57,7 @@ func New(
 		db:           db,
 		cfg:          cfg,
 		now:          time.Now,
+		formatter:    naturalLanguageFormatter{},
 	}
 }
 
@@ -107,13 +109,53 @@ func (a *Announcer) HandleMorning(_ *ga.Service, _ ga.State, _ ga.EntityData) {
 	a.sendDaySummary()
 }
 
-// HandleOnDemand sends the day summary immediately, bypassing the once-per-day cooldown.
-// Wire this to an MQTT command or any external trigger.
+// HandleOnDemand sends a time-aware price summary immediately.
+// Hour < 11 → morning (full day ahead); hour >= 11 → afternoon (remaining window).
 func (a *Announcer) HandleOnDemand() {
 	if a.isSuppressed() {
 		return
 	}
-	a.sendDaySummary()
+
+	now := a.now()
+	idx, err := a.service.CurrentIndex()
+	if err != nil {
+		log.Printf("Announcer: price index unavailable for on-demand: %v", err)
+		return
+	}
+
+	midnight := now.Truncate(24 * time.Hour).Add(24 * time.Hour)
+
+	period := PeriodMorning
+	if now.Hour() >= 11 {
+		period = PeriodAfternoon
+	}
+
+	currentSlot, found := idx.SlotAt(now)
+	currentLevel := pricing.PriceLevelUnknown
+	if found {
+		currentLevel = idx.Level(currentSlot)
+	}
+
+	summary := idx.Summary(now, midnight)
+	ctx := AnnounceContext{
+		Period:       period,
+		CurrentLevel: currentLevel,
+		Summary:      summary,
+	}
+
+	msg := a.formatter.Format(ctx)
+	if msg == "" {
+		debug.Log("Announcer: nothing to announce in on-demand summary")
+		return
+	}
+
+	if err := a.notification.Notify(notifications.Event{
+		Device:  "pricing",
+		Type:    "price_day_summary",
+		Message: msg,
+	}); err != nil {
+		log.Printf("Announcer: failed to send on-demand summary: %v", err)
+	}
 }
 
 func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData) {
