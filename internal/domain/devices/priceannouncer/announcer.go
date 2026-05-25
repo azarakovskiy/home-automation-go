@@ -26,12 +26,12 @@ type AnnouncerConfig struct {
 
 // Announcer owns all price announcement logic.
 type Announcer struct {
-	service            *pricing.Service
-	modes              pricing.ModeProvider
-	notification       NotificationSender
-	cfg                AnnouncerConfig
-	now                func() time.Time
-	formatter          MessageFormatter
+	service      *pricing.Service
+	modes        pricing.ModeProvider
+	notification NotificationSender
+	cfg          AnnouncerConfig
+	now          func() time.Time
+	formatter    MessageFormatter
 	// lastAlertedRunFrom tracks the start of the most-recently alerted extreme run.
 	// In-memory only: at most one duplicate alert per run may fire after a restart — acceptable.
 	lastAlertedRunFrom time.Time

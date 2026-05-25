@@ -193,7 +193,7 @@ func (idx PriceIndex) Summary(from, deadline time.Time) IndexSummary {
 			summary.CheapWindows = append(summary.CheapWindows, w)
 		case r.level == PriceLevelHigh:
 			summary.ExpensiveWindows = append(summary.ExpensiveWindows, w)
-		// PriceLevelAverage windows are normal price periods — not worth announcing.
+			// PriceLevelAverage windows are normal price periods — not worth announcing.
 		}
 	}
 
