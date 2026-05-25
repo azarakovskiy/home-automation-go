@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"home-go/internal/config"
+	"home-go/internal/domain/devices/priceannouncer"
 	"home-go/internal/domain/pricing"
 	domainreminders "home-go/internal/domain/reminders"
 	"home-go/internal/tech/homeassistant/component"
@@ -25,6 +26,26 @@ import (
 
 	ga "saml.dev/gome-assistant"
 )
+
+type haModeProvider struct {
+	state ga.State
+}
+
+func (p *haModeProvider) IsNight() (bool, error) {
+	s, err := p.state.Get(entities.InputSelect.DaytimeMode)
+	if err != nil {
+		return false, fmt.Errorf("get daytime mode: %w", err)
+	}
+	return s.State == "Night", nil
+}
+
+func (p *haModeProvider) IsAway() (bool, error) {
+	s, err := p.state.Get(entities.InputSelect.HouseMode)
+	if err != nil {
+		return false, fmt.Errorf("get house mode: %w", err)
+	}
+	return s.State == "Away" || s.State == "Travel", nil
+}
 
 // RunFromEnv loads config from the environment and starts the application.
 func RunFromEnv() error {
@@ -100,7 +121,43 @@ func Run(cfg config.Config) error {
 
 func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time, mqttPrefix string) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
-	priceService := pricing.NewService(app.GetService(), app.GetState())
+	priceService := pricing.NewService(app.GetState())
+
+	notifier := notifications.NewNotificationService(app.GetService())
+	modeProvider := &haModeProvider{state: app.GetState()}
+	announcerComp := priceannouncer.New(priceService, modeProvider, notifier, priceannouncer.AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+	})
+
+	// Reactive trigger: fire HandlePriceUpdate on every price-sensor change.
+	// Entity ID lives here (app layer) rather than in the domain.
+	app.RegisterEntityListeners(
+		ga.NewEntityListener().
+			EntityIds(entities.Sensor.FrankEnergiePricesCurrentElectricityPriceAllIn).
+			Call(announcerComp.HandlePriceUpdate).
+			Build(),
+	)
+
+	// On-demand trigger: an MQTT switch that sends the day summary when turned ON.
+	priceSummarySwitch, err := runtimeEntities.Switch(ctx, entities.SwitchSpec{
+		CommonSpec: entities.CommonSpec{
+			Key:  "price_summary_trigger",
+			Name: "Price Summary",
+			Icon: "mdi:currency-eur",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("declare price summary switch: %w", err)
+	}
+	if err := priceSummarySwitch.OnCommand(func(_ context.Context, on bool) error {
+		if on {
+			announcerComp.HandleOnDemand()
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("register price summary command handler: %w", err)
+	}
 
 	dishwasherComp, err := dishwasher.New(base, app.GetState(), priceService, runtimeEntities)
 	if err != nil {
@@ -121,6 +178,7 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 
 	return []component.Component{
 		priceService,
+		announcerComp,
 		dishwasherComp,
 		laptopChargerComp,
 		// vacuumChargerComp,

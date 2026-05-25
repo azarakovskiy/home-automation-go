@@ -6,10 +6,8 @@ import (
 )
 
 const (
-	PriceBucketSize        = 0.05
-	CheapPercentile        = 0.35
-	ExpensivePercentile    = 0.7
-	MinSamplesForHistogram = 24
+	CheapPercentile     = 0.35
+	ExpensivePercentile = 0.7
 )
 
 // PriceLevel represents how favorable the current price is.
@@ -47,53 +45,6 @@ func (l PriceLevel) HumanString() string {
 	default:
 		return "unknown"
 	}
-}
-
-type Bucket struct {
-	Price  float64
-	Weight float64
-}
-
-func RoundPriceToBucket(price float64) float64 {
-	return math.Round(price/PriceBucketSize) * PriceBucketSize
-}
-
-func BuildBucketsFromHistogram(hist map[float64]float64) ([]Bucket, float64) {
-	buckets := make([]Bucket, 0, len(hist))
-	var total float64
-	for price, weight := range hist {
-		if weight <= 0 {
-			continue
-		}
-		total += weight
-		buckets = append(buckets, Bucket{
-			Price:  price,
-			Weight: weight,
-		})
-	}
-
-	sort.Slice(buckets, func(i, j int) bool {
-		return buckets[i].Price < buckets[j].Price
-	})
-
-	return buckets, total
-}
-
-func PercentileFromBuckets(buckets []Bucket, total float64, percentile float64) float64 {
-	if len(buckets) == 0 || total == 0 {
-		return 0
-	}
-
-	target := total * percentile
-	cumulative := 0.0
-	for _, bucket := range buckets {
-		cumulative += bucket.Weight
-		if cumulative >= target {
-			return bucket.Price
-		}
-	}
-
-	return buckets[len(buckets)-1].Price
 }
 
 func DeterminePriceLevel(price float64, cheapThreshold, expensiveThreshold float64) PriceLevel {

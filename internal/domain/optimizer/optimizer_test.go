@@ -174,6 +174,10 @@ func TestOptimizer_Optimize_InsufficientSlots(t *testing.T) {
 	optimizer := NewOptimizer()
 
 	now := time.Now().Truncate(time.Hour)
+	orig := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = orig })
+
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(time.Hour), Price: 0.30},
 	}
@@ -535,6 +539,10 @@ func TestOptimizer_Optimize_GracefulDegradation(t *testing.T) {
 
 	// Scenario: Need 4 hours but only have 2 hours of price data
 	now := time.Now().Truncate(time.Hour)
+	orig := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = orig })
+
 	slots := []pricing.PriceSlot{
 		{From: now, Till: now.Add(time.Hour), Price: 0.30},
 		{From: now.Add(time.Hour), Till: now.Add(2 * time.Hour), Price: 0.25}, // Cheaper
@@ -560,10 +568,10 @@ func TestOptimizer_Optimize_GracefulDegradation(t *testing.T) {
 	}
 
 	// Should optimize with available data (2 slots instead of 4)
-	// Since slot 2 is cheaper, it should choose to start there
-	expectedStart := now.Add(time.Hour)
+	// When cycle doesn't fit deadline, fallback to immediate start at first available slot
+	expectedStart := now
 	if !result.StartTime.Equal(expectedStart) {
-		t.Errorf("Expected start at cheapest available slot %v, got %v", expectedStart, result.StartTime)
+		t.Errorf("Expected immediate start at %v, got %v", expectedStart, result.StartTime)
 	}
 
 	// Should have some cost calculated based on available slots
@@ -1202,5 +1210,79 @@ func TestOptimizer_CriticalUptime_SpikeDetection_NightIsStillCheaper(t *testing.
 	// Should wait for the absolute cheapest slots
 	if result.ChargeNow {
 		t.Errorf("Expected ChargeNow=false when cheaper slots exist soon (current=%.4f, cheapest ahead=0.22)", result.CurrentPrice)
+	}
+}
+
+func TestOptimizer_ActiveSlotSelectedWhenCheapest(t *testing.T) {
+	base := time.Date(2024, 1, 1, 14, 0, 0, 0, time.UTC)
+	now := base.Add(30 * time.Minute) // 14:30 — mid-slot
+	orig := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = orig })
+
+	slots := []pricing.PriceSlot{
+		{From: base, Till: base.Add(time.Hour), Price: 0.10},                    // active, cheapest
+		{From: base.Add(time.Hour), Till: base.Add(2 * time.Hour), Price: 0.30}, // future, expensive
+	}
+	profile := MockProfile{
+		duration:          time.Hour,
+		weights:           []float64{1.0},
+		power:             1.0,
+		minSavingsPercent: 5.0,
+	}
+	result, err := NewOptimizer().Optimize(OptimizationRequest{
+		Profile:       profile,
+		PriceSlots:    slots,
+		MaxDelayHours: 2,
+	})
+	if err != nil {
+		t.Fatalf("Optimize failed: %v", err)
+	}
+	// Bug fix: active slot must not be skipped
+	if result.StartTime.Before(now) {
+		t.Errorf("StartTime %v is before now %v — active slot was skipped", result.StartTime, now)
+	}
+	// Should pick the active cheap slot (0.10), not the expensive future one (0.30)
+	if result.EstimatedCost > 0.15 {
+		t.Errorf("expected cost ≈ 0.10 (active cheap slot), got %.4f", result.EstimatedCost)
+	}
+}
+
+func TestOptimizer_SavingsUseActiveSlotBaseline(t *testing.T) {
+	base := time.Date(2024, 1, 1, 14, 0, 0, 0, time.UTC)
+	now := base.Add(30 * time.Minute) // 14:30
+	orig := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = orig })
+
+	slots := []pricing.PriceSlot{
+		{From: base, Till: base.Add(time.Hour), Price: 0.30},                    // active, expensive
+		{From: base.Add(time.Hour), Till: base.Add(2 * time.Hour), Price: 0.15}, // future, cheap
+	}
+	profile := MockProfile{
+		duration:          time.Hour,
+		weights:           []float64{1.0},
+		power:             1.0,
+		minSavingsPercent: 5.0,
+	}
+	result, err := NewOptimizer().Optimize(OptimizationRequest{
+		Profile:       profile,
+		PriceSlots:    slots,
+		MaxDelayHours: 2,
+	})
+	if err != nil {
+		t.Fatalf("Optimize failed: %v", err)
+	}
+	// Best window is the 15:00 slot (cheaper)
+	if result.StartTime.Before(base.Add(time.Hour)) {
+		t.Errorf("expected start at 15:00 (cheap slot), got %v", result.StartTime)
+	}
+	// Bug fix: CurrentCost baseline must use active slot (0.30), not next slot (0.15)
+	// With 1 kW power and 1h duration: cost = price * kW * h
+	if result.CurrentCost < 0.25 {
+		t.Errorf("expected CurrentCost ≈ 0.30 (active slot price), got %.4f — wrong baseline slot", result.CurrentCost)
+	}
+	if result.Savings <= 0 {
+		t.Errorf("expected positive savings, got %.4f", result.Savings)
 	}
 }

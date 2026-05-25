@@ -156,13 +156,19 @@ func (o *Optimizer) findBestWindow(
 	for startIdx := 0; startIdx <= len(req.PriceSlots)-slotsNeeded; startIdx++ {
 		startSlot := req.PriceSlots[startIdx]
 
-		// Skip slots that are in the past
-		if startSlot.From.Before(now) {
-			debug.Log("Skipping past slot %d: %s (before now)", startIdx, startSlot.From.Format(time.RFC3339))
+		// Skip slots that are fully in the past (ended before now)
+		if startSlot.Till.Before(now) {
+			debug.Log("Skipping past slot %d: %s (ended before now)", startIdx, startSlot.Till.Format(time.RFC3339))
 			continue
 		}
 
-		endTime := startSlot.From.Add(cycleDuration)
+		// Clamp start time to now if slot started before now
+		startTime := startSlot.From
+		if startTime.Before(now) {
+			startTime = now
+		}
+
+		endTime := startTime.Add(cycleDuration)
 		if endTime.After(deadline) {
 			debug.Log("Stopping at slot %d: end time %s exceeds deadline", startIdx, endTime.Format(time.RFC3339))
 			break
@@ -173,7 +179,7 @@ func (o *Optimizer) findBestWindow(
 			req.PriceSlots[startIdx:startIdx+slotsNeeded],
 			slotDuration,
 		)
-		result.StartTime = startSlot.From
+		result.StartTime = startTime
 		result.EndTime = endTime
 
 		debug.Log("Evaluated slot %d: start=%s, weightedCost=%.4f, estimatedCost=%.4f",
@@ -212,8 +218,12 @@ func (o *Optimizer) createImmediateResult(
 		req.PriceSlots[firstValidIdx:firstValidIdx+slotsToUse],
 		slotDuration,
 	)
-	result.StartTime = req.PriceSlots[firstValidIdx].From
-	result.EndTime = result.StartTime.Add(cycleDuration)
+	slotStart := req.PriceSlots[firstValidIdx].From
+	if slotStart.Before(now) {
+		slotStart = now
+	}
+	result.StartTime = slotStart
+	result.EndTime = slotStart.Add(cycleDuration)
 	result.CurrentCost = result.EstimatedCost
 	result.Savings = 0
 	result.SavingsPercent = 0
@@ -223,7 +233,7 @@ func (o *Optimizer) createImmediateResult(
 
 func (o *Optimizer) findFirstValidSlot(slots []pricing.PriceSlot, now time.Time) int {
 	for i, slot := range slots {
-		if !slot.From.Before(now) {
+		if !slot.Till.Before(now) {
 			return i
 		}
 	}
