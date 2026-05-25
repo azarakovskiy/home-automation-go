@@ -109,8 +109,8 @@ func (h *Handler) handleCreate(_ context.Context, _ string, payload []byte) {
 	}
 
 	dc := domainreminders.CreateCommand{
-		ID:      cmd.ID,
-		Targets: cmd.Targets,
+		ID:       cmd.ID,
+		Targets:  cmd.Targets,
 		Schedule: schedule,
 		Policy: domainreminders.DeliveryPolicy{
 			RequiresAck: cmd.RequiresAck,

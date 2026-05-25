@@ -7,8 +7,8 @@ import (
 	"time"
 
 	domainreminders "home-go/internal/domain/reminders"
-	hareminders "home-go/internal/tech/homeassistant/devices/reminders"
 	"home-go/internal/tech/homeassistant/component"
+	hareminders "home-go/internal/tech/homeassistant/devices/reminders"
 
 	ga "saml.dev/gome-assistant"
 )
