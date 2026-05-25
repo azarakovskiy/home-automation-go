@@ -124,20 +124,12 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 	base := component.NewBase(app.GetService())
 	priceService := pricing.NewService(app.GetState())
 
-	announcerRepo := postgres.NewAnnouncerRepo(db)
 	notifier := notifications.NewNotificationService(app.GetService())
 	modeProvider := &haModeProvider{state: app.GetState()}
-	announcerComp := priceannouncer.New(priceService, modeProvider, notifier, announcerRepo, priceannouncer.AnnouncerConfig{
+	announcerComp := priceannouncer.New(priceService, modeProvider, notifier, priceannouncer.AnnouncerConfig{
 		SpikeMultiplier:    3.0,
 		MinExtremeDuration: time.Hour,
 	})
-
-	// Morning trigger: fire HandleMorning whenever the daytime mode changes.
-	// The Announcer handles once-per-day dedup and suppression internally.
-	app.RegisterEntityListeners(ga.NewEntityListener().
-		EntityIds(entities.InputSelect.DaytimeMode).
-		Call(announcerComp.HandleMorning).
-		Build())
 
 	// On-demand trigger: an MQTT switch that sends the day summary when turned ON.
 	priceSummarySwitch, err := runtimeEntities.Switch(ctx, entities.SwitchSpec{

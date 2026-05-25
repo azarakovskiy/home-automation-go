@@ -1,7 +1,6 @@
 package priceannouncer
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
@@ -19,12 +18,6 @@ type NotificationSender interface {
 	Notify(notifications.Event) error
 }
 
-// AnnouncerStateStore persists deduplication state across restarts.
-type AnnouncerStateStore interface {
-	LastAnnouncedDate(ctx context.Context) (time.Time, error)
-	SetLastAnnouncedDate(ctx context.Context, t time.Time) error
-}
-
 // AnnouncerConfig holds tuneable thresholds.
 type AnnouncerConfig struct {
 	SpikeMultiplier    float64
@@ -36,7 +29,6 @@ type Announcer struct {
 	service            *pricing.Service
 	modes              pricing.ModeProvider
 	notification       NotificationSender
-	db                 AnnouncerStateStore
 	cfg                AnnouncerConfig
 	now                func() time.Time
 	formatter          MessageFormatter
@@ -50,14 +42,12 @@ func New(
 	service *pricing.Service,
 	modes pricing.ModeProvider,
 	notification NotificationSender,
-	db AnnouncerStateStore,
 	cfg AnnouncerConfig,
 ) *Announcer {
 	return &Announcer{
 		service:      service,
 		modes:        modes,
 		notification: notification,
-		db:           db,
 		cfg:          cfg,
 		now:          time.Now,
 		formatter:    naturalLanguageFormatter{},
@@ -83,34 +73,6 @@ func (a *Announcer) Schedules() []ga.DailySchedule { return nil }
 
 // Intervals implements component.Component (unused).
 func (a *Announcer) Intervals() []ga.Interval { return nil }
-
-// HandleMorning sends the daily morning summary if conditions allow.
-// Register this against any entity whose state change signals morning (e.g. daytime mode).
-func (a *Announcer) HandleMorning(_ *ga.Service, _ ga.State, _ ga.EntityData) {
-	if a.isSuppressed() {
-		return
-	}
-
-	ctx := context.Background()
-	last, err := a.db.LastAnnouncedDate(ctx)
-	if err != nil {
-		log.Printf("Announcer: failed to read last announced date: %v", err)
-		return
-	}
-
-	today := a.now().Truncate(24 * time.Hour)
-	if !last.Before(today) {
-		debug.Log("Announcer: morning summary already sent today, skipping")
-		return
-	}
-
-	if err := a.db.SetLastAnnouncedDate(ctx, a.now()); err != nil {
-		log.Printf("Announcer: failed to persist announced date: %v", err)
-		return
-	}
-
-	a.sendDaySummary()
-}
 
 // HandleOnDemand sends a time-aware price summary immediately.
 // Hour < 11 → morning (full day ahead); hour >= 11 → afternoon (remaining window).
@@ -209,32 +171,6 @@ func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData
 	a.lastAlertedRunFrom = from
 }
 
-func (a *Announcer) sendDaySummary() {
-	idx, err := a.service.CurrentIndex()
-	if err != nil {
-		log.Printf("Announcer: price index unavailable for day summary: %v", err)
-		return
-	}
-
-	now := a.now()
-	midnight := now.Truncate(24 * time.Hour).Add(24 * time.Hour)
-	summary := idx.Summary(now, midnight)
-
-	msg := formatDaySummary(summary)
-	if msg == "" {
-		debug.Log("Announcer: nothing to announce in day summary")
-		return
-	}
-
-	if err := a.notification.Notify(notifications.Event{
-		Device:  "pricing",
-		Type:    "price_day_summary",
-		Message: msg,
-	}); err != nil {
-		log.Printf("Announcer: failed to send day summary: %v", err)
-	}
-}
-
 func (a *Announcer) isSuppressed() bool {
 	if a.modes == nil {
 		return false
@@ -286,29 +222,4 @@ func (a *Announcer) firstExtremeRun(idx pricing.PriceIndex, from, deadline time.
 		return true, runFrom, runFrom.Add(runDur), runKind
 	}
 	return false, time.Time{}, time.Time{}, ""
-}
-
-func formatDaySummary(summary pricing.IndexSummary) string {
-	if len(summary.CheapWindows) == 0 && len(summary.ExpensiveWindows) == 0 && len(summary.NegativeWindows) == 0 {
-		return ""
-	}
-
-	msg := fmt.Sprintf("Electricity prices today (median %.0f ct/kWh).", summary.MedianPrice*100)
-
-	if len(summary.NegativeWindows) > 0 {
-		w := summary.NegativeWindows[0]
-		msg += fmt.Sprintf(" Negative prices %s–%s.", w.From.Format("15:04"), w.Till.Format("15:04"))
-	}
-
-	if len(summary.CheapWindows) > 0 {
-		w := summary.CheapWindows[0]
-		msg += fmt.Sprintf(" Cheap window %s–%s.", w.From.Format("15:04"), w.Till.Format("15:04"))
-	}
-
-	if len(summary.ExpensiveWindows) > 0 {
-		w := summary.ExpensiveWindows[0]
-		msg += fmt.Sprintf(" Expensive %s–%s.", w.From.Format("15:04"), w.Till.Format("15:04"))
-	}
-
-	return msg
 }
