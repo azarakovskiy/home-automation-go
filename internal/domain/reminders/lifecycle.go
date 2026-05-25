@@ -17,14 +17,6 @@ func New(id ReminderID, targets []string, schedule Schedule, policy DeliveryPoli
 		return Reminder{}, fmt.Errorf("%w: %q", ErrInvalidSchedule, schedule.Kind)
 	}
 
-	switch policy.CompletionPolicy {
-	case CompletionPolicyAllTargetsAck, CompletionPolicyAnyTargetAck:
-	case "":
-		policy.CompletionPolicy = CompletionPolicyAllTargetsAck
-	default:
-		return Reminder{}, fmt.Errorf("%w: %q", ErrInvalidPolicy, policy.CompletionPolicy)
-	}
-
 	if policy.Profile == "" {
 		policy.Profile = ProfileNormal
 	}
@@ -36,7 +28,6 @@ func New(id ReminderID, targets []string, schedule Schedule, policy DeliveryPoli
 		Schedule: schedule,
 		Policy:   policy,
 		State: State{
-			Status:    StatusActive,
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
@@ -46,110 +37,82 @@ func New(id ReminderID, targets []string, schedule Schedule, policy DeliveryPoli
 
 // IsDue returns true if the reminder should fire at the given time.
 func (r Reminder) IsDue(now time.Time) bool {
-	if r.State.Status != StatusActive {
-		return false
-	}
-
 	if r.Schedule.NextRunAt != nil {
 		return !now.Before(*r.Schedule.NextRunAt)
 	}
-
 	return !now.Before(r.Schedule.TriggerAt)
 }
 
-// Trigger fires the reminder, advancing its state.
-// For once-type reminders without ack requirement, it transitions to completed.
-// For recurring reminders, it computes the next run time from RecurEvery.
-// For once+requires_ack reminders, the next run time is derived from the
-// escalation policy: InitialDelay on the first fire, RepeatInterval on repeats.
-func (r *Reminder) Trigger(now time.Time) error {
-	if r.State.Status != StatusActive {
-		return ErrNotActive
-	}
-
-	isFirstFire := r.State.LastFiredAt == nil
+// Trigger fires the reminder, advancing FireCount and computing the next run time.
+// For recurring reminders, Acks are reset so the next cycle starts unacknowledged.
+func (r *Reminder) Trigger(now time.Time) {
+	r.State.FireCount++
 	r.State.LastFiredAt = &now
 	r.State.UpdatedAt = now
-
-	switch {
-	case r.Schedule.Kind == ScheduleKindRecurring && r.Schedule.RecurEvery != nil:
-		next := now.Add(*r.Schedule.RecurEvery)
-		r.Schedule.NextRunAt = &next
-
-	case r.Schedule.Kind == ScheduleKindOnce && r.Policy.RequiresAck:
-		ep := PolicyForProfile(r.Policy.Profile)
-		delay := ep.RepeatInterval
-		if isFirstFire {
-			delay = ep.InitialDelay
-		}
-		next := now.Add(delay)
-		r.Schedule.NextRunAt = &next
-
-	case r.Schedule.Kind == ScheduleKindOnce && !r.Policy.RequiresAck:
-		r.State.Status = StatusCompleted
+	r.Schedule.NextRunAt = r.computeNextRunAt(now)
+	if r.Schedule.Kind == ScheduleKindRecurring {
+		r.Acks = nil
 	}
-
-	return nil
 }
 
-// Acknowledge records an ack from the given user.
-// It is idempotent: re-acking for the same user is a no-op.
-// If the completion policy is now satisfied, the reminder transitions to completed.
-func (r *Reminder) Acknowledge(userID string, now time.Time) error {
-	if !r.isTarget(userID) {
-		return fmt.Errorf("%w: %q", ErrNotTarget, userID)
-	}
+// computeNextRunAt returns the next time the reminder should fire after a trigger at now,
+// or nil if no further firings are scheduled.
+func (r Reminder) computeNextRunAt(now time.Time) *time.Time {
+	switch {
+	case r.Schedule.Kind == ScheduleKindRecurring:
+		next := now.Add(*r.Schedule.RecurEvery)
+		return &next
 
-	// Idempotent: skip if already acked by this user.
+	case r.Policy.RequiresAck:
+		ep := PolicyForProfile(r.Policy.Profile)
+		if ep.MaxRepeats > 0 && r.State.FireCount >= ep.MaxRepeats {
+			return nil
+		}
+		next := now.Add(r.repeatDelay(ep))
+		return &next
+
+	default:
+		// once, no ack required — caller removes after notification
+		return nil
+	}
+}
+
+// repeatDelay computes the delay to the next fire based on current FireCount and policy.
+func (r Reminder) repeatDelay(ep EscalationPolicy) time.Duration {
+	if r.State.FireCount == 1 {
+		return ep.InitialDelay
+	}
+	if ep.DecreaseStep > 0 {
+		reduced := ep.RepeatInterval - time.Duration(r.State.FireCount-2)*ep.DecreaseStep
+		if reduced < ep.MinInterval {
+			return ep.MinInterval
+		}
+		return reduced
+	}
+	return ep.RepeatInterval
+}
+
+// Acknowledge records an ack for targetUserID. Idempotent for the same user.
+func (r *Reminder) Acknowledge(targetUserID string, now time.Time) error {
+	if !r.isTarget(targetUserID) {
+		return fmt.Errorf("%w: %q", ErrNotTarget, targetUserID)
+	}
 	for _, a := range r.Acks {
-		if a.UserID == userID {
+		if a.UserID == targetUserID {
 			return nil
 		}
 	}
-
-	r.Acks = append(r.Acks, UserAck{UserID: userID, AckedAt: now})
+	r.Acks = append(r.Acks, UserAck{UserID: targetUserID, AckedAt: now})
 	r.State.UpdatedAt = now
-
-	if r.IsComplete() {
-		r.State.Status = StatusCompleted
-	}
-
 	return nil
 }
 
-// IsComplete checks whether the reminder's completion policy is satisfied.
+// IsComplete returns true if any target has acknowledged the reminder.
 func (r Reminder) IsComplete() bool {
-	switch r.Policy.CompletionPolicy {
-	case CompletionPolicyAnyTargetAck:
-		return len(r.Acks) >= 1
-	case CompletionPolicyAllTargetsAck:
-		if len(r.Acks) < len(r.Targets) {
-			return false
-		}
-		for _, t := range r.Targets {
-			if !r.hasAckFrom(t) {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
-	}
+	return len(r.Acks) >= 1
 }
 
-// Delete marks the reminder as deleted.
-func (r *Reminder) Delete(now time.Time) {
-	r.State.Status = StatusDeleted
-	r.State.UpdatedAt = now
-}
-
-// Expire marks the reminder as expired.
-func (r *Reminder) Expire(now time.Time) {
-	r.State.Status = StatusExpired
-	r.State.UpdatedAt = now
-}
-
-// IsExpired returns true if the reminder has a ValidUntil and it has passed.
+// IsExpired returns true if ValidUntil is set and has passed.
 func (r Reminder) IsExpired(now time.Time) bool {
 	return r.Schedule.ValidUntil != nil && now.After(*r.Schedule.ValidUntil)
 }
@@ -157,15 +120,6 @@ func (r Reminder) IsExpired(now time.Time) bool {
 func (r Reminder) isTarget(userID string) bool {
 	for _, t := range r.Targets {
 		if t == userID {
-			return true
-		}
-	}
-	return false
-}
-
-func (r Reminder) hasAckFrom(userID string) bool {
-	for _, a := range r.Acks {
-		if a.UserID == userID {
 			return true
 		}
 	}

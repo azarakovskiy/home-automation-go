@@ -7,145 +7,120 @@ import (
 )
 
 //go:generate mockgen -destination=mocks/mock_repository.go -package=mocks home-go/internal/domain/reminders Repository
+//go:generate mockgen -destination=mocks/mock_notifier.go -package=mocks home-go/internal/domain/reminders Notifier
 
-// ActionKind describes what the adapter layer should do after a manager operation.
-type ActionKind string
-
-const (
-	// ActionShowProjection instructs the adapter to create or refresh the
-	// reminder projection for all target users.
-	ActionShowProjection ActionKind = "show"
-
-	// ActionRemoveProjection instructs the adapter to tear down the reminder
-	// projection for all target users.
-	ActionRemoveProjection ActionKind = "remove"
-
-	// ActionNoop means no projection change is needed.
-	ActionNoop ActionKind = "noop"
-)
-
-// Action is the result of a manager operation that the adapter layer acts on.
-type Action struct {
-	Kind     ActionKind
-	Reminder Reminder // populated for show/refresh; zero value for remove and noop
+// CreateCommand carries the parameters for creating a new reminder.
+type CreateCommand struct {
+	ID       ReminderID
+	Targets  []string
+	Schedule Schedule
+	Policy   DeliveryPolicy
+	Meta     Metadata
 }
 
-// Manager orchestrates reminder lifecycle operations against a Repository.
-// It is the single entry point for mutating reminder state; all callers
-// (adapters, tick scheduler) go through here.
+// Manager orchestrates reminder lifecycle operations.
 type Manager struct {
-	repo Repository
-	now  func() time.Time // injectable for tests
+	repo     Repository
+	notifier Notifier
+	now      func() time.Time
 }
 
-// NewManager constructs a Manager backed by the given Repository.
+// NewManager constructs a Manager with the given repository, notifier, and clock.
 // nowFn may be nil; time.Now().UTC() is used in that case.
-func NewManager(repo Repository, nowFn func() time.Time) *Manager {
+func NewManager(repo Repository, notifier Notifier, nowFn func() time.Time) *Manager {
 	if nowFn == nil {
 		nowFn = func() time.Time { return time.Now().UTC() }
 	}
-	return &Manager{repo: repo, now: nowFn}
+	return &Manager{repo: repo, notifier: notifier, now: nowFn}
 }
 
-// Create validates and persists a new reminder, returning a ShowProjection action.
-func (m *Manager) Create(ctx context.Context, id ReminderID, targets []string, schedule Schedule, policy DeliveryPolicy, meta Metadata) (Action, error) {
-	rem, err := New(id, targets, schedule, policy, meta, m.now())
+// Create validates and persists a new reminder.
+func (m *Manager) Create(ctx context.Context, cmd CreateCommand) (Reminder, error) {
+	rem, err := New(cmd.ID, cmd.Targets, cmd.Schedule, cmd.Policy, cmd.Meta, m.now())
 	if err != nil {
-		return Action{}, fmt.Errorf("build reminder: %w", err)
+		return Reminder{}, fmt.Errorf("build reminder: %w", err)
 	}
-
 	if err := m.repo.Save(ctx, rem); err != nil {
-		return Action{}, fmt.Errorf("save reminder: %w", err)
+		return Reminder{}, fmt.Errorf("save reminder: %w", err)
 	}
-
-	return Action{Kind: ActionShowProjection, Reminder: rem}, nil
+	return rem, nil
 }
 
-// Ack records a per-user acknowledgement.
-// Returns RemoveProjection if the reminder is now complete, ShowProjection otherwise.
-func (m *Manager) Ack(ctx context.Context, reminderID ReminderID, userID string) (Action, error) {
+// Ack records a per-user acknowledgement. Removes the reminder if IsComplete.
+func (m *Manager) Ack(ctx context.Context, reminderID ReminderID, targetUserID string) error {
 	rem, err := m.repo.GetByID(ctx, reminderID)
 	if err != nil {
-		return Action{}, fmt.Errorf("get reminder: %w", err)
+		return fmt.Errorf("get reminder: %w", err)
 	}
-
-	if err := rem.Acknowledge(userID, m.now()); err != nil {
-		return Action{}, fmt.Errorf("acknowledge: %w", err)
+	if err := rem.Acknowledge(targetUserID, m.now()); err != nil {
+		return fmt.Errorf("acknowledge: %w", err)
 	}
-
-	if err := m.repo.Save(ctx, rem); err != nil {
-		return Action{}, fmt.Errorf("save reminder after ack: %w", err)
+	if rem.IsComplete() {
+		return m.repo.Remove(ctx, reminderID)
 	}
-
-	if rem.State.Status == StatusCompleted {
-		return Action{Kind: ActionRemoveProjection, Reminder: rem}, nil
-	}
-	return Action{Kind: ActionShowProjection, Reminder: rem}, nil
+	return m.repo.Save(ctx, rem)
 }
 
-// Delete marks a reminder as deleted and returns a RemoveProjection action.
-func (m *Manager) Delete(ctx context.Context, reminderID ReminderID) (Action, error) {
-	rem, err := m.repo.GetByID(ctx, reminderID)
-	if err != nil {
-		return Action{}, fmt.Errorf("get reminder: %w", err)
-	}
-
-	rem.Delete(m.now())
-
-	if err := m.repo.Save(ctx, rem); err != nil {
-		return Action{}, fmt.Errorf("save reminder after delete: %w", err)
-	}
-
-	return Action{Kind: ActionRemoveProjection, Reminder: rem}, nil
+// List returns all stored reminders.
+func (m *Manager) List(ctx context.Context) ([]Reminder, error) {
+	return m.repo.List(ctx)
 }
 
-// Restore returns all active reminders so the adapter can rebuild projections
-// on startup without re-triggering them.
-func (m *Manager) Restore(ctx context.Context) ([]Reminder, error) {
-	list, err := m.repo.ListActive(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list active reminders: %w", err)
-	}
-	return list, nil
+// Delete hard-deletes a reminder immediately.
+func (m *Manager) Delete(ctx context.Context, reminderID ReminderID) error {
+	return m.repo.Remove(ctx, reminderID)
 }
 
-// Tick evaluates all due and expired reminders at the given instant.
-// It returns one Action per affected reminder; callers should process them all.
-func (m *Manager) Tick(ctx context.Context, now time.Time) ([]Action, error) {
+// Tick evaluates all due reminders at now. Called every minute by the event handler.
+//
+// For each due reminder:
+//  1. Hard-delete if ValidUntil has passed (no notification).
+//  2. Trigger: increment FireCount, compute NextRunAt.
+//  3. Hard-delete silently if RequiresAck and MaxRepeats reached (NextRunAt==nil).
+//  4. Notify via Notifier.
+//  5. Hard-delete if NextRunAt==nil (once/no-ack); otherwise Save.
+func (m *Manager) Tick(ctx context.Context, now time.Time) error {
 	due, err := m.repo.ListDueBefore(ctx, now)
 	if err != nil {
-		return nil, fmt.Errorf("list due reminders: %w", err)
+		return fmt.Errorf("list due reminders: %w", err)
 	}
-
-	var actions []Action
 
 	for i := range due {
 		rem := &due[i]
 
-		// Expiry takes priority over triggering.
 		if rem.IsExpired(now) {
-			rem.Expire(now)
-			if err := m.repo.Save(ctx, *rem); err != nil {
-				return nil, fmt.Errorf("save expired reminder %s: %w", rem.ID, err)
+			if err := m.repo.Remove(ctx, rem.ID); err != nil {
+				return fmt.Errorf("remove expired reminder %s: %w", rem.ID, err)
 			}
-			actions = append(actions, Action{Kind: ActionRemoveProjection, Reminder: *rem})
 			continue
 		}
 
-		if err := rem.Trigger(now); err != nil {
-			return nil, fmt.Errorf("trigger reminder %s: %w", rem.ID, err)
+		rem.Trigger(now)
+
+		// MaxRepeats reached: requires-ack reminder exhausted its fire budget silently.
+		if rem.Policy.RequiresAck && rem.Schedule.NextRunAt == nil {
+			if err := m.repo.Remove(ctx, rem.ID); err != nil {
+				return fmt.Errorf("remove exhausted reminder %s: %w", rem.ID, err)
+			}
+			continue
 		}
 
-		if err := m.repo.Save(ctx, *rem); err != nil {
-			return nil, fmt.Errorf("save triggered reminder %s: %w", rem.ID, err)
+		n := Notification{ID: rem.ID, To: rem.Targets, Body: rem.Meta.Message}
+		if err := m.notifier.Notify(ctx, n); err != nil {
+			return fmt.Errorf("notify reminder %s: %w", rem.ID, err)
 		}
 
-		if rem.State.Status == StatusCompleted {
-			actions = append(actions, Action{Kind: ActionRemoveProjection, Reminder: *rem})
+		if rem.Schedule.NextRunAt == nil {
+			// once/no-ack: fire-and-forget, remove after notification
+			if err := m.repo.Remove(ctx, rem.ID); err != nil {
+				return fmt.Errorf("remove one-shot reminder %s: %w", rem.ID, err)
+			}
 		} else {
-			actions = append(actions, Action{Kind: ActionShowProjection, Reminder: *rem})
+			if err := m.repo.Save(ctx, *rem); err != nil {
+				return fmt.Errorf("save triggered reminder %s: %w", rem.ID, err)
+			}
 		}
 	}
 
-	return actions, nil
+	return nil
 }

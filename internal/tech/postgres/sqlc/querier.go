@@ -10,6 +10,7 @@ import (
 
 type Querier interface {
 	DeleteAcks(ctx context.Context, reminderID string) error
+	DeleteReminder(ctx context.Context, id string) error
 	DeleteTargets(ctx context.Context, reminderID string) error
 	GetReminder(ctx context.Context, id string) (Reminder, error)
 	ListAcks(ctx context.Context, reminderID string) ([]ListAcksRow, error)

@@ -185,6 +185,10 @@ func (dr *DeviceRuntime) BinarySensor(ctx context.Context, spec BinarySensorSpec
 	return &BinarySensorHandle{runtime: dr.rt, key: entity.key}, nil
 }
 
+func (dr *DeviceRuntime) Remove(ctx context.Context, key string) error {
+	return dr.rt.Remove(ctx, key)
+}
+
 func NewRuntime(cfg RuntimeConfig) (*Runtime, error) {
 	if strings.TrimSpace(cfg.BrokerURL) == "" {
 		return nil, fmt.Errorf("broker URL is required")
@@ -324,6 +328,12 @@ func (r *Runtime) Remove(ctx context.Context, key string) error {
 	r.mu.Unlock()
 
 	return nil
+}
+
+// Subscribe registers an MQTT message handler for topic. The handler is
+// restored automatically on reconnect, matching internal subscription behaviour.
+func (r *Runtime) Subscribe(ctx context.Context, topic string, handler func(context.Context, string, []byte)) error {
+	return r.mqtt.Subscribe(ctx, topic, handler)
 }
 
 func (r *Runtime) Reconcile(ctx context.Context, keep []string) error {
