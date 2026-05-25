@@ -15,15 +15,15 @@ type Reminder struct {
 	NextRunAt         sql.NullInt64 `json:"next_run_at"`
 	RecurEverySeconds sql.NullInt64 `json:"recur_every_seconds"`
 	ValidUntil        sql.NullInt64 `json:"valid_until"`
-	RequiresAck       bool          `json:"requires_ack"`
 	Profile           string        `json:"profile"`
-	FireCount         int32         `json:"fire_count"`
 	LastFiredAt       sql.NullInt64 `json:"last_fired_at"`
 	Source            string        `json:"source"`
 	Owner             string        `json:"owner"`
 	Message           string        `json:"message"`
 	CreatedAt         int64         `json:"created_at"`
 	UpdatedAt         int64         `json:"updated_at"`
+	FireCount         int32         `json:"fire_count"`
+	RequiresAck       bool          `json:"requires_ack"`
 }
 
 type ReminderAck struct {

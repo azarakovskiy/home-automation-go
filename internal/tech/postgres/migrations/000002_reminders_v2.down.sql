@@ -3,7 +3,10 @@ ALTER TABLE reminders
     ADD COLUMN completion_policy TEXT NOT NULL DEFAULT 'all_targets_ack';
 
 ALTER TABLE reminders
-    ALTER COLUMN requires_ack TYPE BIGINT USING (CASE WHEN requires_ack THEN 1 ELSE 0 END);
+    DROP COLUMN requires_ack;
+
+ALTER TABLE reminders
+    ADD COLUMN requires_ack BIGINT NOT NULL DEFAULT 0;
 
 ALTER TABLE reminders
     DROP COLUMN fire_count;

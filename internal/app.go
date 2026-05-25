@@ -26,24 +26,6 @@ import (
 	ga "saml.dev/gome-assistant"
 )
 
-// notificationAdapter wraps notifications.NotificationService to satisfy reminders.Notifier.
-type notificationAdapter struct {
-	svc *notifications.NotificationService
-}
-
-func (a *notificationAdapter) Notify(_ context.Context, n domainreminders.Notification) error {
-	for _, userID := range n.To {
-		if err := a.svc.Notify(notifications.Event{
-			Device:  userID,
-			Type:    "reminder",
-			Message: n.Body,
-		}); err != nil {
-			return fmt.Errorf("notify %s: %w", userID, err)
-		}
-	}
-	return nil
-}
-
 // RunFromEnv loads config from the environment and starts the application.
 func RunFromEnv() error {
 	cfg, err := config.Load()
@@ -91,8 +73,7 @@ func Run(cfg config.Config) error {
 	remindersRepo := postgres.NewRemindersRepo(db)
 
 	notifSvc := notifications.NewNotificationService(app.GetService())
-	remindersNotifier := &notificationAdapter{svc: notifSvc}
-	remindersManager := domainreminders.NewManager(remindersRepo, remindersNotifier, time.Now)
+	remindersManager := domainreminders.NewManager(remindersRepo, notifications.NewReminderNotifier(notifSvc), time.Now)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

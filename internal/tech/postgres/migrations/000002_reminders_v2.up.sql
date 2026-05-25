@@ -2,13 +2,10 @@ ALTER TABLE reminders
     ADD COLUMN fire_count INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE reminders
-    ALTER COLUMN requires_ack DROP DEFAULT;
+    DROP COLUMN requires_ack;
 
 ALTER TABLE reminders
-    ALTER COLUMN requires_ack TYPE BOOLEAN USING (requires_ack != 0);
-
-ALTER TABLE reminders
-    ALTER COLUMN requires_ack SET DEFAULT false;
+    ADD COLUMN requires_ack BOOLEAN NOT NULL DEFAULT false;
 
 ALTER TABLE reminders
     DROP COLUMN status,

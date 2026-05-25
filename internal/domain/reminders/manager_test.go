@@ -43,12 +43,6 @@ func onceCmd(id string, at time.Time) reminders.CreateCommand {
 	}
 }
 
-func ackCmd(id string, at time.Time) reminders.CreateCommand {
-	cmd := onceCmd(id, at)
-	cmd.Policy.RequiresAck = true
-	return cmd
-}
-
 // --- Create ---
 
 func TestManager_Create_SavesAndReturnsReminder(t *testing.T) {

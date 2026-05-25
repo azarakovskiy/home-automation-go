@@ -44,32 +44,32 @@ func (r Reminder) IsDue(now time.Time) bool {
 }
 
 // Trigger fires the reminder, advancing FireCount and computing the next run time.
-// For once+requires_ack reminders: uses escalation policy; clears NextRunAt when MaxRepeats reached.
-// For recurring reminders: advances by RecurEvery.
-// For once+no-ack reminders: clears NextRunAt (fire-and-forget).
 func (r *Reminder) Trigger(now time.Time) {
 	r.State.FireCount++
 	r.State.LastFiredAt = &now
 	r.State.UpdatedAt = now
+	r.Schedule.NextRunAt = r.computeNextRunAt(now)
+}
 
+// computeNextRunAt returns the next time the reminder should fire after a trigger at now,
+// or nil if no further firings are scheduled.
+func (r Reminder) computeNextRunAt(now time.Time) *time.Time {
 	switch {
 	case r.Schedule.Kind == ScheduleKindRecurring:
 		next := now.Add(*r.Schedule.RecurEvery)
-		r.Schedule.NextRunAt = &next
+		return &next
 
 	case r.Policy.RequiresAck:
 		ep := PolicyForProfile(r.Policy.Profile)
 		if ep.MaxRepeats > 0 && r.State.FireCount >= ep.MaxRepeats {
-			r.Schedule.NextRunAt = nil
-			return
+			return nil
 		}
-		delay := r.repeatDelay(ep)
-		next := now.Add(delay)
-		r.Schedule.NextRunAt = &next
+		next := now.Add(r.repeatDelay(ep))
+		return &next
 
 	default:
-		// once, no ack required — caller will remove after notification
-		r.Schedule.NextRunAt = nil
+		// once, no ack required — caller removes after notification
+		return nil
 	}
 }
 
