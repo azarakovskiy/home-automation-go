@@ -5,10 +5,9 @@ CREATE TABLE IF NOT EXISTS reminders (
     next_run_at BIGINT,
     recur_every_seconds BIGINT,
     valid_until BIGINT,
-    requires_ack BIGINT NOT NULL DEFAULT 0,
-    completion_policy TEXT NOT NULL DEFAULT 'all_targets_ack',
+    requires_ack BOOLEAN NOT NULL DEFAULT false,
+    fire_count INTEGER NOT NULL DEFAULT 0,
     profile TEXT NOT NULL DEFAULT 'normal',
-    status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'deleted', 'expired')) DEFAULT 'active',
     last_fired_at BIGINT,
     source TEXT NOT NULL DEFAULT '',
     owner TEXT NOT NULL DEFAULT '',
@@ -30,6 +29,5 @@ CREATE TABLE IF NOT EXISTS reminder_acks (
     PRIMARY KEY (reminder_id, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status);
 CREATE INDEX IF NOT EXISTS idx_reminders_next_run_at ON reminders(next_run_at);
 CREATE INDEX IF NOT EXISTS idx_reminders_trigger_at ON reminders(trigger_at);

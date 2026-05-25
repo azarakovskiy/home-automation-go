@@ -38,7 +38,7 @@ func (q *Queries) DeleteTargets(ctx context.Context, reminderID string) error {
 }
 
 const getReminder = `-- name: GetReminder :one
-SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, profile, last_fired_at, source, owner, message, created_at, updated_at, fire_count, requires_ack FROM reminders WHERE id = $1
+SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, fire_count, profile, last_fired_at, source, owner, message, created_at, updated_at FROM reminders WHERE id = $1
 `
 
 func (q *Queries) GetReminder(ctx context.Context, id string) (Reminder, error) {
@@ -51,6 +51,8 @@ func (q *Queries) GetReminder(ctx context.Context, id string) (Reminder, error) 
 		&i.NextRunAt,
 		&i.RecurEverySeconds,
 		&i.ValidUntil,
+		&i.RequiresAck,
+		&i.FireCount,
 		&i.Profile,
 		&i.LastFiredAt,
 		&i.Source,
@@ -58,8 +60,6 @@ func (q *Queries) GetReminder(ctx context.Context, id string) (Reminder, error) 
 		&i.Message,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.FireCount,
-		&i.RequiresAck,
 	)
 	return i, err
 }
@@ -97,7 +97,7 @@ func (q *Queries) ListAcks(ctx context.Context, reminderID string) ([]ListAcksRo
 }
 
 const listActiveReminders = `-- name: ListActiveReminders :many
-SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, profile, last_fired_at, source, owner, message, created_at, updated_at, fire_count, requires_ack FROM reminders
+SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, fire_count, profile, last_fired_at, source, owner, message, created_at, updated_at FROM reminders
 `
 
 func (q *Queries) ListActiveReminders(ctx context.Context) ([]Reminder, error) {
@@ -116,6 +116,8 @@ func (q *Queries) ListActiveReminders(ctx context.Context) ([]Reminder, error) {
 			&i.NextRunAt,
 			&i.RecurEverySeconds,
 			&i.ValidUntil,
+			&i.RequiresAck,
+			&i.FireCount,
 			&i.Profile,
 			&i.LastFiredAt,
 			&i.Source,
@@ -123,8 +125,6 @@ func (q *Queries) ListActiveReminders(ctx context.Context) ([]Reminder, error) {
 			&i.Message,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.FireCount,
-			&i.RequiresAck,
 		); err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func (q *Queries) ListActiveReminders(ctx context.Context) ([]Reminder, error) {
 }
 
 const listRemindersDueBefore = `-- name: ListRemindersDueBefore :many
-SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, profile, last_fired_at, source, owner, message, created_at, updated_at, fire_count, requires_ack FROM reminders
+SELECT id, schedule_kind, trigger_at, next_run_at, recur_every_seconds, valid_until, requires_ack, fire_count, profile, last_fired_at, source, owner, message, created_at, updated_at FROM reminders
 WHERE (
     (next_run_at IS NOT NULL AND next_run_at <= $1)
     OR (next_run_at IS NULL AND trigger_at <= $2)
@@ -168,6 +168,8 @@ func (q *Queries) ListRemindersDueBefore(ctx context.Context, arg ListRemindersD
 			&i.NextRunAt,
 			&i.RecurEverySeconds,
 			&i.ValidUntil,
+			&i.RequiresAck,
+			&i.FireCount,
 			&i.Profile,
 			&i.LastFiredAt,
 			&i.Source,
@@ -175,8 +177,6 @@ func (q *Queries) ListRemindersDueBefore(ctx context.Context, arg ListRemindersD
 			&i.Message,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.FireCount,
-			&i.RequiresAck,
 		); err != nil {
 			return nil, err
 		}

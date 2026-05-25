@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/mock/gomock"
+
 	"home-go/internal/domain/reminders"
 	"home-go/internal/domain/reminders/mocks"
-
-	"go.uber.org/mock/gomock"
 )
 
 var (
@@ -85,12 +85,12 @@ func TestManager_Ack_Complete_Removes(t *testing.T) {
 	mgr, repo, _ := newTestManager(t)
 
 	stored := reminders.Reminder{
-		ID:      "r1",
-		Targets: []string{"u1"},
+		ID:       "r1",
+		Targets:  []string{"u1"},
 		Schedule: reminders.Schedule{Kind: reminders.ScheduleKindOnce, TriggerAt: managerNow},
-		Policy:  reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
-		State:   reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
-		Meta:    reminders.Metadata{Message: "m"},
+		Policy:   reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
+		State:    reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
+		Meta:     reminders.Metadata{Message: "m"},
 	}
 
 	repo.EXPECT().GetByID(managerCtx, "r1").Return(stored, nil)
@@ -105,12 +105,12 @@ func TestManager_Ack_MultiTarget_NotComplete_Saves(t *testing.T) {
 	mgr, repo, _ := newTestManager(t)
 
 	stored := reminders.Reminder{
-		ID:      "r1",
-		Targets: []string{"u1", "u2"},
+		ID:       "r1",
+		Targets:  []string{"u1", "u2"},
 		Schedule: reminders.Schedule{Kind: reminders.ScheduleKindOnce, TriggerAt: managerNow},
-		Policy:  reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
-		State:   reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
-		Meta:    reminders.Metadata{Message: "m"},
+		Policy:   reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
+		State:    reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
+		Meta:     reminders.Metadata{Message: "m"},
 	}
 
 	// First ack from u1 still completes (any-ack policy)
@@ -126,12 +126,12 @@ func TestManager_Ack_NotTarget_Errors(t *testing.T) {
 	mgr, repo, _ := newTestManager(t)
 
 	stored := reminders.Reminder{
-		ID:      "r1",
-		Targets: []string{"u1"},
+		ID:       "r1",
+		Targets:  []string{"u1"},
 		Schedule: reminders.Schedule{Kind: reminders.ScheduleKindOnce, TriggerAt: managerNow},
-		Policy:  reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
-		State:   reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
-		Meta:    reminders.Metadata{Message: "m"},
+		Policy:   reminders.DeliveryPolicy{RequiresAck: true, Profile: reminders.ProfileNormal},
+		State:    reminders.State{CreatedAt: managerNow, UpdatedAt: managerNow},
+		Meta:     reminders.Metadata{Message: "m"},
 	}
 
 	repo.EXPECT().GetByID(managerCtx, "r1").Return(stored, nil)

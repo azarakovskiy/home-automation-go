@@ -398,7 +398,6 @@ func TestIsExpired(t *testing.T) {
 	}
 }
 
-
 // --- PolicyForProfile ---
 
 func TestPolicyForProfile(t *testing.T) {

@@ -44,9 +44,9 @@ func rowToReminder(row sqlc.Reminder, targets []string, ackRows []sqlc.ListAcksR
 	}
 
 	return reminders.Reminder{
-		ID:      row.ID,
-		Targets: targets,
-		Acks:    acks,
+		ID:       row.ID,
+		Targets:  targets,
+		Acks:     acks,
 		Schedule: sched,
 		Policy: reminders.DeliveryPolicy{
 			RequiresAck: row.RequiresAck,
