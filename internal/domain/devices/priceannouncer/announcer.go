@@ -33,13 +33,16 @@ type AnnouncerConfig struct {
 
 // Announcer owns all price announcement logic.
 type Announcer struct {
-	service      *pricing.Service
-	modes        pricing.ModeProvider
-	notification NotificationSender
-	db           AnnouncerStateStore
-	cfg          AnnouncerConfig
-	now          func() time.Time
-	formatter    MessageFormatter
+	service            *pricing.Service
+	modes              pricing.ModeProvider
+	notification       NotificationSender
+	db                 AnnouncerStateStore
+	cfg                AnnouncerConfig
+	now                func() time.Time
+	formatter          MessageFormatter
+	// lastAlertedRunFrom tracks the start of the most-recently alerted extreme run.
+	// In-memory only: at most one duplicate alert per run may fire after a restart — acceptable.
+	lastAlertedRunFrom time.Time
 }
 
 // New constructs an Announcer.
@@ -177,6 +180,11 @@ func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData
 		return
 	}
 
+	// Skip if this is the same run we already alerted on.
+	if from.Equal(a.lastAlertedRunFrom) {
+		return
+	}
+
 	dur := till.Sub(from)
 	hours := max(int(dur.Hours()), 1)
 
@@ -195,7 +203,10 @@ func (a *Announcer) handlePriceUpdate(_ *ga.Service, _ ga.State, _ ga.EntityData
 		},
 	}); err != nil {
 		log.Printf("Announcer: failed to send reactive alert: %v", err)
+		return
 	}
+
+	a.lastAlertedRunFrom = from
 }
 
 func (a *Announcer) sendDaySummary() {
