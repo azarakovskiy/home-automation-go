@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -109,7 +108,7 @@ func Run(cfg config.Config) error {
 		}
 	}()
 
-	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, startTime, db, cfg.MQTT.AppPrefix)
+	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, startTime, cfg.MQTT.AppPrefix)
 	if err != nil {
 		return err
 	}
@@ -120,7 +119,7 @@ func Run(cfg config.Config) error {
 	return nil
 }
 
-func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time, db *sql.DB, mqttPrefix string) ([]component.Component, error) {
+func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time, mqttPrefix string) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
 	priceService := pricing.NewService(app.GetState())
 

@@ -58,7 +58,7 @@ func New(
 func (a *Announcer) EventListeners() []ga.EventListener { return nil }
 
 // EntityListeners registers the reactive price-update trigger.
-// The morning trigger is registered externally by the caller via HandleMorning.
+// On-demand summaries are triggered via the MQTT price summary switch, not here.
 func (a *Announcer) EntityListeners() []ga.EntityListener {
 	return []ga.EntityListener{
 		ga.NewEntityListener().

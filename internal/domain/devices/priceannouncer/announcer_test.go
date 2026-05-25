@@ -239,6 +239,62 @@ func TestAnnouncer_Reactive_NoDuplicateAlert(t *testing.T) {
 	}
 }
 
+func TestAnnouncer_Reactive_SuppressedAtNight(t *testing.T) {
+	base := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
+	prices := []float64{0.10, 0.12, 0.40, 1.50, 1.40, 1.35, 0.15}
+	slots := make([]pricing.PriceSlot, len(prices))
+	for i, p := range prices {
+		slots[i] = pricing.PriceSlot{
+			From:  base.Add(time.Duration(i) * time.Hour),
+			Till:  base.Add(time.Duration(i+1) * time.Hour),
+			Price: p,
+		}
+	}
+	sender := &fakeSender{}
+	modes := &fakeModes{night: true}
+	svc := makePricingService(slots)
+
+	a := New(svc, modes, sender, AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+	})
+	a.now = func() time.Time { return base }
+
+	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+
+	if len(sender.events) != 0 {
+		t.Fatalf("expected no reactive alert during night, got %d", len(sender.events))
+	}
+}
+
+func TestAnnouncer_Reactive_SuppressedWhenAway(t *testing.T) {
+	base := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
+	prices := []float64{0.10, 0.12, 0.40, 1.50, 1.40, 1.35, 0.15}
+	slots := make([]pricing.PriceSlot, len(prices))
+	for i, p := range prices {
+		slots[i] = pricing.PriceSlot{
+			From:  base.Add(time.Duration(i) * time.Hour),
+			Till:  base.Add(time.Duration(i+1) * time.Hour),
+			Price: p,
+		}
+	}
+	sender := &fakeSender{}
+	modes := &fakeModes{away: true}
+	svc := makePricingService(slots)
+
+	a := New(svc, modes, sender, AnnouncerConfig{
+		SpikeMultiplier:    3.0,
+		MinExtremeDuration: time.Hour,
+	})
+	a.now = func() time.Time { return base }
+
+	a.handlePriceUpdate(nil, nil, ga.EntityData{})
+
+	if len(sender.events) != 0 {
+		t.Fatalf("expected no reactive alert when away, got %d", len(sender.events))
+	}
+}
+
 func TestAnnouncer_OnDemand_SuppressedAtNight(t *testing.T) {
 	base := time.Date(2024, 1, 1, 8, 0, 0, 0, time.UTC)
 	sender := &fakeSender{}
