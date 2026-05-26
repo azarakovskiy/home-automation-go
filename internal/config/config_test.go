@@ -4,13 +4,16 @@ import "testing"
 
 func TestLoad(t *testing.T) {
 	tests := []struct {
-		name         string
-		env          map[string]string
-		wantErr      bool
-		wantDebug    bool
-		wantDry      bool
-		wantHTTPHost string
-		wantHTTPPort int
+		name                       string
+		env                        map[string]string
+		wantErr                    bool
+		wantDebug                  bool
+		wantDry                    bool
+		wantHTTPHost               string
+		wantHTTPPort               int
+		wantMQTTAppName            string
+		wantMQTTDeviceNameSep      string
+		wantDatabaseDSN            string
 	}{
 		{
 			name: "loads config and runtime flags",
@@ -72,6 +75,38 @@ func TestLoad(t *testing.T) {
 			wantHTTPHost: "127.0.0.1",
 			wantHTTPPort: 9090,
 		},
+		{
+			name: "uses MQTT app name and separator defaults when env not set",
+			env: map[string]string{
+				"HA_URL":             "http://home-assistant:8123",
+				"HA_AUTH_TOKEN":      "token",
+				"HA_MQTT_BROKER_URL": "tcp://mqtt:1883",
+			},
+			wantMQTTAppName:       "home-go",
+			wantMQTTDeviceNameSep: " / ",
+		},
+		{
+			name: "reads MQTT_APP_NAME and MQTT_DEVICE_NAME_SEPARATOR from env",
+			env: map[string]string{
+				"HA_URL":                      "http://home-assistant:8123",
+				"HA_AUTH_TOKEN":               "token",
+				"HA_MQTT_BROKER_URL":          "tcp://mqtt:1883",
+				"MQTT_APP_NAME":               "my-app",
+				"MQTT_DEVICE_NAME_SEPARATOR":  "-",
+			},
+			wantMQTTAppName:       "my-app",
+			wantMQTTDeviceNameSep: "-",
+		},
+		{
+			name: "reads DATABASE_URL from env",
+			env: map[string]string{
+				"HA_URL":             "http://home-assistant:8123",
+				"HA_AUTH_TOKEN":      "token",
+				"HA_MQTT_BROKER_URL": "tcp://mqtt:1883",
+				"DATABASE_URL":       "postgres://user:pass@localhost:5432/home_go?sslmode=disable",
+			},
+			wantDatabaseDSN: "postgres://user:pass@localhost:5432/home_go?sslmode=disable",
+		},
 	}
 
 	for _, tt := range tests {
@@ -85,6 +120,8 @@ func TestLoad(t *testing.T) {
 			t.Setenv("DRY_RUN", "")
 			t.Setenv("HTTP_HOST", "")
 			t.Setenv("HTTP_PORT", "")
+			t.Setenv("MQTT_APP_NAME", "")
+			t.Setenv("MQTT_DEVICE_NAME_SEPARATOR", "")
 			t.Setenv("DATABASE_URL", "")
 
 			for key, value := range tt.env {
@@ -101,12 +138,12 @@ func TestLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load() error = %v", err)
 			}
-			assertConfig(t, cfg, tt.env, tt.wantDebug, tt.wantDry, tt.wantHTTPHost, tt.wantHTTPPort)
+			assertConfig(t, cfg, tt.env, tt.wantDebug, tt.wantDry, tt.wantHTTPHost, tt.wantHTTPPort, tt.wantMQTTAppName, tt.wantMQTTDeviceNameSep, tt.wantDatabaseDSN)
 		})
 	}
 }
 
-func assertConfig(t *testing.T, cfg Config, env map[string]string, wantDebug, wantDry bool, wantHTTPHost string, wantHTTPPort int) {
+func assertConfig(t *testing.T, cfg Config, env map[string]string, wantDebug, wantDry bool, wantHTTPHost string, wantHTTPPort int, wantMQTTAppName, wantMQTTDeviceNameSep, wantDatabaseDSN string) {
 	t.Helper()
 	if cfg.HAURL != env["HA_URL"] {
 		t.Fatalf("HAURL = %q, want %q", cfg.HAURL, env["HA_URL"])
@@ -135,6 +172,21 @@ func assertConfig(t *testing.T, cfg Config, env map[string]string, wantDebug, wa
 		}
 		if cfg.HTTP.Port != wantHTTPPort {
 			t.Fatalf("HTTP.Port = %d, want %d", cfg.HTTP.Port, wantHTTPPort)
+		}
+	}
+	if wantMQTTAppName != "" {
+		if cfg.MQTT.AppName != wantMQTTAppName {
+			t.Fatalf("MQTT.AppName = %q, want %q", cfg.MQTT.AppName, wantMQTTAppName)
+		}
+	}
+	if wantMQTTDeviceNameSep != "" {
+		if cfg.MQTT.DeviceNameSeparator != wantMQTTDeviceNameSep {
+			t.Fatalf("MQTT.DeviceNameSeparator = %q, want %q", cfg.MQTT.DeviceNameSeparator, wantMQTTDeviceNameSep)
+		}
+	}
+	if wantDatabaseDSN != "" {
+		if cfg.Database.DSN != wantDatabaseDSN {
+			t.Fatalf("Database.DSN = %q, want %q", cfg.Database.DSN, wantDatabaseDSN)
 		}
 	}
 }

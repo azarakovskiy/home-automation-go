@@ -28,10 +28,22 @@ DRY_RUN=true make run
 
 ## Environment Variables
 
-- `HA_URL` - Home Assistant URL
-- `HA_AUTH_TOKEN` - Long-lived access token
-- `DRY_RUN` - Enable dry-run mode
-- `DEBUG` - Enable verbose debug logging
+Copy `env.example` to `.env` and fill in the required values. Docker Compose reads from `.env` automatically.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `HA_URL` | yes | — | Home Assistant base URL (e.g. `http://homeassistant.local:8123`) |
+| `HA_AUTH_TOKEN` | yes | — | Long-lived access token (HA → Profile → Long-lived access tokens) |
+| `HA_MQTT_BROKER_URL` | yes | — | MQTT broker URL (e.g. `tcp://homeassistant.local:1883`) |
+| `HA_MQTT_USERNAME` | no | — | MQTT broker username |
+| `HA_MQTT_PASSWORD` | no | — | MQTT broker password |
+| `DATABASE_URL` | no | — | PostgreSQL connection URL (e.g. `postgres://user:pass@host:5432/db?sslmode=disable`) |
+| `HTTP_HOST` | no | `0.0.0.0` | HTTP server bind address |
+| `HTTP_PORT` | no | `8080` | HTTP server port |
+| `MQTT_APP_NAME` | no | `home-go` | MQTT client identifier and topic prefix |
+| `MQTT_DEVICE_NAME_SEPARATOR` | no | ` / ` | Separator used in MQTT device names |
+| `DRY_RUN` | no | `false` | Log device actions instead of executing them (`true`/`false`) |
+| `DEBUG` | no | `false` | Enable verbose debug logging (`true`/`false`) |
 
 ## Entity Generation
 
