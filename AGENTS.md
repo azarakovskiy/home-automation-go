@@ -5,11 +5,13 @@ This document contains coding standards, architectural patterns, and conventions
 ## Core Principles
 
 ### 1. Understand Before Implementing
+
 - **Never start coding before understanding requirements fully**
 - Ask clarifying questions if requirements are ambiguous
 - Review existing patterns and follow them
 
 ### 2. YAGNI (You Aren't Gonna Need It) - Balanced Approach
+
 - Only implement what's actually needed **now**
 - **Balance:** Start with proper architecture that enables extension, but don't over-engineer
 - Good abstractions make future development easier, but avoid adding unused features "just in case"
@@ -17,6 +19,7 @@ This document contains coding standards, architectural patterns, and conventions
 - **Rule of thumb:** Build for today's requirements with tomorrow's extensibility in mind, not next year's hypothetical features
 
 ### 3. Package Organization
+
 - Each component should be self-contained
 - Device-specific code stays with the device (e.g., `dishwasher/profile.go`)
 - Generic utilities go in appropriate shared packages
@@ -26,6 +29,7 @@ This document contains coding standards, architectural patterns, and conventions
   - `optimizer` package - pure optimization algorithms, no domain-specific types
 
 ### 4. Component Architecture
+
 - All components embed `component.Base` for common services
 - Components declare their own listener needs via methods:
   - `EventListeners()` - React to custom events
@@ -35,6 +39,7 @@ This document contains coding standards, architectural patterns, and conventions
 - Each component is registered in `cmd/home-go/main.go`
 
 ### State Persistence
+
 - Use Home Assistant entities for state that must survive restarts
 - Entity types available:
   - `input_boolean` - on/off states
@@ -47,6 +52,7 @@ This document contains coding standards, architectural patterns, and conventions
 ## Code Quality Standards
 
 ### Architecture vs. Simplicity Balance
+
 - **Good architecture enables growth** - Clean interfaces, proper separation of concerns, extensible patterns
 - **Over-engineering hinders velocity** - Complex abstractions for hypothetical use cases, excessive indirection
 - **When to invest in architecture:**
@@ -60,6 +66,7 @@ This document contains coding standards, architectural patterns, and conventions
 - **Example:** We created unified `optimizer.Optimizer` because dishwasher and chargers both needed price optimization (real need), not because "maybe someday we'll optimize heating" (hypothetical)
 
 ### Testing
+
 - Use table-driven tests for comprehensive coverage
 - Mock external dependencies using `mockgen`
 - Aim for meaningful coverage, not just high percentages
@@ -69,18 +76,21 @@ This document contains coding standards, architectural patterns, and conventions
 - Run `make test` before considering work complete
 
 ### Error Handling
+
 - Always handle errors explicitly
 - Log errors with context
 - Return errors up the stack, don't swallow them
 - Use `fmt.Errorf()` for error wrapping
 
 ### Logging
+
 - Use `debug.Log()` for verbose development logs
 - Control via `DEBUG=true` environment variable
 - Use standard `log.Printf()` for important events
 - Include context in log messages
 
 ### Code Readability
+
 - **Keep functions small and readable like a book** - each function should do one thing
 - Extract complex logic into well-named helper methods
 - Aim for functions under 20-30 lines when possible
@@ -88,6 +98,7 @@ This document contains coding standards, architectural patterns, and conventions
 - Example: Instead of one 100-line function with nested conditionals, create 4-5 functions with descriptive names that read naturally
 
 ### Cyclomatic Complexity
+
 - Keep functions under complexity 15
 - Extract helper functions when complexity grows
 - Use early returns to reduce nesting
@@ -111,12 +122,14 @@ This document contains coding standards, architectural patterns, and conventions
    - Finds **cheapest slots** within a window to charge/run
 
 ### Dynamic Savings Threshold
+
 - Uses exponential decay: `threshold = base + scale * e^(-decay * hours)`
 - More wait time allowed = lower threshold required
 - Special case: Night mode accepts any positive savings
 - No hard thresholds, smooth mathematical function
 
 ### Presence Detection
+
 - `component.Base` provides house mode helpers:
   - `IsAway()` - Check if house mode is Away/Travel
   - `IsAwayForDuration(duration)` - Check prolonged absence
@@ -125,6 +138,7 @@ This document contains coding standards, architectural patterns, and conventions
 - Use for safety features (e.g., disable chargers when away >2h)
 
 ### Notifications
+
 - Fire custom events via `notifications.NotificationService`
 - Each device constructs the complete message in human-readable format
 - Home Assistant automations handle text-to-speech delivery
@@ -132,6 +146,7 @@ This document contains coding standards, architectural patterns, and conventions
 - Use `notifications.FormatTimeForSpeech()` for natural time formats (e.g., "3 PM", "noon")
 
 ### Dry-Run Mode
+
 - Set `DRY_RUN=true` to test without actual device control
 - Wrapper in `dryrun` package logs actions instead of executing
 - Use for testing logic before deploying
@@ -139,15 +154,18 @@ This document contains coding standards, architectural patterns, and conventions
 ## Naming Conventions
 
 ### Packages
+
 - Device packages use singular names: `dishwasher`, `laptop`, not `dishwashers`
 - Group related functionality: `scheduler/optimizer`, `charger/laptop`
 
 ### Files
+
 - `component.go` - Main component implementation
 - `profile.go` - Device profiles and modes
 - `*_test.go` - Tests for the corresponding file
 
 ### Types
+
 - Components: `Dishwasher`, `LaptopCharger` (not `DishwasherComponent`)
 - Profiles: `Profile`, `ChargingProfile` (specific to domain)
 - Interfaces: Clear purpose in name (`DeviceProfile`, `Component`)
@@ -155,6 +173,7 @@ This document contains coding standards, architectural patterns, and conventions
 ## Time Handling
 
 ### Precision
+
 - Use `time.Duration` for exact timing, not hours as `int`
 - Example: `137 * time.Minute`, not `2` hours (rounded)
 - Match optimization intervals to pricing granularity:
@@ -162,6 +181,7 @@ This document contains coding standards, architectural patterns, and conventions
   - Charger optimization: 15 minutes (not 1 hour)
 
 ### Notifications
+
 - Use `notifications.FormatTimeForSpeech()` for human-readable for time formatting
 - Examples: "3 PM", "3:30 PM", "noon", "midnight"
 - Avoid technical formats: "15:00", "03:00"
@@ -170,22 +190,26 @@ This document contains coding standards, architectural patterns, and conventions
 ## Git Workflow
 
 ### Commit Approval
+
 - **NEVER commit code without explicit user approval**
 - **Wait for the user to say "commit" or "push" before executing git commands**
 - Present a summary of changes and ask for approval first
 - The user reviews and decides when code is ready to commit
 
 ### Commit Signing
+
 - Different key for personal and work repos (configured in git config)
 - All commits must be signed
 
 ### Branch Naming
+
 - `feature/*` - New features
 - `docs/*` - Documentation
 - `fix/*` - Bug fixes
 - `refactor/*` - Code restructuring
 
 ### Commit Messages
+
 - Use conventional commits format
 - `feat:` - New features
 - `fix:` - Bug fixes
@@ -197,6 +221,7 @@ This document contains coding standards, architectural patterns, and conventions
 ### Home Assistant Integration
 
 ### Entity Naming
+
 - Follow HA conventions: `domain.name`, specifically `domain.area_device_variable`, e.g. `input_text.kitchen_dishwasher_cost` means "an input text to store cost for dishwasher in the kitchen"
 - Use underscores: `input_boolean.office_laptop_charge_optimization_auto`
 - Define in `internal/tech/homeassistant/entities/custom_entities.go`. `internal/tech/homeassistant/entities/entities.go` is generated with `make generate`
@@ -210,6 +235,7 @@ This document contains coding standards, architectural patterns, and conventions
   - If entity exists in HA (like companion app sensors), it's already in `internal/tech/homeassistant/entities/entities.go` - use it directly
 
 ### Runtime MQTT Entities
+
 - The `internal/tech/homeassistant/entities` package also contains a runtime MQTT entity component for service-owned dynamic entities.
 - Prefer generated constants and HA helpers first. Reach for runtime MQTT entities only when the Go service must create and retire HA-visible entities dynamically.
 - Runtime MQTT entities are owned by the Go service, not by Home Assistant configuration.
@@ -220,11 +246,13 @@ This document contains coding standards, architectural patterns, and conventions
 - Never commit secrets or live Home Assistant credentials into runtime entity tests or examples.
 
 ### Event-Driven Architecture
+
 - Components react to events
 - Use appropriate listener types
 - Fire custom events for cross-component communication
 
 ### Automation Handoff
+
 - Go service fires events with structured data
 - Home Assistant automations handle presentation (TTS, mobile notifications, UI)
 - Service constructs messages with full context in human-readable language
@@ -233,12 +261,14 @@ This document contains coding standards, architectural patterns, and conventions
 ## Performance Considerations
 
 ### Optimization Frequency
+
 - Match pricing service update frequency
 - Current: 15-minute intervals for pricing
 - Chargers: 15-minute optimization cycles
 - Scheduled devices: On-demand when triggered
 
 ### Resource Usage
+
 - Avoid unnecessary API calls
 - Cache when appropriate
 - Use `debug.Log()` to avoid log spam in production
@@ -246,17 +276,20 @@ This document contains coding standards, architectural patterns, and conventions
 ## Testing Philosophy
 
 ### What to Test
+
 - Business logic and algorithms
 - Error handling paths
 - Edge cases (empty inputs, boundary values)
 - Integration between components
 
 ### What Not to Over-Test
+
 - Simple getters/setters
 - Pass-through functions
 - External library behavior
 
 ### Mock Strategy
+
 - Use `mockgen` with real production interfaces
 - Don't create test-only interfaces
 - Keep mocks in `internal/mocks/`
@@ -265,6 +298,7 @@ This document contains coding standards, architectural patterns, and conventions
 ## Common Patterns
 
 ### Service Initialization
+
 ```go
 // In cmd/home-go/main.go
 base := component.NewBase(component.BaseConfig{
@@ -276,6 +310,7 @@ comp := device.New(base, pricingService, ...)
 ```
 
 ### Profile Definition
+
 ```go
 // In device/profile.go
 var ProfileName = Profile{
@@ -287,6 +322,7 @@ var ProfileName = Profile{
 ```
 
 ### Event Handling
+
 ```go
 // In component.go
 func (c *Component) EventListeners() []ga.EventListener {
@@ -302,16 +338,19 @@ func (c *Component) EventListeners() []ga.EventListener {
 ## Debugging
 
 ### Debug Mode
+
 - Set `DEBUG=true` in environment
 - Enables verbose logging via `debug.Log()`
 - Shows optimization decisions, API calls, etc.
 
 ### Dry-Run Mode  
+
 - Set `DRY_RUN=true` in environment
 - Logs device control actions without executing
 - Safe for testing logic
 
 ### VS Code Launch Config
+
 - `.vscode/launch.json` configured for debugging
 - Can set environment variables in launch config
 - Breakpoints work normally
@@ -319,12 +358,14 @@ func (c *Component) EventListeners() []ga.EventListener {
 ## Documentation
 
 ### Code Comments
+
 - Document **why**, not what
 - Explain business logic and decisions
 - Use godoc format for public APIs
 - Keep comments up to date with code
 
 ### README
+
 - High-level architecture overview
 - Setup and installation instructions
 - Environment variables
@@ -332,10 +373,27 @@ func (c *Component) EventListeners() []ga.EventListener {
 - Keep the list of available automations up-to-date
 
 ### This File (AGENTS.md)
+
 - Patterns and conventions
 - Architectural decisions
 - Common pitfalls and how to avoid them
 - Update when new patterns emerge
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context. See `docs/agents/domain.md`.
 
 ---
 

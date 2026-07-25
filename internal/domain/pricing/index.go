@@ -87,6 +87,12 @@ func (idx PriceIndex) Level(slot PriceSlot) PriceLevel {
 // MedianPrice returns the median of all slot prices in the index.
 func (idx PriceIndex) MedianPrice() float64 { return idx.median }
 
+// CheapThreshold returns the price below which a slot is considered cheap.
+func (idx PriceIndex) CheapThreshold() float64 { return idx.cheapThreshold }
+
+// ExpensiveThreshold returns the price above which a slot is considered expensive.
+func (idx PriceIndex) ExpensiveThreshold() float64 { return idx.expThreshold }
+
 // IsExtreme reports whether a slot is extreme: negative or above spikeMultiplier × median.
 func (idx PriceIndex) IsExtreme(slot PriceSlot, spikeMultiplier float64) bool {
 	return slot.Price < 0 || slot.Price > idx.MedianPrice()*spikeMultiplier
