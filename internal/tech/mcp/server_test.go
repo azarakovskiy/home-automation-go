@@ -6,9 +6,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	mcppkg "home-go/internal/mocks/tech/mcp/pricing"
+	mcppkgpricing "home-go/internal/tech/mcp/pricing"
 
 	"go.uber.org/mock/gomock"
 )
@@ -173,5 +175,194 @@ func TestNewServer_ServesCurrentPrice(t *testing.T) {
 	}
 	if price["price"] != 0.42 {
 		t.Errorf("price = %v, want 0.42", price["price"])
+	}
+}
+
+// TestNewServer_ServesNextPrice is the end-to-end check for the
+// pricing_get_next_price tool.
+func TestNewServer_ServesNextPrice(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	svc := mcppkg.NewMockPricingService(ctrl)
+	want := mcppkgpricing.NextPriceInfo{
+		Price: 0.18,
+		From:  "2025-01-01T14:00:00Z",
+		Till:  "2025-01-01T15:00:00Z",
+		Level: "expensive",
+	}
+	svc.EXPECT().GetNextPrice(120).Return(want, nil)
+
+	srv := httptest.NewServer(NewServer(svc))
+	defer srv.Close()
+	sessionID := initializeSession(t, srv.URL)
+
+	callReq := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name":      "pricing_get_next_price",
+			"arguments": map[string]any{"window_minutes": float64(120)},
+		},
+	}
+	resp := postJSONWithSession(t, srv.URL, sessionID, callReq)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var rpc jsonRPCResponse
+	if err := json.Unmarshal(body, &rpc); err != nil {
+		t.Fatalf("unmarshal jsonrpc: %v; body = %s", err, body)
+	}
+	if rpc.Error != nil {
+		t.Fatalf("jsonrpc error: code=%d message=%q", rpc.Error.Code, rpc.Error.Message)
+	}
+
+	// Result shape: {"content": [{"type": "text", "text": "<json>"}], "isError": false}
+	var result struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+		IsError bool `json:"isError"`
+	}
+	if err := json.Unmarshal(rpc.Result, &result); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("result.IsError = true, want false")
+	}
+	if len(result.Content) != 1 {
+		t.Fatalf("content len = %d, want 1", len(result.Content))
+	}
+
+	var got mcppkgpricing.NextPriceInfo
+	if err := json.Unmarshal([]byte(result.Content[0].Text), &got); err != nil {
+		t.Fatalf("unmarshal tool text %q: %v", result.Content[0].Text, err)
+	}
+	if got != want {
+		t.Errorf("NextPriceInfo = %+v, want %+v", got, want)
+	}
+}
+
+// TestNewServer_ServesDailySummary is the end-to-end check for the
+// pricing_get_daily_summary tool.
+func TestNewServer_ServesDailySummary(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	svc := mcppkg.NewMockPricingService(ctrl)
+	want := mcppkgpricing.PriceSummary{
+		CurrentPrice:       0.12,
+		CurrentLevel:       "average",
+		MedianPrice:        0.11,
+		CheapThreshold:     0.08,
+		ExpensiveThreshold: 0.15,
+		MinPrice:           -0.02,
+		MaxPrice:           0.35,
+		AveragePrice:       0.12,
+		CheapWindows: []mcppkgpricing.PriceWindow{
+			{From: "2025-01-01T02:00:00Z", Till: "2025-01-01T05:00:00Z", AvgPrice: 0.05},
+		},
+	}
+	svc.EXPECT().GetPriceSummary().Return(want, nil)
+
+	srv := httptest.NewServer(NewServer(svc))
+	defer srv.Close()
+	sessionID := initializeSession(t, srv.URL)
+
+	callReq := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params":  map[string]any{"name": "pricing_get_daily_summary"},
+	}
+	resp := postJSONWithSession(t, srv.URL, sessionID, callReq)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var rpc jsonRPCResponse
+	if err := json.Unmarshal(body, &rpc); err != nil {
+		t.Fatalf("unmarshal jsonrpc: %v; body = %s", err, body)
+	}
+	if rpc.Error != nil {
+		t.Fatalf("jsonrpc error: code=%d message=%q", rpc.Error.Code, rpc.Error.Message)
+	}
+
+	var result struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(rpc.Result, &result); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if len(result.Content) != 1 {
+		t.Fatalf("content len = %d, want 1", len(result.Content))
+	}
+
+	var got mcppkgpricing.PriceSummary
+	if err := json.Unmarshal([]byte(result.Content[0].Text), &got); err != nil {
+		t.Fatalf("unmarshal tool text: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("PriceSummary = %+v, want %+v", got, want)
+	}
+}
+
+// TestNewServer_ServesCheapestWindow is the end-to-end check for the
+// pricing_find_cheapest_window tool.
+func TestNewServer_ServesCheapestWindow(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	svc := mcppkg.NewMockPricingService(ctrl)
+	want := mcppkgpricing.CheapestWindow{
+		From:     "2025-01-01T03:00:00Z",
+		Till:     "2025-01-01T05:00:00Z",
+		AvgPrice: 0.06,
+		Level:    "cheap",
+	}
+	svc.EXPECT().FindCheapestWindow(120, 720).Return(want, nil)
+
+	srv := httptest.NewServer(NewServer(svc))
+	defer srv.Close()
+	sessionID := initializeSession(t, srv.URL)
+
+	callReq := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name":      "pricing_find_cheapest_window",
+			"arguments": map[string]any{"duration_minutes": float64(120), "deadline_minutes": float64(720)},
+		},
+	}
+	resp := postJSONWithSession(t, srv.URL, sessionID, callReq)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var rpc jsonRPCResponse
+	if err := json.Unmarshal(body, &rpc); err != nil {
+		t.Fatalf("unmarshal jsonrpc: %v; body = %s", err, body)
+	}
+	if rpc.Error != nil {
+		t.Fatalf("jsonrpc error: code=%d message=%q", rpc.Error.Code, rpc.Error.Message)
+	}
+
+	var result struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(rpc.Result, &result); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if len(result.Content) != 1 {
+		t.Fatalf("content len = %d, want 1", len(result.Content))
+	}
+
+	var got mcppkgpricing.CheapestWindow
+	if err := json.Unmarshal([]byte(result.Content[0].Text), &got); err != nil {
+		t.Fatalf("unmarshal tool text: %v", err)
+	}
+	if got != want {
+		t.Errorf("CheapestWindow = %+v, want %+v", got, want)
 	}
 }
