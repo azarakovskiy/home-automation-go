@@ -35,7 +35,7 @@ func NewServer(pricingSrv pricing.PricingService) http.Handler {
 	), pricingHandler.CurrentPrice)
 
 	srv.AddTool(mcp.NewTool("pricing_get_next_price",
-		mcp.WithDescription("Return the next price change after now, within the requested window in minutes."),
+		mcp.WithDescription("Return the next price change after now. Requires: window_minutes — how far ahead to look, in minutes."),
 		mcp.WithNumber("window_minutes",
 			mcp.Description("How far ahead to look for the next price change, in minutes."),
 			mcp.Required(),
@@ -56,7 +56,7 @@ func NewServer(pricingSrv pricing.PricingService) http.Handler {
 	), pricingHandler.DailySummary)
 
 	srv.AddTool(mcp.NewTool("pricing_find_cheapest_window",
-		mcp.WithDescription("Find the cheapest consecutive block of slots for an appliance of the requested duration, within the requested deadline in minutes from now."),
+		mcp.WithDescription("Find the cheapest consecutive block of slots for an appliance. Requires: duration_minutes (how long the appliance runs) and deadline_minutes (how far ahead to search, in minutes from now)."),
 		mcp.WithNumber("duration_minutes",
 			mcp.Description("How long the appliance runs, in minutes."),
 			mcp.Required(),
