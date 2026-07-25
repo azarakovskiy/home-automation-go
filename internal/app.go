@@ -22,6 +22,7 @@ import (
 	healthhttp "home-go/internal/tech/http/health"
 	noisehttp "home-go/internal/tech/http/noise"
 	mcpsrv "home-go/internal/tech/mcp"
+	mcppkgpricing "home-go/internal/tech/mcp/pricing"
 	"home-go/internal/tech/postgres"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
@@ -115,7 +116,7 @@ func Run(cfg config.Config) error {
 	healthHTTPHandler := healthhttp.New(startTime)
 	noiseHTTPHandler := &noisehttp.Handler{}
 	priceService := pricing.NewService(app.GetState())
-	mcpHTTPHandler := mcpsrv.NewServer(priceService)
+	mcpHTTPHandler := mcpsrv.NewServer(mcppkgpricing.NewServiceAdapter(priceService, nil))
 	srv := apphttp.NewServer(cfg.HTTP.Host, cfg.HTTP.Port, noiseHTTPHandler.ServeNoise, healthHTTPHandler.ServeHealth, mcpHTTPHandler)
 	go func() {
 		if err := srv.Start(ctx); err != nil {

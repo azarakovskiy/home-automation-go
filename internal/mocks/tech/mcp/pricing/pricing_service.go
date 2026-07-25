@@ -10,6 +10,7 @@
 package pricing
 
 import (
+	pricing "home-go/internal/tech/mcp/pricing"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -39,6 +40,21 @@ func (m *MockPricingService) EXPECT() *MockPricingServiceMockRecorder {
 	return m.recorder
 }
 
+// FindCheapestWindow mocks base method.
+func (m *MockPricingService) FindCheapestWindow(durationMinutes, deadlineMinutes int) (pricing.CheapestWindow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindCheapestWindow", durationMinutes, deadlineMinutes)
+	ret0, _ := ret[0].(pricing.CheapestWindow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindCheapestWindow indicates an expected call of FindCheapestWindow.
+func (mr *MockPricingServiceMockRecorder) FindCheapestWindow(durationMinutes, deadlineMinutes any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindCheapestWindow", reflect.TypeOf((*MockPricingService)(nil).FindCheapestWindow), durationMinutes, deadlineMinutes)
+}
+
 // GetCurrentPrice mocks base method.
 func (m *MockPricingService) GetCurrentPrice() (float64, error) {
 	m.ctrl.T.Helper()
@@ -52,4 +68,34 @@ func (m *MockPricingService) GetCurrentPrice() (float64, error) {
 func (mr *MockPricingServiceMockRecorder) GetCurrentPrice() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentPrice", reflect.TypeOf((*MockPricingService)(nil).GetCurrentPrice))
+}
+
+// GetNextPrice mocks base method.
+func (m *MockPricingService) GetNextPrice(windowMinutes int) (pricing.NextPriceInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextPrice", windowMinutes)
+	ret0, _ := ret[0].(pricing.NextPriceInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNextPrice indicates an expected call of GetNextPrice.
+func (mr *MockPricingServiceMockRecorder) GetNextPrice(windowMinutes any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextPrice", reflect.TypeOf((*MockPricingService)(nil).GetNextPrice), windowMinutes)
+}
+
+// GetPriceSummary mocks base method.
+func (m *MockPricingService) GetPriceSummary() (pricing.PriceSummary, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPriceSummary")
+	ret0, _ := ret[0].(pricing.PriceSummary)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPriceSummary indicates an expected call of GetPriceSummary.
+func (mr *MockPricingServiceMockRecorder) GetPriceSummary() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPriceSummary", reflect.TypeOf((*MockPricingService)(nil).GetPriceSummary))
 }
