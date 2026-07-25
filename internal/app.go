@@ -21,6 +21,7 @@ import (
 	apphttp "home-go/internal/tech/http"
 	healthhttp "home-go/internal/tech/http/health"
 	noisehttp "home-go/internal/tech/http/noise"
+	mcpsrv "home-go/internal/tech/mcp"
 	"home-go/internal/tech/postgres"
 	"home-go/internal/tech/runtime/debug"
 	"home-go/internal/tech/runtime/dryrun"
@@ -113,14 +114,16 @@ func Run(cfg config.Config) error {
 
 	healthHTTPHandler := healthhttp.New(startTime)
 	noiseHTTPHandler := &noisehttp.Handler{}
-	srv := apphttp.NewServer(cfg.HTTP.Host, cfg.HTTP.Port, noiseHTTPHandler.ServeNoise, healthHTTPHandler.ServeHealth)
+	priceService := pricing.NewService(app.GetState())
+	mcpHTTPHandler := mcpsrv.NewServer(priceService)
+	srv := apphttp.NewServer(cfg.HTTP.Host, cfg.HTTP.Port, noiseHTTPHandler.ServeNoise, healthHTTPHandler.ServeHealth, mcpHTTPHandler)
 	go func() {
 		if err := srv.Start(ctx); err != nil {
 			log.Printf("ERROR: HTTP server: %v", err)
 		}
 	}()
 
-	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, startTime, cfg.MQTT.AppPrefix)
+	components, err := buildComponents(ctx, app, runtimeEntities, remindersManager, priceService, startTime, cfg.MQTT.AppPrefix)
 	if err != nil {
 		return err
 	}
@@ -131,9 +134,8 @@ func Run(cfg config.Config) error {
 	return nil
 }
 
-func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, startTime time.Time, mqttPrefix string) ([]component.Component, error) {
+func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities.Runtime, remindersManager *domainreminders.Manager, priceService *pricing.Service, startTime time.Time, mqttPrefix string) ([]component.Component, error) {
 	base := component.NewBase(app.GetService())
-	priceService := pricing.NewService(app.GetState())
 
 	notifier := notifications.NewNotificationService(app.GetService())
 	modeProvider := &haModeProvider{state: app.GetState()}

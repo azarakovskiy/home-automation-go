@@ -15,14 +15,16 @@ type Server struct {
 }
 
 // NewServer creates a Gin server bound to host:port.
-// Routes registered: GET /health and GET /noise/:type.
+// Routes registered: GET /health, GET /noise/:type, and any method on /mcp
+// for the MCP streamable-HTTP transport.
 // gin.Logger is intentionally omitted to suppress health-check log spam.
-func NewServer(host string, port int, noiseHandler gin.HandlerFunc, healthHandler gin.HandlerFunc) *Server {
+func NewServer(host string, port int, noiseHandler gin.HandlerFunc, healthHandler gin.HandlerFunc, mcpHandler nethttp.Handler) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	engine.GET("/health", healthHandler)
 	engine.GET("/noise/:type", noiseHandler)
+	engine.Any("/mcp", gin.WrapH(mcpHandler))
 
 	return &Server{
 		srv: &nethttp.Server{
