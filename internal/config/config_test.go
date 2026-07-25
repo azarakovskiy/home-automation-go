@@ -142,23 +142,20 @@ func TestLoad(t *testing.T) {
 	}
 }
 
+func checkField(t *testing.T, got, want, name string) {
+	t.Helper()
+	if got != want {
+		t.Fatalf("%s = %q, want %q", name, got, want)
+	}
+}
+
 func assertConfig(t *testing.T, cfg Config, env map[string]string, wantDebug, wantDry bool, wantHTTPHost string, wantHTTPPort int, wantMQTTAppName, wantMQTTDeviceNameSep, wantDatabaseDSN string) {
 	t.Helper()
-	if cfg.HAURL != env["HA_URL"] {
-		t.Fatalf("HAURL = %q, want %q", cfg.HAURL, env["HA_URL"])
-	}
-	if cfg.HAAuthToken != env["HA_AUTH_TOKEN"] {
-		t.Fatalf("HAAuthToken = %q, want %q", cfg.HAAuthToken, env["HA_AUTH_TOKEN"])
-	}
-	if cfg.MQTT.BrokerURL != env["HA_MQTT_BROKER_URL"] {
-		t.Fatalf("MQTT.BrokerURL = %q, want %q", cfg.MQTT.BrokerURL, env["HA_MQTT_BROKER_URL"])
-	}
-	if cfg.MQTT.Username != env["HA_MQTT_USERNAME"] {
-		t.Fatalf("MQTT.Username = %q, want %q", cfg.MQTT.Username, env["HA_MQTT_USERNAME"])
-	}
-	if cfg.MQTT.Password != env["HA_MQTT_PASSWORD"] {
-		t.Fatalf("MQTT.Password = %q, want %q", cfg.MQTT.Password, env["HA_MQTT_PASSWORD"])
-	}
+	checkField(t, cfg.HAURL, env["HA_URL"], "HAURL")
+	checkField(t, cfg.HAAuthToken, env["HA_AUTH_TOKEN"], "HAAuthToken")
+	checkField(t, cfg.MQTT.BrokerURL, env["HA_MQTT_BROKER_URL"], "MQTT.BrokerURL")
+	checkField(t, cfg.MQTT.Username, env["HA_MQTT_USERNAME"], "MQTT.Username")
+	checkField(t, cfg.MQTT.Password, env["HA_MQTT_PASSWORD"], "MQTT.Password")
 	if cfg.Debug != wantDebug {
 		t.Fatalf("Debug = %t, want %t", cfg.Debug, wantDebug)
 	}
