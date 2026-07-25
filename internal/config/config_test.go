@@ -4,16 +4,16 @@ import "testing"
 
 func TestLoad(t *testing.T) {
 	tests := []struct {
-		name                       string
-		env                        map[string]string
-		wantErr                    bool
-		wantDebug                  bool
-		wantDry                    bool
-		wantHTTPHost               string
-		wantHTTPPort               int
-		wantMQTTAppName            string
-		wantMQTTDeviceNameSep      string
-		wantDatabaseDSN            string
+		name                  string
+		env                   map[string]string
+		wantErr               bool
+		wantDebug             bool
+		wantDry               bool
+		wantHTTPHost          string
+		wantHTTPPort          int
+		wantMQTTAppName       string
+		wantMQTTDeviceNameSep string
+		wantDatabaseDSN       string
 	}{
 		{
 			name: "loads config and runtime flags",
@@ -46,12 +46,11 @@ func TestLoad(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "requires mqtt broker url",
+			name: "loads without mqtt broker url",
 			env: map[string]string{
 				"HA_URL":        "http://home-assistant:8123",
 				"HA_AUTH_TOKEN": "token",
 			},
-			wantErr: true,
 		},
 		{
 			name: "uses HTTP defaults when env not set",
@@ -82,17 +81,17 @@ func TestLoad(t *testing.T) {
 				"HA_AUTH_TOKEN":      "token",
 				"HA_MQTT_BROKER_URL": "tcp://mqtt:1883",
 			},
-			wantMQTTAppName:       "home-go",
+			wantMQTTAppName:       AppName,
 			wantMQTTDeviceNameSep: " / ",
 		},
 		{
 			name: "reads MQTT_APP_NAME and MQTT_DEVICE_NAME_SEPARATOR from env",
 			env: map[string]string{
-				"HA_URL":                      "http://home-assistant:8123",
-				"HA_AUTH_TOKEN":               "token",
-				"HA_MQTT_BROKER_URL":          "tcp://mqtt:1883",
-				"MQTT_APP_NAME":               "my-app",
-				"MQTT_DEVICE_NAME_SEPARATOR":  "-",
+				"HA_URL":                     "http://home-assistant:8123",
+				"HA_AUTH_TOKEN":              "token",
+				"HA_MQTT_BROKER_URL":         "tcp://mqtt:1883",
+				"MQTT_APP_NAME":              "my-app",
+				"MQTT_DEVICE_NAME_SEPARATOR": "-",
 			},
 			wantMQTTAppName:       "my-app",
 			wantMQTTDeviceNameSep: "-",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"home-go/internal/config"
@@ -72,29 +73,40 @@ func Run(cfg config.Config) error {
 	}
 	defer app.Cleanup()
 
-	runtimeEntities, err := entities.NewRuntime(entities.RuntimeConfig{
-		BrokerURL:           cfg.MQTT.BrokerURL,
-		Username:            cfg.MQTT.Username,
-		Password:            cfg.MQTT.Password,
-		DiscoveryPrefix:     cfg.MQTT.DiscoveryPrefix,
-		AppPrefix:           cfg.MQTT.AppPrefix,
-		AppName:             cfg.MQTT.AppName,
-		DeviceNameSeparator: cfg.MQTT.DeviceNameSeparator,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create runtime entities: %w", err)
+	// MQTT is optional: without a broker URL, MQTT-backed components are skipped.
+	var runtimeEntities *entities.Runtime
+	if strings.TrimSpace(cfg.MQTT.BrokerURL) != "" {
+		runtimeEntities, err = entities.NewRuntime(entities.RuntimeConfig{
+			BrokerURL:           cfg.MQTT.BrokerURL,
+			Username:            cfg.MQTT.Username,
+			Password:            cfg.MQTT.Password,
+			DiscoveryPrefix:     cfg.MQTT.DiscoveryPrefix,
+			AppPrefix:           cfg.MQTT.AppPrefix,
+			AppName:             cfg.MQTT.AppName,
+			DeviceNameSeparator: cfg.MQTT.DeviceNameSeparator,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create runtime entities: %w", err)
+		}
+		defer runtimeEntities.Close()
+	} else {
+		log.Printf("MQTT disabled (HA_MQTT_BROKER_URL not set): skipping MQTT-backed components")
 	}
-	defer runtimeEntities.Close()
 
-	db, err := postgres.Open(cfg.Database)
-	if err != nil {
-		return fmt.Errorf("open database: %w", err)
+	// The database is optional: without a DSN, the reminders component is skipped.
+	var remindersManager *domainreminders.Manager
+	if strings.TrimSpace(cfg.Database.DSN) != "" {
+		db, err := postgres.Open(cfg.Database)
+		if err != nil {
+			return fmt.Errorf("open database: %w", err)
+		}
+		defer db.Close()
+
+		notifSvc := notifications.NewNotificationService(app.GetService())
+		remindersManager = domainreminders.NewManager(postgres.NewRemindersRepo(db), notifications.NewReminderNotifier(notifSvc), time.Now)
+	} else {
+		log.Printf("Database disabled (DATABASE_URL not set): skipping reminders component")
 	}
-	defer db.Close()
-	remindersRepo := postgres.NewRemindersRepo(db)
-
-	notifSvc := notifications.NewNotificationService(app.GetService())
-	remindersManager := domainreminders.NewManager(remindersRepo, notifications.NewReminderNotifier(notifSvc), time.Now)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -139,6 +151,20 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 			Build(),
 	)
 
+	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
+	// vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
+
+	components := []component.Component{
+		priceService,
+		announcerComp,
+		laptopChargerComp,
+		// vacuumChargerComp,
+	}
+
+	if runtimeEntities == nil {
+		return components, nil
+	}
+
 	// On-demand trigger: an MQTT switch that sends the day summary when turned ON.
 	priceSummarySwitch, err := runtimeEntities.Switch(ctx, entities.SwitchSpec{
 		CommonSpec: entities.CommonSpec{
@@ -163,28 +189,23 @@ func buildComponents(ctx context.Context, app *ga.App, runtimeEntities *entities
 	if err != nil {
 		return nil, fmt.Errorf("build dishwasher component: %w", err)
 	}
-	laptopChargerComp := laptop.New(base, app.GetState(), priceService)
-	// vacuumChargerComp := vacuum.New(base, app.GetState(), priceService)
+	components = append(components, dishwasherComp)
 
-	remindersHandler := hareminders.New(base, runtimeEntities, remindersManager, hareminders.AdaptDeviceRuntime(runtimeEntities.ForDevice("Reminders")), mqttPrefix)
-	if err := remindersHandler.Start(ctx); err != nil {
-		return nil, fmt.Errorf("start reminders handler: %w", err)
+	if remindersManager != nil {
+		remindersHandler := hareminders.New(base, runtimeEntities, remindersManager, hareminders.AdaptDeviceRuntime(runtimeEntities.ForDevice("Reminders")), mqttPrefix)
+		if err := remindersHandler.Start(ctx); err != nil {
+			return nil, fmt.Errorf("start reminders handler: %w", err)
+		}
+		components = append(components, remindersHandler)
 	}
 
 	healthComp, err := svchealth.New(ctx, base, runtimeEntities, startTime)
 	if err != nil {
 		return nil, fmt.Errorf("build health component: %w", err)
 	}
+	components = append(components, healthComp)
 
-	return []component.Component{
-		priceService,
-		announcerComp,
-		dishwasherComp,
-		laptopChargerComp,
-		// vacuumChargerComp,
-		remindersHandler,
-		healthComp,
-	}, nil
+	return components, nil
 }
 
 func registerComponents(app *ga.App, components []component.Component) {

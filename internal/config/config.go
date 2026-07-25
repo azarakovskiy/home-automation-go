@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const AppName = "home-go"
+
 type Config struct {
 	HAURL       string
 	HAAuthToken string
@@ -45,8 +47,8 @@ func Load() (Config, error) {
 			Username:            os.Getenv("HA_MQTT_USERNAME"),
 			Password:            os.Getenv("HA_MQTT_PASSWORD"),
 			DiscoveryPrefix:     "homeassistant",
-			AppPrefix:           "home-go",
-			AppName:             envOrDefault("MQTT_APP_NAME", "home-go"),
+			AppPrefix:           AppName,
+			AppName:             envOrDefault("MQTT_APP_NAME", AppName),
 			DeviceNameSeparator: envOrDefault("MQTT_DEVICE_NAME_SEPARATOR", " / "),
 		},
 		Database: DatabaseConfig{
@@ -66,9 +68,8 @@ func Load() (Config, error) {
 	if strings.TrimSpace(cfg.HAAuthToken) == "" {
 		return Config{}, fmt.Errorf("HA_AUTH_TOKEN is not set")
 	}
-	if strings.TrimSpace(cfg.MQTT.BrokerURL) == "" {
-		return Config{}, fmt.Errorf("HA_MQTT_BROKER_URL is not set")
-	}
+	// MQTT and the database are optional: components that need them are
+	// skipped when HA_MQTT_BROKER_URL / DATABASE_URL are not set.
 
 	return cfg, nil
 }
